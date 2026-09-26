@@ -200,7 +200,7 @@ describe("the Remnant", () => {
   it("opens its core while it attacks", () => {
     const boss = spawn("remnant", 3) as RemnantBoss;
     // Standing within tendril reach: it wakes, winds up a slam, and the core opens.
-    for (let i = 0; i < 300 && boss.isArmoured("head"); i++) boss.update(1 / 30, level, perceive(4), [boss]);
+    for (let i = 0; i < 300 && boss.isArmoured("head"); i++) boss.update(1 / 30, level, perceive(4));
     expect(boss.isArmoured("head")).toBe(false);
     expect(boss.isArmoured("body")).toBe(true);
   });
