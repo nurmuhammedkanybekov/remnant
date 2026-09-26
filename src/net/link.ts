@@ -120,7 +120,10 @@ export class PeerLink {
         ? new MeteredSignaling(id, roomPeerId(code), key, role === "guest")
         : new Signaling(id, signalUrl ?? DEFAULT_SIGNAL_URL);
     this.signaling.onOpen = (reconnected: boolean) => {
-      this.status(reconnected ? "matchmaking reconnected" : role === "host" ? "room open, waiting" : "matchmaking connected");
+      const via = this.signaling instanceof MeteredSignaling ? "" : " (PeerJS)";
+      this.status(
+        reconnected ? `matchmaking reconnected${via}` : role === "host" ? `room open, waiting${via}` : `matchmaking connected${via}`
+      );
       // A guest calls the host once; after a reconnection mid-handshake the call already under way carries on.
       if (role === "guest" && !this.remoteId) void this.call();
     };
