@@ -6,6 +6,7 @@ export const VENTILATION: LevelDef = {
   id: "ventilation",
   name: "Sublevel 5",
   subtitle: "Ventilation",
+  tagline: "Count the turns. If the radio tells you a different way, count again.",
   objective: "Find a way through the ducts.",
   spawnYaw: -Math.PI / 2,
   theme: { fog: 0x040404, fogDensity: 0.075, wallTint: 0xb8b2a8, floorTint: 0xa8a298, fillIntensity: 0.8 },

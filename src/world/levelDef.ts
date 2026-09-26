@@ -36,6 +36,8 @@ export interface LevelDef {
   name: string;
   /** "Infirmary" */
   subtitle: string;
+  /** One line for the level's title card. */
+  tagline: string;
   objective: string;
   map: string[];
   notes: Record<string, string>;

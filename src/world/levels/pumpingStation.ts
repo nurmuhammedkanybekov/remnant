@@ -6,6 +6,7 @@ export const PUMPING_STATION: LevelDef = {
   id: "pumping-station",
   name: "Sublevel 7",
   subtitle: "Pumping Station",
+  tagline: "It hears the water. It hears everything.",
   objective: "Find the pump control keycard.",
   spawnYaw: -Math.PI / 2,
   theme: { fog: 0x040809, fogDensity: 0.065, wallTint: 0xb4c6bf, floorTint: 0xa8b8b0, skyLight: 0x4a6660, lampColor: 0xd8ffe8 },

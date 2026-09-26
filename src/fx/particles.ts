@@ -118,7 +118,10 @@ export class Effects {
   private readonly dust: THREE.Points;
   private readonly dustBase: Float32Array;
 
-  constructor(private readonly scene: THREE.Scene) {
+  constructor(
+    private readonly scene: THREE.Scene,
+    dustMotes = 260
+  ) {
     scene.add(this.sparks.points, this.blood.points);
 
     const decalGeo = new THREE.PlaneGeometry(0.16, 0.16);
@@ -139,7 +142,7 @@ export class Effects {
 
     // Dust motes: a box of points that follows the player; only the ones
     // inside the flashlight cone are visible (computed in the shader).
-    const N = 260;
+    const N = dustMotes;
     this.dustBase = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
       this.dustBase[i * 3] = (Math.random() - 0.5) * 10;
