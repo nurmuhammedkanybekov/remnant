@@ -1,18 +1,22 @@
 import * as THREE from "three";
 import { findPath } from "../world/pathfinding";
-import { ENEMIES, type EnemyDef, type EnemyKind } from "../content/enemies";
-import { circleHitsWall, hasLineOfSight, randomFloorNear, type LevelGrid } from "../world/grid";
-import { buildCreature, type CreatureRig } from "./enemyMesh";
+import { enemyDef, type EnemyDef, type EnemyKind } from "../content/enemies";
+import { circleHitsWall, hasLineOfSight, randomFloorNear, WALL_HEIGHT, type LevelGrid } from "../world/grid";
+import { buildBody, type CreatureBody } from "./bodies";
 
 /**
+ *  lurk        – waiting in ambush: clinging to the ceiling (Crawler) or hiding and luring (Mimic)
+ *  drop        – falling from the ceiling
  *  patrol      – wandering near home, unaware
  *  investigate – heard something, walking to where it came from
  *  chase       – has the player, pathing straight to them
- *  attack      – in reach: wind-up, then strike (you can dodge the wind-up)
+ *  attack      – wind-up, then strike or spit (you can dodge the wind-up)
  *  search      – lost the player, checking the last known position
  *  dead
  */
-export type EnemyState = "patrol" | "investigate" | "chase" | "attack" | "search" | "dead";
+export type EnemyState = "lurk" | "drop" | "patrol" | "investigate" | "chase" | "attack" | "search" | "dead";
+
+export type VocalKind = "idle" | "windup" | "hurt" | "death" | "drop" | "spit" | "takedown" | "slam" | "roar";
 
 /** Difficulty scaling applied on top of an enemy's definition. */
 export interface EnemyModifiers {
@@ -27,68 +31,106 @@ export const NO_MODIFIERS: EnemyModifiers = { health: 1, damage: 1, perception: 
 const VISION_HALF_ANGLE = Math.PI / 3; // 60° each side
 const SIGHT_DARK = 6; // how far they see you with your light off
 const SIGHT_LIT = 15; // ...and with it on (they see the beam)
+const TOUCH_RANGE = 1.1; // even blind creatures notice you bumping into them
 const LOSE_TIME = 3.5; // seconds without contact before chase → search
 const SEARCH_TIME = 6;
 const REPATH_INTERVAL = 0.4;
+/** Crawlers drop when you pass (almost) beneath them. */
+const DROP_RADIUS = 1.7;
+const DROP_TIME = 0.45;
+/** Mimics spring their ambush when you get this close. */
+const AMBUSH_RADIUS = 3.2;
+/** The flashlight beam: half-angle and how far it holds a Watcher. */
+const BEAM_HALF_ANGLE = 0.42;
+const BEAM_REACH = 20;
+/** Behind = more than this far round from where it's facing. */
+const BEHIND_ANGLE = THREE.MathUtils.degToRad(105);
+const MELEE_WINDUP_MAX = 0.45;
 
 export interface Perception {
   playerPos: THREE.Vector2;
   playerNoise: number; // current movement noise radius
+  /** The flashlight is on and actually lit. */
   torchOn: boolean;
   playerDead: boolean;
+  /** Eye position and view direction (for "is the beam on me?"). */
+  eye: THREE.Vector3;
+  look: THREE.Vector3;
 }
 
 export class Enemy {
   readonly kind: EnemyKind;
   readonly stats: EnemyDef;
-  readonly rig: CreatureRig;
+  /** Position and facing. The body hangs underneath. */
+  readonly root = new THREE.Group();
+  readonly body: CreatureBody;
+  readonly maxHealth: number;
   state: EnemyState = "patrol";
   health: number;
   /** 0..1 — how close this enemy is to noticing you by sight. */
   suspicion = 0;
+  /** A Watcher held in the flashlight beam. */
+  frozen = false;
 
   onAttackHit: ((damage: number, from: THREE.Vector2) => void) | null = null;
   onAlert: ((enemy: Enemy) => void) | null = null;
-  onVocal: ((enemy: Enemy, kind: "idle" | "windup" | "hurt" | "death") => void) | null = null;
+  onVocal: ((enemy: Enemy, kind: VocalKind) => void) | null = null;
+  /** Launch one projectile from `from` towards `target`. */
+  onRanged: ((enemy: Enemy, from: THREE.Vector3, target: THREE.Vector3) => void) | null = null;
+  /** A Mimic wants to make a sound to draw you in. */
+  onLure: ((enemy: Enemy) => void) | null = null;
 
-  private readonly home: THREE.Vector2;
-  private patrolTarget: THREE.Vector2;
-  private patrolWait = 0;
-  private path: THREE.Vector2[] = [];
-  private repathTimer = 0;
-  private lastKnown = new THREE.Vector2();
-  private sinceContact = 0;
-  private searchTimer = 0;
-  private attackTimer = 0;
-  private attackPhase: "windup" | "recover" | null = null;
-  private facing = Math.random() * Math.PI * 2;
-  private walkPhase = Math.random() * 10;
-  private speedNow = 0;
-  private hitFlash = 0;
-  private stagger = 0;
-  private deathT = 0;
-  private vocalTimer = 3 + Math.random() * 6;
-  private lookAround = 0;
+  protected readonly home: THREE.Vector2;
+  protected patrolTarget: THREE.Vector2;
+  protected patrolWait = 0;
+  protected path: THREE.Vector2[] = [];
+  protected repathTimer = 0;
+  protected lastKnown = new THREE.Vector2();
+  protected sinceContact = 0;
+  protected searchTimer = 0;
+  protected attackTimer = 0;
+  protected attackDuration = 1;
+  protected attackPhase: "windup" | "recover" | null = null;
+  protected attackKind: "melee" | "ranged" = "melee";
+  protected facing = Math.random() * Math.PI * 2;
+  protected walkPhase = Math.random() * 10;
+  protected speedNow = 0;
+  protected hitFlash = 0;
+  protected stagger = 0;
+  protected deathT = 0;
+  protected vocalTimer = 3 + Math.random() * 6;
+  protected lookAround = 0;
+  protected time = Math.random() * 100;
+  protected rangedCooldown = 1 + Math.random();
+  protected lureTimer = 4 + Math.random() * 6;
+  private dropT = 0;
+  private diedOnCeiling = false;
 
   constructor(
     private readonly scene: THREE.Scene,
     spawn: THREE.Vector2,
     kind: EnemyKind,
-    private readonly mods: EnemyModifiers = NO_MODIFIERS
+    protected readonly mods: EnemyModifiers = NO_MODIFIERS,
+    /** Tests pass a stand-in; the real bodies need a canvas for their textures. */
+    body?: CreatureBody
   ) {
     this.kind = kind;
-    this.stats = ENEMIES[kind];
-    this.health = this.stats.health * mods.health;
+    this.stats = enemyDef(kind);
+    this.maxHealth = this.stats.health * mods.health;
+    this.health = this.maxHealth;
     this.home = spawn.clone();
     this.patrolTarget = spawn.clone();
-    this.rig = buildCreature(this.stats.tint, this.stats.scale);
-    this.rig.root.position.set(spawn.x, 0, spawn.y);
-    this.rig.root.rotation.order = "YXZ"; // yaw first, so the death fall tips backwards relative to facing
-    scene.add(this.rig.root);
+    this.body = body ?? buildBody(this.stats);
+    this.root.add(this.body.group);
+    this.root.position.set(spawn.x, 0, spawn.y);
+    this.root.rotation.order = "YXZ";
+    if (this.stats.behaviour === "ceiling" || this.stats.behaviour === "lurker") this.state = "lurk";
+    if (this.onCeiling) this.hangFromCeiling(1);
+    scene.add(this.root);
   }
 
   get position2D(): THREE.Vector2 {
-    return new THREE.Vector2(this.rig.root.position.x, this.rig.root.position.z);
+    return new THREE.Vector2(this.root.position.x, this.root.position.z);
   }
 
   get isDead(): boolean {
@@ -99,40 +141,85 @@ export class Enemy {
     return this.state === "chase" || this.state === "attack";
   }
 
-  /** World-space hit volumes: head (bonus damage) and two body spheres. */
-  hitVolumes(): { head: THREE.Sphere; body: THREE.Sphere[] } {
-    const s = this.stats.scale;
-    const head = new THREE.Sphere(this.rig.head.getWorldPosition(new THREE.Vector3()), 0.17 * s);
-    const chest = new THREE.Sphere(this.rig.torso.localToWorld(new THREE.Vector3(0, 0.38, 0)), 0.3 * s);
-    const hips = new THREE.Sphere(this.rig.body.getWorldPosition(new THREE.Vector3()), 0.26 * s);
-    const legs = new THREE.Sphere(this.rig.root.position.clone().setY(0.45 * s), 0.25 * s);
-    return { head, body: [chest, hips, legs] };
+  get onCeiling(): boolean {
+    return this.stats.behaviour === "ceiling" && this.state === "lurk";
   }
 
-  takeDamage(amount: number, from: THREE.Vector2): boolean {
+  /** Direction it's facing, as a yaw angle (0 = +Z). */
+  get heading(): number {
+    return this.facing;
+  }
+
+  hitVolumes(): { head: THREE.Sphere; body: THREE.Sphere[] } {
+    return this.body.hitVolumes();
+  }
+
+  /** Damage from the player. `part` lets armoured creatures shrug off body hits. Returns true if this killed it. */
+  takeDamage(amount: number, from: THREE.Vector2, part: "head" | "body" = "body"): boolean {
     if (this.isDead) return false;
-    this.health -= amount;
-    this.hitFlash = 1;
-    this.stagger = Math.min(1, this.stagger + 0.6);
+    this.health -= amount * (part === "body" ? (this.stats.armor ?? 1) : 1);
     if (this.health <= 0) {
-      this.state = "dead";
-      this.onVocal?.(this, "death");
-      for (const g of this.rig.eyeGlow) g.visible = false;
+      this.hitFlash = 1;
+      this.die(true);
       return true;
     }
-    this.onVocal?.(this, "hurt");
-    // Getting shot always tells them where you are.
+    if (this.hitFlash < 0.3) this.onVocal?.(this, "hurt");
+    this.hitFlash = 1;
+    this.stagger = Math.min(1, this.stagger + 0.6);
+    // Getting hurt always tells them where you are.
     this.lastKnown.copy(from);
     this.sinceContact = 0;
-    if (!this.isHunting) this.enterChase();
+    if (this.onCeiling) this.startDrop();
+    else if (this.state !== "drop" && !this.isHunting) this.enterChase();
     return false;
+  }
+
+  /** True if a quiet melee strike from `from` would kill it outright. */
+  canBeTakenDown(from: THREE.Vector2): boolean {
+    if (this.isDead || !this.stats.takedown || this.onCeiling || this.state === "drop") return false;
+    if (this.frozen) return true; // locked in the light: helpless from any side
+    if (this.isHunting) return false;
+    const to = from.clone().sub(this.position2D);
+    return Math.abs(wrapAngle(Math.atan2(to.x, to.y) - this.facing)) > BEHIND_ANGLE;
+  }
+
+  /** Killed silently from behind. */
+  takedown(): void {
+    if (this.isDead) return;
+    this.health = 0;
+    this.hitFlash = 0.6;
+    this.onVocal?.(this, "takedown");
+    this.die(false);
+  }
+
+  /** A melee hit that didn't kill: knocked back and staggered. */
+  shove(dir: THREE.Vector2, distance: number, level: LevelGrid): void {
+    if (this.isDead || this.stats.behaviour === "boss") return;
+    this.stagger = 1;
+    const me = this.position2D;
+    const nx = me.x + dir.x * distance;
+    const nz = me.y + dir.y * distance;
+    if (!circleHitsWall(level, nx, me.y, this.stats.radius)) this.root.position.x = nx;
+    if (!circleHitsWall(level, this.root.position.x, nz, this.stats.radius)) this.root.position.z = nz;
+    // Interrupt a wind-up: that's the point of shoving.
+    if (this.state === "attack" && this.attackPhase === "windup") {
+      this.attackPhase = "recover";
+      this.attackTimer = this.stats.recover;
+      this.attackDuration = this.stats.recover;
+    }
+  }
+
+  protected die(vocal = false): void {
+    this.diedOnCeiling = this.onCeiling || this.state === "drop";
+    this.state = "dead";
+    if (vocal) this.onVocal?.(this, "death");
   }
 
   /** Removes the enemy without a death scene (it was killed before a checkpoint). */
   removeFromPlay(): void {
     this.health = 0;
     this.state = "dead";
-    this.rig.root.visible = false;
+    this.root.visible = false;
   }
 
   /** A loud noise (gunshot) at `pos`. `radius` is already reduced for walls by the caller. */
@@ -140,6 +227,11 @@ export class Enemy {
     if (this.isDead) return;
     if (this.position2D.distanceTo(pos) > radius * this.stats.hearing * this.mods.perception) return;
     this.lastKnown.copy(pos);
+    if (this.onCeiling) {
+      this.startDrop();
+      return;
+    }
+    if (this.state === "drop") return;
     if (this.isHunting) {
       this.sinceContact = 0;
       return;
@@ -147,25 +239,58 @@ export class Enemy {
     this.goInvestigate(pos);
   }
 
-  private enterChase(): void {
-    if (this.state === "patrol" || this.state === "search" || this.state === "investigate") this.onAlert?.(this);
+  /** Starts hunting the player at `pos` straight away (freshly summoned creatures). */
+  alertTo(pos: THREE.Vector2): void {
+    if (this.isDead) return;
+    this.lastKnown.copy(pos);
+    this.sinceContact = 0;
+    if (this.onCeiling) this.startDrop();
+    else this.enterChase();
+  }
+
+  protected enterChase(): void {
+    if (this.state !== "chase" && this.state !== "attack") this.onAlert?.(this);
     this.state = "chase";
     this.path = [];
     this.repathTimer = 0;
   }
 
   private goInvestigate(pos: THREE.Vector2): void {
-    if (this.state === "patrol") this.onAlert?.(this);
+    if (this.state === "patrol" || this.state === "lurk") this.onAlert?.(this);
     this.state = "investigate";
     this.lastKnown.copy(pos);
     this.path = [];
     this.repathTimer = 0;
   }
 
+  private startDrop(): void {
+    this.state = "drop";
+    this.dropT = 0;
+    this.onAlert?.(this);
+  }
+
+  /**
+   * k = 1: upside down on the ceiling, hands and feet in the concrete; 0: on
+   * the floor. In between it flips over as it falls.
+   */
+  private hangFromCeiling(k: number): void {
+    const g = this.body.group;
+    g.rotation.z = Math.PI * k;
+    g.position.y = WALL_HEIGHT * (1 - (1 - k) * (1 - k));
+  }
+
+  /** Is the flashlight beam on this creature? */
+  private inBeam(p: Perception, los: boolean): boolean {
+    if (!p.torchOn || !los) return false;
+    const chest = new THREE.Vector3(this.root.position.x, 1.1 * this.stats.scale, this.root.position.z).sub(p.eye);
+    const d = chest.length();
+    return d < BEAM_REACH && p.look.angleTo(chest) < BEAM_HALF_ANGLE + Math.atan2(0.4, d);
+  }
+
   update(dt: number, level: LevelGrid, p: Perception, others: Enemy[]): void {
+    this.time += dt;
     this.hitFlash = Math.max(0, this.hitFlash - dt * 6);
     this.stagger = Math.max(0, this.stagger - dt * 2.5);
-    this.rig.skin.emissive.setRGB(this.hitFlash * 0.6, this.hitFlash * 0.05, 0);
 
     if (this.isDead) {
       this.animateDeath(dt);
@@ -176,27 +301,72 @@ export class Enemy {
     const toPlayer = p.playerPos.clone().sub(me);
     const dist = toPlayer.length();
     const los = !p.playerDead && hasLineOfSight(level, me, p.playerPos);
-
-    // --- Sight ---
     const angleTo = Math.atan2(toPlayer.x, toPlayer.y);
-    const inCone = Math.abs(wrapAngle(angleTo - this.facing)) < VISION_HALF_ANGLE;
-    const sightRange = (p.torchOn ? SIGHT_LIT : SIGHT_DARK) * this.mods.perception;
+    const s = this.stats;
+
+    this.frozen = s.light === "freezes" && this.state !== "drop" && this.inBeam(p, los);
+
+    // --- Sight (blind creatures skip it; "ignores" means the beam doesn't give you away) ---
     const hunting = this.isHunting;
-    // Once hunting, they track you all round (they know roughly where you are).
-    const canSee = los && dist < sightRange && (inCone || hunting || dist < 2);
-    if (canSee) {
-      // Close = instant; far = suspicion builds over time (gives you a moment to duck away).
-      const rate = dist < sightRange * 0.4 ? 10 : 1.6 + (1 - dist / sightRange) * 2;
-      this.suspicion = Math.min(1, this.suspicion + rate * dt);
-    } else {
-      this.suspicion = Math.max(0, this.suspicion - dt * 0.35);
+    let canSee = false;
+    if (s.sight > 0 && !p.playerDead) {
+      const lit = p.torchOn && s.light !== "ignores";
+      const sightRange = (lit ? SIGHT_LIT : SIGHT_DARK) * this.mods.perception * s.sight;
+      const inCone = Math.abs(wrapAngle(angleTo - this.facing)) < VISION_HALF_ANGLE;
+      // Once hunting, they track you all round (they know roughly where you are).
+      canSee = los && dist < sightRange && (inCone || hunting || dist < 2);
+      if (canSee) {
+        // Close = instant; far = suspicion builds over time (gives you a moment to duck away).
+        const rate = dist < sightRange * 0.4 ? 10 : 1.6 + (1 - dist / sightRange) * 2;
+        this.suspicion = Math.min(1, this.suspicion + rate * dt);
+      }
     }
+    if (!canSee) this.suspicion = Math.max(0, this.suspicion - dt * 0.35);
+    const touch = !p.playerDead && los && dist < TOUCH_RANGE;
 
     // --- Hearing (movement noise; walls muffle it to 40%) ---
-    const heardRadius = p.playerNoise * this.stats.hearing * this.mods.perception * (los ? 1 : 0.4);
+    const heardRadius = p.playerNoise * s.hearing * this.mods.perception * (los ? 1 : 0.4);
     const canHear = !p.playerDead && dist < heardRadius;
 
-    if (!p.playerDead && (this.suspicion >= 1 || (hunting && (canSee || canHear)))) {
+    // --- Ambushers ---
+    if (this.state === "lurk") {
+      this.speedNow = 0;
+      if (this.onCeiling) {
+        if (!p.playerDead && ((dist < DROP_RADIUS && los) || canHear || this.suspicion >= 1)) {
+          this.lastKnown.copy(p.playerPos);
+          this.startDrop();
+        }
+      } else if (!p.playerDead && ((dist < AMBUSH_RADIUS && los) || canHear || this.suspicion >= 1 || touch)) {
+        this.lastKnown.copy(p.playerPos);
+        this.sinceContact = 0;
+        this.enterChase();
+      } else {
+        this.lureTimer -= dt;
+        if (this.lureTimer <= 0 && !p.playerDead) {
+          this.lureTimer = 9 + Math.random() * 8;
+          this.onLure?.(this);
+        }
+      }
+      this.finishFrame(dt, hunting);
+      return;
+    }
+    if (this.state === "drop") {
+      this.dropT += dt;
+      const k = Math.min(1, this.dropT / DROP_TIME);
+      this.hangFromCeiling(1 - k);
+      if (k >= 1) {
+        this.hangFromCeiling(0);
+        this.onVocal?.(this, "drop");
+        this.lastKnown.copy(p.playerDead ? me : p.playerPos);
+        this.sinceContact = 0;
+        this.stagger = 0.6;
+        this.enterChase();
+      }
+      this.finishFrame(dt, true);
+      return;
+    }
+
+    if (!p.playerDead && (this.suspicion >= 1 || touch || (hunting && (canSee || canHear)))) {
       this.lastKnown.copy(p.playerPos);
       this.sinceContact = 0;
       if (!hunting) this.enterChase();
@@ -212,57 +382,33 @@ export class Enemy {
       this.searchTimer = SEARCH_TIME;
     }
 
+    this.rangedCooldown -= dt;
+    // Locked by the light: it knows where you are, but it can't move or strike.
+    if (this.frozen) {
+      this.speedNow = 0;
+      this.finishFrame(dt, this.isHunting);
+      return;
+    }
+
     switch (this.state) {
       case "patrol":
         this.updatePatrol(dt, level, others);
         break;
       case "investigate":
-        if (this.followPathTo(dt, level, this.lastKnown, this.stats.investigateSpeed, others)) {
+        if (this.followPathTo(dt, level, this.lastKnown, s.investigateSpeed, others)) {
           this.state = "search";
           this.searchTimer = SEARCH_TIME * 0.6;
         }
         break;
       case "chase":
-        this.sinceContact += dt;
-        if (this.sinceContact > LOSE_TIME) {
-          this.state = "search";
-          this.searchTimer = SEARCH_TIME;
-          break;
-        }
-        if (dist < this.stats.attackRange && los) {
-          this.state = "attack";
-          this.attackPhase = "windup";
-          this.attackTimer = this.stats.windup;
-          this.onVocal?.(this, "windup");
-          break;
-        }
-        this.followPathTo(
-          dt,
-          level,
-          this.sinceContact < 0.2 ? p.playerPos : this.lastKnown,
-          this.stats.chaseSpeed * (1 - this.stagger * 0.7),
-          others
-        );
+        this.updateChase(dt, level, p, dist, los, angleTo, others);
         break;
       case "attack":
-        this.faceToward(angleTo, dt, 10);
-        this.speedNow = 0;
-        this.attackTimer -= dt;
-        if (this.attackPhase === "windup" && this.attackTimer <= 0) {
-          // Strike lands only if you're still in reach (plus a little lunge).
-          if (dist < this.stats.attackRange + 0.35 && los && !p.playerDead) {
-            this.onAttackHit?.(this.stats.attackDamage * this.mods.damage, me);
-          }
-          this.attackPhase = "recover";
-          this.attackTimer = this.stats.recover;
-        } else if (this.attackPhase === "recover" && this.attackTimer <= 0) {
-          this.attackPhase = null;
-          this.state = "chase";
-        }
+        this.updateAttack(dt, p, dist, los, angleTo, me);
         break;
       case "search":
         this.searchTimer -= dt;
-        if (this.followPathTo(dt, level, this.lastKnown, this.stats.investigateSpeed, others)) {
+        if (this.followPathTo(dt, level, this.lastKnown, s.investigateSpeed, others)) {
           // Look around at the spot.
           this.lookAround += dt;
           this.faceToward(this.facing + Math.sin(this.lookAround * 1.5) * 0.08, dt, 3);
@@ -270,22 +416,108 @@ export class Enemy {
         }
         if (this.searchTimer <= 0) {
           this.state = "patrol";
-          this.patrolTarget = randomFloorNear(level, this.home.x, this.home.y, 2);
+          this.patrolTarget = s.behaviour === "lurker" ? this.home.clone() : randomFloorNear(level, this.home.x, this.home.y, 2);
         }
         break;
     }
+    this.finishFrame(dt, hunting);
+  }
 
+  private updateChase(dt: number, level: LevelGrid, p: Perception, dist: number, los: boolean, angleTo: number, others: Enemy[]): void {
+    const s = this.stats;
+    this.sinceContact += dt;
+    if (this.sinceContact > LOSE_TIME) {
+      this.state = "search";
+      this.searchTimer = SEARCH_TIME;
+      return;
+    }
+    const target = this.sinceContact < 0.2 ? p.playerPos : this.lastKnown;
+    const speed = s.chaseSpeed * (1 - this.stagger * 0.7);
+    const r = s.behaviour === "ranged" ? s.ranged : undefined;
+    if (dist < s.attackRange && los) {
+      this.startAttack("melee");
+    } else if (r && los && dist <= r.range && this.rangedCooldown <= 0 && this.sinceContact < 0.5) {
+      this.startAttack("ranged");
+    } else if (r && los && dist < r.minRange) {
+      // Too close for comfort: back off, still facing you.
+      const me = this.position2D;
+      const away = me.clone().sub(p.playerPos).normalize();
+      this.moveToward(dt, level, me, me.clone().addScaledVector(away, 1.5), s.investigateSpeed, others);
+      this.faceToward(angleTo, dt, 10);
+    } else if (r && los && dist < r.range * 0.8) {
+      // In range: hold position and wait for the next spit.
+      this.speedNow = 0;
+      this.faceToward(angleTo, dt, 8);
+    } else {
+      this.followPathTo(dt, level, target, speed, others);
+    }
+  }
+
+  private startAttack(kind: "melee" | "ranged"): void {
+    this.state = "attack";
+    this.attackKind = kind;
+    this.attackPhase = "windup";
+    this.attackDuration = kind === "melee" && this.stats.ranged ? Math.min(this.stats.windup, MELEE_WINDUP_MAX) : this.stats.windup;
+    this.attackTimer = this.attackDuration;
+    this.onVocal?.(this, kind === "ranged" ? "spit" : "windup");
+  }
+
+  private updateAttack(dt: number, p: Perception, dist: number, los: boolean, angleTo: number, me: THREE.Vector2): void {
+    const s = this.stats;
+    this.faceToward(angleTo, dt, 10);
+    this.speedNow = 0;
+    this.attackTimer -= dt;
+    if (this.attackPhase === "windup" && this.attackTimer <= 0) {
+      if (this.attackKind === "ranged") {
+        const target = new THREE.Vector3(p.playerPos.x, Math.max(0.9, p.eye.y - 0.45), p.playerPos.y);
+        if (!p.playerDead) this.onRanged?.(this, this.body.mouth(), target);
+        this.rangedCooldown = (s.ranged?.cooldown ?? 2) * (0.8 + Math.random() * 0.4);
+      } else if (dist < s.attackRange + 0.35 && los && !p.playerDead) {
+        // Strike lands only if you're still in reach (plus a little lunge).
+        this.onAttackHit?.(s.attackDamage * this.mods.damage, me);
+      }
+      this.attackPhase = "recover";
+      this.attackTimer = s.recover;
+      this.attackDuration = s.recover;
+    } else if (this.attackPhase === "recover" && this.attackTimer <= 0) {
+      this.attackPhase = null;
+      this.state = "chase";
+    }
+  }
+
+  /** Vocals, facing and animation — the tail of every update. */
+  protected finishFrame(dt: number, hunting: boolean): void {
     this.vocalTimer -= dt;
     if (this.vocalTimer <= 0) {
       this.vocalTimer = (hunting ? 2 : 5) + Math.random() * 6;
-      this.onVocal?.(this, "idle");
+      // Mimics are silent except when they mean to be heard; frozen things can't make a sound.
+      const silent = (this.stats.behaviour === "lurker" && this.state === "lurk") || this.frozen;
+      if (!silent) this.onVocal?.(this, "idle");
     }
-
-    this.rig.root.rotation.y = this.facing;
-    this.animate(dt);
+    this.root.rotation.y = this.facing;
+    this.walkPhase += dt * this.speedNow * this.stats.stride;
+    this.body.pose({
+      time: this.time,
+      speed: this.speedNow,
+      walkPhase: this.walkPhase,
+      hunting: this.isHunting || this.state === "drop",
+      attack:
+        this.state === "attack" && this.attackPhase
+          ? { kind: this.attackKind, phase: this.attackPhase, k: 1 - Math.max(0, this.attackTimer) / this.attackDuration }
+          : null,
+      stagger: this.stagger,
+      frozen: this.frozen,
+    });
+    const agitation = this.isHunting ? 1 : this.state === "investigate" || this.state === "search" ? 0.5 : this.suspicion * 0.5;
+    this.body.glow(this.hitFlash, agitation, this.time);
   }
 
   private updatePatrol(dt: number, level: LevelGrid, others: Enemy[]): void {
+    if (this.stats.behaviour === "lurker") {
+      // Mimics go back to their hiding place and wait.
+      if (this.followPathTo(dt, level, this.home, this.stats.patrolSpeed, others)) this.state = "lurk";
+      return;
+    }
     if (this.patrolWait > 0) {
       this.patrolWait -= dt;
       this.speedNow = 0;
@@ -298,7 +530,7 @@ export class Enemy {
   }
 
   /** Walk along a BFS path to `target`. Returns true once arrived. */
-  private followPathTo(dt: number, level: LevelGrid, target: THREE.Vector2, speed: number, others: Enemy[]): boolean {
+  protected followPathTo(dt: number, level: LevelGrid, target: THREE.Vector2, speed: number, others: Enemy[]): boolean {
     const me = this.position2D;
     if (me.distanceTo(target) < 0.6) {
       this.speedNow = 0;
@@ -328,7 +560,7 @@ export class Enemy {
 
     // Separation so a pack doesn't merge into one blob.
     for (const o of others) {
-      if (o === this || o.isDead) continue;
+      if (o === this || o.isDead || o.onCeiling) continue;
       const away = me.clone().sub(o.position2D);
       const od = away.length();
       const minD = this.stats.radius + o.stats.radius + 0.2;
@@ -342,89 +574,39 @@ export class Enemy {
     let nz = me.y + dir.y * step;
     if (circleHitsWall(level, nx, me.y, r)) nx = me.x;
     if (circleHitsWall(level, nx, nz, r)) nz = me.y;
-    this.rig.root.position.x = nx;
-    this.rig.root.position.z = nz;
+    this.root.position.x = nx;
+    this.root.position.z = nz;
     this.speedNow = Math.hypot(nx - me.x, nz - me.y) / Math.max(dt, 1e-6);
     this.faceToward(Math.atan2(dir.x, dir.y), dt, 8);
   }
 
-  private faceToward(angle: number, dt: number, rate: number): void {
+  protected faceToward(angle: number, dt: number, rate: number): void {
     this.facing += wrapAngle(angle - this.facing) * Math.min(1, rate * dt);
   }
 
-  private animate(dt: number): void {
-    const r = this.rig;
-    const t = performance.now() / 1000;
-    this.walkPhase += dt * this.speedNow * this.stats.stride;
-    const stride = Math.min(1, this.speedNow / 2);
-    const s = Math.sin(this.walkPhase);
-    const c = Math.cos(this.walkPhase);
-
-    r.legL.rotation.x = s * 0.7 * stride;
-    r.legR.rotation.x = -s * 0.7 * stride;
-    r.shinL.rotation.x = Math.max(0, -c) * 0.9 * stride + 0.1;
-    r.shinR.rotation.x = Math.max(0, c) * 0.9 * stride + 0.1;
-    r.body.position.y = 0.95 - Math.abs(c) * 0.06 * stride + Math.sin(t * 1.3) * 0.01;
-
-    const hunting = this.isHunting;
-    // Idle twitch: the head jerks now and then.
-    const twitch = Math.sin(t * 7.3 + this.walkPhase) > 0.97 ? 0.25 : 0;
-    r.head.rotation.z = Math.sin(t * 0.9) * 0.15 + twitch;
-    r.jaw.position.y = -0.1 - (hunting ? 0.03 + Math.abs(Math.sin(t * 9)) * 0.02 : 0);
-
-    let armBase = hunting ? -1.1 : -0.15;
-    let armSwing = s * 0.5 * stride;
-    let foreBend = hunting ? -0.6 : -0.3;
-    let lean = hunting ? 0.75 : 0.5;
-
-    if (this.state === "attack") {
-      if (this.attackPhase === "windup") {
-        const k = 1 - this.attackTimer / this.stats.windup;
-        armBase = -1.2 - k * 1.6; // arms rise up and back
-        foreBend = -1.2;
-        lean = 0.35;
-        armSwing = 0;
-      } else {
-        const k = Math.min(1, (this.stats.recover - this.attackTimer) / 0.12);
-        armBase = -2.8 + k * 2.3; // slash down
-        foreBend = -0.2;
-        lean = 0.95;
-        armSwing = 0;
-      }
-    }
-    r.armL.rotation.x = armBase + armSwing;
-    r.armR.rotation.x = armBase - armSwing;
-    r.armL.rotation.z = -0.2;
-    r.armR.rotation.z = 0.2;
-    r.foreL.rotation.x = foreBend;
-    r.foreR.rotation.x = foreBend;
-    r.torso.rotation.x = lean - this.stagger * 0.5;
-
-    const pulse = 0.6 + 0.4 * Math.sin(t * (hunting ? 12 : 3));
-    for (const g of r.eyeGlow) g.material.opacity = (hunting ? 1 : 0.6) * pulse;
-  }
-
-  private animateDeath(dt: number): void {
+  protected animateDeath(dt: number): void {
     this.deathT += dt;
-    const k = Math.min(1, this.deathT / 0.7);
-    const ease = 1 - Math.pow(1 - k, 3);
-    const r = this.rig;
-    r.root.rotation.x = -ease * (Math.PI / 2 - 0.1);
-    r.root.position.y = ease * 0.15 * this.stats.scale;
-    r.legL.rotation.x = ease * -0.4;
-    r.legR.rotation.x = ease * 0.3;
-    r.armL.rotation.x = -1.5 * ease;
-    r.armR.rotation.x = -0.4 * ease;
-    // Eyes fade out
-    for (const e of r.eyes) (e.material as THREE.MeshBasicMaterial).color.setRGB(1 - ease * 0.9, 0.2 * (1 - ease), 0.1 * (1 - ease));
+    let t = this.deathT;
+    if (this.diedOnCeiling) {
+      // Fall from the ceiling first, then collapse.
+      const fall = Math.min(1, t / DROP_TIME);
+      this.hangFromCeiling(1 - fall);
+      if (fall < 1) {
+        this.body.glow(this.hitFlash, 0, this.time);
+        return;
+      }
+      t -= DROP_TIME;
+    }
+    const k = Math.min(1, t / 0.7);
+    this.body.die(1 - Math.pow(1 - k, 3));
   }
 
   dispose(): void {
-    this.scene.remove(this.rig.root);
+    this.scene.remove(this.root);
   }
 }
 
-function wrapAngle(a: number): number {
+export function wrapAngle(a: number): number {
   while (a > Math.PI) a -= Math.PI * 2;
   while (a < -Math.PI) a += Math.PI * 2;
   return a;

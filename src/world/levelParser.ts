@@ -1,5 +1,6 @@
-import type * as THREE from "three";
-import { ENEMY_GLYPHS, type EnemyKind } from "../content/enemies";
+import * as THREE from "three";
+import { ENEMY_GLYPHS, enemyDef, type EnemyKind } from "../content/enemies";
+import { ITEM_GLYPHS, type PickupType } from "../content/items";
 import { cellCenter, type Cell, type LevelGrid } from "./grid";
 import type { LevelDef } from "./levelDef";
 import { resolveTheme } from "./theme";
@@ -13,6 +14,11 @@ export interface LampSpawn {
   pos: THREE.Vector2;
   color: number;
   emergency: boolean;
+}
+
+export interface ItemSpawn {
+  type: PickupType;
+  pos: THREE.Vector2;
 }
 
 export interface EnemySpawn {
@@ -37,10 +43,8 @@ export interface TriggerSpawn extends CellSpawn {
 export interface Spawns {
   playerStart: THREE.Vector2;
   enemies: EnemySpawn[];
-  ammo: THREE.Vector2[];
-  medkits: THREE.Vector2[];
-  batteries: THREE.Vector2[];
-  keycards: THREE.Vector2[];
+  /** Every pickup except notes (ammo, medkits, batteries, keycards, weapons). */
+  items: ItemSpawn[];
   notes: NoteSpawn[];
   lamps: LampSpawn[];
   doors: DoorSpawn[];
@@ -87,10 +91,7 @@ export function parseLevel(def: LevelDef): ParsedLevel {
   const props: ParsedLevel["props"] = { walls: [], crates: [], barrels: [] };
   const spawns: Omit<Spawns, "playerStart" | "exit"> = {
     enemies: [],
-    ammo: [],
-    medkits: [],
-    batteries: [],
-    keycards: [],
+    items: [],
     notes: [],
     lamps: [],
     doors: [],
@@ -137,18 +138,6 @@ export function parseLevel(def: LevelDef): ParsedLevel {
           if (exitCell) fail(`more than one exit (second at ${col},${row})`);
           exitCell = { col, row };
           break;
-        case "A":
-          spawns.ammo.push(c);
-          break;
-        case "M":
-          spawns.medkits.push(c);
-          break;
-        case "B":
-          spawns.batteries.push(c);
-          break;
-        case "K":
-          spawns.keycards.push(c);
-          break;
         case "L":
           spawns.lamps.push({ pos: c, color: lampColor, emergency: false });
           break;
@@ -178,8 +167,17 @@ export function parseLevel(def: LevelDef): ParsedLevel {
           break;
         default: {
           const enemy = ENEMY_GLYPHS.get(ch);
+          const item = ITEM_GLYPHS.get(ch);
           if (enemy) {
-            spawns.enemies.push({ pos: c, kind: enemy });
+            // A pack (swarm) spreads round the cell in a fixed pattern, so spawn order stays deterministic.
+            const n = enemyDef(enemy).pack ?? 1;
+            for (let i = 0; i < n; i++) {
+              const a = (i / n) * Math.PI * 2;
+              const r = n > 1 ? 0.9 : 0;
+              spawns.enemies.push({ pos: new THREE.Vector2(c.x + Math.cos(a) * r, c.y + Math.sin(a) * r), kind: enemy });
+            }
+          } else if (item) {
+            spawns.items.push({ type: item, pos: c });
           } else if (ch >= "0" && ch <= "9") {
             const text = def.notes[ch];
             if (!text) fail(`note "${ch}" at ${col},${row} has no text in the notes table`);
@@ -204,6 +202,7 @@ export function parseLevel(def: LevelDef): ParsedLevel {
     fail(`${spawns.intercoms.length} intercoms (Y) on the map but ${intercomScripts} intercom scripts`);
   }
   if (spawns.consoles.length > 0 && !def.finale) fail("detonator console (Z) outside the finale");
+  if (spawns.enemies.filter((e) => enemyDef(e.kind).behaviour === "boss").length > 1) fail("more than one boss");
 
   const start = startCell!;
   const exit = exitCell!;

@@ -12,7 +12,14 @@ const SPEAKER_NAMES: Record<RadioLine["speaker"], string> = {
   operator: "OPERATOR — RADIO",
   aida: "AIDA",
   unknown: "??? — RADIO",
+  echo: "OPERATOR — NOT ON THE RADIO",
 };
+
+export interface WeaponSlot {
+  slot: number;
+  name: string;
+  owned: boolean;
+}
 
 export interface HudState {
   health: number; // 0..1
@@ -27,6 +34,13 @@ export interface HudState {
   threat: number; // 0..1
   spreadPx: number;
   hasKeycard: boolean;
+  weapon: string;
+  /** Single-loading weapons show "LOADING" rather than "RELOADING". */
+  singleLoad: boolean;
+  medkits: number;
+  healing: boolean;
+  /** The weapon slot in hand (1-based). */
+  slot: number;
 }
 
 export class Hud {
@@ -64,10 +78,14 @@ export class Hud {
         <div class="vrow health">${ICON.heart}<div class="vbar"><b class="lag" data-k="hpLag"></b><b class="fill" data-k="hp"></b></div><div class="vnum" data-k="hpNum"></div></div>
         <div class="vrow stamina">${ICON.run}<div class="vbar"><b class="fill" data-k="st"></b></div><div class="vnum"></div></div>
         <div class="vrow battery" data-k="batRow">${ICON.torch}<div class="vbar"><b class="fill" data-k="bat"></b></div><div class="vnum" data-k="batNum"></div></div>
+        <div class="medkits" data-k="med"><b>✚</b><span data-k="medNum"></span><kbd data-k="medKey"></kbd></div>
         <div class="keycard" data-k="key">▣ KEYCARD</div>
       </div>
+      <div class="boss" data-k="boss"><div class="name" data-k="bossName"></div><div class="bar"><b class="lag" data-k="bossLag"></b><b class="fill" data-k="bossHp"></b></div></div>
       <div class="noise"><div class="bars" data-k="noiseBars"></div><div class="lbl">NOISE</div></div>
       <div class="ammo">
+        <div class="slots" data-k="slots"></div>
+        <div class="wname" data-k="wname"></div>
         <div><span class="mag" data-k="mag"></span><span class="res" data-k="res"></span></div>
         <div class="pips" data-k="pips"></div>
         <div class="status" data-k="ammoStatus"></div>
@@ -102,6 +120,33 @@ export class Hud {
     }
   }
 
+  /** The weapon strip above the ammo counter. */
+  setWeapons(slots: WeaponSlot[]): void {
+    this.el.slots.innerHTML = slots
+      .map(
+        (w) => `<i data-slot="${w.slot}" class="${w.owned ? "owned" : ""}">${w.slot}<span>${w.owned ? w.name.toUpperCase() : ""}</span></i>`
+      )
+      .join("");
+    this.last.slot = undefined;
+  }
+
+  /** The heal key's label, shown next to the medkit count. */
+  setHealKey(key: string): void {
+    this.el.medKey.textContent = key;
+  }
+
+  /** The boss health bar. Pass null to hide it. */
+  boss(name: string | null, fraction = 0): void {
+    this.el.boss.classList.toggle("show", name !== null);
+    if (name === null) return;
+    if (this.el.bossName.textContent !== name.toUpperCase()) this.el.bossName.textContent = name.toUpperCase();
+    const pct = `${Math.max(0, fraction) * 100}%`;
+    if (this.el.bossHp.style.width !== pct) {
+      this.el.bossHp.style.width = pct;
+      this.el.bossLag.style.width = pct;
+    }
+  }
+
   setObjective(level: string, text: string): void {
     this.el.lvl.textContent = level.toUpperCase();
     this.el.obj.textContent = text;
@@ -123,18 +168,22 @@ export class Hud {
       this.el.batRow.classList.toggle("low", s.battery < 0.2);
       this.el.batRow.classList.toggle("off", !s.torchOn);
     }
-    if (L.mag !== s.mag || L.reserve !== s.reserve || L.reloading !== s.reloading) {
+    if (L.mag !== s.mag || L.reserve !== s.reserve || L.reloading !== s.reloading || L.healing !== s.healing || L.weapon !== s.weapon) {
       this.el.mag.textContent = `${s.mag}`;
       this.el.mag.classList.toggle("empty", s.mag === 0);
       this.el.res.textContent = `/ ${s.reserve}`;
       this.pips.forEach((p, i) => p.classList.toggle("spent", i >= s.mag));
-      this.el.ammoStatus.textContent = s.reloading
-        ? "RELOADING"
-        : s.mag === 0 && s.reserve === 0
-          ? "NO AMMO"
-          : s.mag <= 2 && s.reserve > 0
-            ? "[R] RELOAD"
-            : "";
+      this.el.ammoStatus.textContent = s.healing
+        ? "HEALING"
+        : s.reloading
+          ? s.singleLoad
+            ? "LOADING"
+            : "RELOADING"
+          : s.mag === 0 && s.reserve === 0
+            ? "NO AMMO"
+            : s.mag <= 2 && s.reserve > 0
+              ? "[R] RELOAD"
+              : "";
     }
     if (L.noise !== s.noise) {
       this.noiseBars.forEach((b, i) => {
@@ -158,6 +207,13 @@ export class Hud {
       r.style.left = `${g}px`;
     }
     if (L.hasKeycard !== s.hasKeycard) this.el.key.classList.toggle("show", s.hasKeycard);
+    if (L.weapon !== s.weapon) this.el.wname.textContent = s.weapon.toUpperCase();
+    if (L.slot !== s.slot)
+      this.el.slots.querySelectorAll<HTMLElement>("i").forEach((i) => i.classList.toggle("on", Number(i.dataset.slot) === s.slot));
+    if (L.medkits !== s.medkits) {
+      this.el.medNum.textContent = `×${s.medkits}`;
+      this.el.med.classList.toggle("none", s.medkits === 0);
+    }
     this.last = { ...s };
   }
 
@@ -242,6 +298,7 @@ export class Hud {
     this.el.intro.classList.remove("show");
     this.el.prompt.classList.remove("show");
     this.el.toasts.innerHTML = "";
+    this.boss(null);
   }
 
   intro(a: string, b: string): void {

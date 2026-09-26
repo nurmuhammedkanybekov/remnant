@@ -1,7 +1,7 @@
-import { aida, objective, op, radio } from "../../game/script";
+import { aida, hint, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
-/** Level 6 — a maze of ducts, and the first time the radio lies. */
+/** Level 6 — a maze of ducts, Crawlers overhead, a rivet gun, and the first time the radio lies. */
 export const VENTILATION: LevelDef = {
   id: "ventilation",
   name: "Sublevel 5",
@@ -11,25 +11,26 @@ export const VENTILATION: LevelDef = {
   theme: { fog: 0x040404, fogDensity: 0.075, wallTint: 0xb8b2a8, floorTint: 0xa8a298, fillIntensity: 0.8 },
   map: [
     "##########################",
-    "#S.a.#.....#..E....#.....#",
+    "#S.a.#.....#..V....#.....#",
     "###.##.###.#.#####.#.###.#",
-    "#...#..#1#.#.#...#...#B#.#",
+    "#^2.#..#1#.#.#...#...#B#.#",
     "#.###.##.#.#.#.#.#####.#.#",
-    "#.#...#..#...#.#.E...#...#",
+    "#.#...#..#.c.#.#.E...#...#",
     "#.#.###.######.#####.###.#",
-    "#.#.#.....L....#...#...#.#",
+    "#.#.#.J...L....#...#...#.#",
     "#.#.#.#######.##.#.###.#.#",
-    "#...#.#..E..#.#..#...#.#.#",
+    "#...#.#..Q..#.#..#...#.#.#",
     "#####.#.###.#.#.####.#.#.#",
     "#.....#.#Y#.#.#....#.#...#",
     "#.#####.#.#.#.####.#.###.#",
-    "#.#.....#...#.b....#.#.A.#",
+    "#.#.....#...#.b..J.#.#.A.#",
     "#.#.#########.######.#.###",
-    "#...E....*.......E.#...X.#",
+    "#...V....*.......E.#...X.#",
     "##########################",
   ],
   notes: {
     "1": "Note to self: count the turns. Left, left, right. If the radio tells you a different way, count again.",
+    "2": "MAINTENANCE: rivet guns are NOT to be used with the interlock removed. They will fire across a room. — Site Safety",
   },
   events: {
     start: [radio(op("Five is ventilation. It's a maze. Keep your light off and listen before every corner."))],
@@ -43,7 +44,17 @@ export const VENTILATION: LevelDef = {
     ],
   ],
   triggers: {
-    a: [radio(aida("Tight in here. If one of them finds me in a duct, there's nowhere to go."))],
+    a: [
+      radio(aida("Tight in here. If one of them finds me in a duct, there's nowhere to go.")),
+      hint("Get behind a creature that hasn't noticed you and press {melee} for a silent takedown"),
+    ],
+    c: [
+      radio(
+        op("Listen for clicking above you. The crews who stayed in the vents... they don't walk on the floor any more."),
+        aida("Great. Look up. Noted.")
+      ),
+      hint("Crawlers cling to the ceiling and drop when you pass beneath — sneak by, or shoot them down first"),
+    ],
     b: [
       radio(
         op("Aida? Are you still there? I haven't said anything for ten minutes."),

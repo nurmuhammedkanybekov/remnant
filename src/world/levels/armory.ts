@@ -1,7 +1,7 @@
-import { aida, checkpoint, objective, op, radio } from "../../game/script";
+import { aida, checkpoint, hint, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
-/** Level 8 — the consortium's security floor. Supplies, a big open hall, and a lot of company. */
+/** Level 8 — the consortium's security floor. A shotgun, a big open hall, and the Swarm. */
 export const ARMORY: LevelDef = {
   id: "armory",
   name: "Sublevel 3",
@@ -11,21 +11,21 @@ export const ARMORY: LevelDef = {
   theme: { fog: 0x060606, wallTint: 0xc8c4bc, floorTint: 0xb8b4ac, lampColor: 0xfff0d8 },
   map: [
     "################################",
-    "#......#.....L.....#...........#",
+    "#.T....#.....L.....#...........#",
     "#.A..1.D...........D....L...K..#",
     "#......#..C.....C..#...........#",
     "####D###...........####D########",
-    "#.......b...E...E..............#",
-    "#..C....C.........C....C...E...#",
+    "#.......b...%...E..............#",
+    "#..C....C.........C....C...%...#",
     "#...........L..........L.......#",
     "#..E....C....H....C..........A.#",
-    "#..C...........................#",
+    "#..C........T..................#",
     "#......*.....C...C.....H....C..#",
-    "#.M..........L..........E......#",
+    "#.M..........L..........%......#",
     "####D############=#######D######",
     "#......#.................#.....#",
     "#.A..B.#..R....X.....R...#.A.M.#",
-    "#......#.................#.....#",
+    "#..!...#.................#..T..#",
     "#......D.................D.....#",
     "#S.....#.................#.....#",
     "################################",
@@ -47,6 +47,10 @@ export const ARMORY: LevelDef = {
     ],
   },
   triggers: {
-    b: [radio(aida("That's a lot of them. Too many to fight.")), checkpoint()],
+    b: [
+      radio(aida("That's a lot of them. Too many to fight."), aida("And the floor's moving. Rats. Dozens of them.")),
+      hint("A Swarm is fast but fragile — the shotgun, or a boot, deals with it"),
+      checkpoint(),
+    ],
   },
 };

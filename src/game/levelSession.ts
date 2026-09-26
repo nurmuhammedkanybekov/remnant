@@ -1,12 +1,15 @@
 import * as THREE from "three";
 import type { SoundManager, Spatial } from "../audio/soundManager";
 import type { DifficultyDef } from "../content/difficulty";
-import type { EndingId } from "../content/story";
-import { ITEMS } from "../content/items";
-import { WEAPONS } from "../content/weapons";
+import { MIMIC_LINES, type EndingId } from "../content/story";
+import { HEAL_TIME, ITEMS, MAX_MEDKITS } from "../content/items";
+import { WEAPON_ORDER, WEAPONS, type WeaponId } from "../content/weapons";
 import { ACTIONS, type Action } from "../core/actions";
 import type { Engine } from "../core/engine";
+import { RemnantBoss } from "../enemies/boss";
+import type { Enemy, Perception } from "../enemies/enemy";
 import { EnemyManager } from "../enemies/enemyManager";
+import { Projectiles } from "../enemies/projectiles";
 import { Effects } from "../fx/particles";
 import { Pickup } from "../items/pickup";
 import type { PlayerCommand } from "../player/command";
@@ -15,14 +18,14 @@ import { DRY, NOISE_RADIUS, PlayerController, WATER } from "../player/playerCont
 import type { Hud } from "../ui/hud";
 import { Weapon } from "../weapons/weapon";
 import type { Viewmodel } from "../weapons/viewmodel";
-import { hasLineOfSight, raycastWorld, worldToCell } from "../world/grid";
+import { hasLineOfSight, isSolid, raycastWorld, worldToCell } from "../world/grid";
 import { CheckpointMarker, DetonatorConsole, Door, Generator, Intercom, type Interactable } from "../world/interactables";
 import { LampSystem } from "../world/lamps";
 import { buildLevel, type LevelData } from "../world/levelBuilder";
 import type { LevelDef } from "../world/levelDef";
 import { parseLevel } from "../world/levelParser";
 import type { CheckpointState } from "./checkpoint";
-import type { Loadout } from "./loadout";
+import type { Loadout, WeaponAmmo } from "./loadout";
 import { RadioChannel } from "./radio";
 import type { ScriptAction } from "./script";
 import { freshStats, type RunStats } from "./stats";
@@ -36,6 +39,14 @@ const GENERATOR_HUM_NOISE = 11;
 const GENERATOR_HUM_INTERVAL = 4.5;
 /** cos of the widest angle off-centre you can be looking and still use something. */
 const INTERACT_FACING = Math.cos(THREE.MathUtils.degToRad(55));
+const SWITCH_TIME = 0.45;
+const MELEE_COOLDOWN = 0.55;
+const MELEE_RANGE = 1.9;
+const MELEE_DAMAGE = 20;
+const MELEE_NOISE = 4;
+const TAKEDOWN_NOISE = 1.5;
+const MELEE_FACING = Math.cos(THREE.MathUtils.degToRad(50));
+const AMMO_LABEL: Record<WeaponId, string> = { pistol: "ROUNDS", rivet: "RIVETS", shotgun: "SHELLS" };
 
 /** The systems a session renders and plays sound through; owned by `Game`, shared across levels. */
 export interface SessionServices {
@@ -56,9 +67,12 @@ export class LevelSession {
   readonly level: LevelData;
   readonly player: PlayerController;
   readonly enemies: EnemyManager;
-  readonly weapon: Weapon;
   readonly stats: RunStats = freshStats();
   hasKeycard = false;
+  medkits: number;
+  /** Carried weapons, by id. */
+  private readonly weapons = new Map<WeaponId, Weapon>();
+  private currentWeapon: WeaponId;
 
   /** Fired once when the player's health reaches zero. */
   onDeath: (() => void) | null = null;
@@ -82,7 +96,15 @@ export class LevelSession {
   private readonly waterCells = new Set<number>();
   private readonly radio: RadioChannel;
   private readonly muzzleLight: THREE.PointLight;
+  private readonly projectiles: Projectiles;
+  private readonly boss: RemnantBoss | null;
   private objective: string;
+  private switchTimer = 0;
+  private healTimer = 0;
+  private meleeCooldown = 0;
+  private healHintShown = false;
+  /** Everything the boss has birthed; it dies with its mother. */
+  private readonly brood = new Set<Enemy>();
   private humTimer = 0;
   private muzzleTime = 0;
   private promptCooldown = 0;
@@ -109,9 +131,12 @@ export class LevelSession {
     this.radio = new RadioChannel(hud, sound);
     this.objective = def.objective;
 
+    // A checkpoint carries the loadout from the moment it was reached.
+    const start = restore?.loadout ?? loadout;
     this.player = new PlayerController(camera, this.level, sp.playerStart, def.spawnYaw);
-    this.player.health.current = loadout.health;
-    this.player.flashlight.battery = loadout.battery;
+    this.player.health.current = start.health;
+    this.player.flashlight.battery = start.battery;
+    this.medkits = start.medkits;
     this.player.flashlight.drainMultiplier = difficulty.batteryDrain;
     this.player.health.onDeath = () => this.handleDeath();
     this.player.health.onDamage = (amount, source) => this.handleDamage(amount, source);
@@ -123,17 +148,18 @@ export class LevelSession {
       damage: difficulty.enemyDamage,
       perception: difficulty.enemyPerception,
     });
-    for (const e of this.enemies.enemies) {
-      e.onAttackHit = (dmg, from) => this.player.health.takeDamage(dmg, from);
-      e.onAlert = (en) => sound.playEnemy("alert", en.stats.voicePitch, this.spatial(en.position2D));
-      e.onVocal = (en, kind) => sound.playEnemy(kind, en.stats.voicePitch, this.spatial(en.position2D));
-    }
+    this.projectiles = new Projectiles(scene, this.level);
+    this.projectiles.onHitPlayer = (dmg, from) => this.player.health.takeDamage(dmg, from);
+    this.projectiles.onSplash = (at) => {
+      this.effects.acidSplash(at);
+      sound.playAcidSplash(this.spatial(new THREE.Vector2(at.x, at.z)));
+    };
+    this.enemies.onSpawned = (e) => this.wireEnemy(e);
+    this.enemies.wireAll();
+    this.boss = this.enemies.boss;
 
     this.pickups = [
-      ...sp.ammo.map((p) => new Pickup(scene, "ammo", p)),
-      ...sp.medkits.map((p) => new Pickup(scene, "medkit", p)),
-      ...sp.batteries.map((p) => new Pickup(scene, "battery", p)),
-      ...sp.keycards.map((p) => new Pickup(scene, "keycard", p)),
+      ...sp.items.map((i) => new Pickup(scene, i.type, i.pos)),
       ...sp.notes.map((n) => new Pickup(scene, "note", n.pos, n.text)),
     ];
 
@@ -174,17 +200,21 @@ export class LevelSession {
     for (const t of sp.triggers) this.triggerCells.set(cellIndex(t.cell), t.key);
     for (const w of sp.water) this.waterCells.add(cellIndex(w.cell));
 
-    this.weapon = new Weapon(WEAPONS.pistol, loadout.reserve, loadout.mag);
-    this.weapon.onFire = () => sound.playGunshot();
-    this.weapon.onEmptyFire = () => sound.playEmptyClick();
-    this.weapon.onReloadStart = () => sound.playReload(this.weapon.config.reloadTime);
+    for (const id of WEAPON_ORDER) {
+      const ammo = start.weapons[id];
+      if (ammo) this.addWeapon(id, ammo);
+    }
+    this.currentWeapon = this.weapons.has(start.current) ? start.current : "pistol";
 
     this.muzzleLight = new THREE.PointLight(0xffb060, 0, 12, 1.6);
     this.muzzleLight.position.set(0.2, -0.1, -0.6);
     camera.add(this.muzzleLight);
 
     hud.setMagSize(this.weapon.config.magSize);
+    hud.setHealKey(services.keyFor("heal"));
+    this.refreshWeaponStrip();
     hud.intro(def.name, def.subtitle);
+    viewmodel.equip(this.currentWeapon, true);
     viewmodel.setVisible(true);
 
     if (restore) this.restore(restore);
@@ -192,13 +222,21 @@ export class LevelSession {
     this.refreshObjective();
   }
 
+  /** The weapon in hand. */
+  get weapon(): Weapon {
+    return this.weapons.get(this.currentWeapon)!;
+  }
+
   /** What the player is carrying right now. */
   get loadout(): Loadout {
+    const weapons: Loadout["weapons"] = {};
+    for (const [id, w] of this.weapons) weapons[id] = { mag: w.ammoInMag, reserve: w.reserveAmmo };
     return {
       health: this.player.health.current,
       battery: this.player.flashlight.battery,
-      mag: this.weapon.ammoInMag,
-      reserve: this.weapon.reserveAmmo,
+      medkits: this.medkits,
+      weapons,
+      current: this.currentWeapon,
     };
   }
 
@@ -208,7 +246,7 @@ export class LevelSession {
 
   /** The keycard opens security doors if there are any, otherwise the exit. */
   private get keycardLocksExit(): boolean {
-    return this.level.spawns.keycards.length > 0 && !this.doors.some((d) => d.security);
+    return this.level.spawns.items.some((i) => i.type === "keycard") && !this.doors.some((d) => d.security);
   }
 
   // ------------------------------------------------------------------ simulation
@@ -224,17 +262,12 @@ export class LevelSession {
     const cellI = cell.row * this.level.cols + cell.col;
     this.player.terrain = this.waterCells.has(cellI) ? WATER : DRY;
     this.player.update(dt, cmd);
+    this.keepOutOfBoss();
     this.checkTriggers();
 
-    this.enemies.update(dt, {
-      playerPos: this.player.position2D,
-      playerNoise: this.player.noiseRadius,
-      torchOn: this.player.flashlight.on,
-      playerDead: this.player.health.isDead,
-    });
-    this.weapon.update(dt);
-    if (cmd.reload) this.weapon.tryReload();
-    if (cmd.fire) this.fire();
+    this.enemies.update(dt, this.perception(false));
+    this.projectiles.update(dt, this.player.position, this.player.position.y, this.player.health.isDead);
+    this.updateCombat(dt, cmd);
     this.updatePickups(dt);
     this.updateInteraction(dt, cmd.interact);
     this.updateGenerators(dt);
@@ -250,7 +283,7 @@ export class LevelSession {
       this.player.lookDelta.y,
       this.player.moveFactor,
       this.player.isSprinting,
-      this.weapon.reloadProgress,
+      this.switchTimer > 0 ? 0 : this.weapon.reloadProgress,
       this.player.flashlight.level
     );
 
@@ -260,6 +293,7 @@ export class LevelSession {
     sound.updateHeartbeat(dt, hp);
     sound.updateAmbient(dt);
     this.updateHud();
+    this.updateBossBar();
 
     if (!this.finished) this.checkExit();
   }
@@ -271,11 +305,103 @@ export class LevelSession {
     const cam = engine.camera;
     cam.position.y = THREE.MathUtils.lerp(cam.position.y, 0.35, 1 - Math.exp(-dt * 3));
     cam.rotation.z = THREE.MathUtils.lerp(cam.rotation.z, 0.9, 1 - Math.exp(-dt * 2));
-    this.enemies.update(dt, { playerPos: this.player.position2D, playerNoise: 0, torchOn: false, playerDead: true });
+    this.enemies.update(dt, this.perception(true));
+    this.projectiles.update(dt, this.player.position, this.player.position.y, true);
     this.lamps.update(dt, this.player.position, this.time);
     this.effects.update(dt, cam, this.player.flashlight.level, this.time);
     this.damageFx = Math.max(0.4, this.damageFx - dt);
     engine.setPostFx(this.damageFx, 1, this.time);
+  }
+
+  /** What the creatures can sense this frame. */
+  private perception(dead: boolean): Perception {
+    const cam = this.services.engine.camera;
+    const torch = this.player.flashlight;
+    return {
+      playerPos: this.player.position2D,
+      playerNoise: dead ? 0 : this.player.noiseRadius,
+      torchOn: !dead && torch.on && torch.level > 0.3,
+      playerDead: dead || this.player.health.isDead,
+      eye: cam.getWorldPosition(new THREE.Vector3()),
+      look: cam.getWorldDirection(new THREE.Vector3()),
+    };
+  }
+
+  /** The Remnant is solid: you can't walk into it. */
+  private keepOutOfBoss(): void {
+    const b = this.boss;
+    if (!b || b.isDead) return;
+    const d = this.player.position2D.sub(b.position2D);
+    const min = b.stats.radius + 0.4;
+    const len = d.length();
+    if (len >= min || len < 1e-6) return;
+    d.multiplyScalar(min / len);
+    this.player.position.x = b.position2D.x + d.x;
+    this.player.position.z = b.position2D.y + d.y;
+  }
+
+  private wireEnemy(e: Enemy): void {
+    const { sound } = this.services;
+    e.onAttackHit = (dmg, from) => {
+      this.player.health.takeDamage(dmg, from);
+      if (e.stats.behaviour === "boss") this.player.addTrauma(0.6);
+    };
+    e.onAlert = (en) => sound.playEnemy("alert", en.stats.voicePitch, this.spatial(en.position2D));
+    e.onVocal = (en, kind) => {
+      sound.playEnemy(kind, en.stats.voicePitch, this.spatial(en.position2D));
+      if (kind === "slam" && en.position2D.distanceTo(this.player.position2D) < 14) this.player.addTrauma(0.35);
+    };
+    e.onRanged = (en, from, target) => {
+      const r = en.stats.ranged;
+      if (r) this.projectiles.spawn(from, target, r.speed, r.damage * this.difficulty.enemyDamage);
+    };
+    e.onLure = (en) => this.handleLure(en);
+    if (e instanceof RemnantBoss) {
+      e.onPhase = (phase) => this.handleBossPhase(phase);
+      e.onSummon = (boss) => this.handleSummon(boss);
+    }
+  }
+
+  /** A Mimic makes a sound to draw you in: your own footsteps, a pickup, or the Operator's voice. */
+  private handleLure(e: Enemy): void {
+    const pos = e.position2D;
+    if (pos.distanceTo(this.player.position2D) > 26) return;
+    const sp = this.spatial(pos);
+    const r = Math.random();
+    if (r < 0.45 && this.radio.sayFrom({ speaker: "echo", text: MIMIC_LINES[Math.floor(Math.random() * MIMIC_LINES.length)] }, sp)) return;
+    this.services.sound.playLure(r < 0.75 ? "footsteps" : "pickup", sp);
+  }
+
+  private handleBossPhase(phase: number): void {
+    const b = this.boss!;
+    this.player.addTrauma(0.7);
+    this.services.hud.toast(`THE REMNANT — PHASE ${phase}`, "var(--ui-red)");
+    // The scream reaches every creature on the level.
+    this.enemies.emitNoise(b.position2D, 60);
+    this.run((phase === 2 ? this.def.events?.bossPhase2 : this.def.events?.bossPhase3) ?? []);
+  }
+
+  /** The mass births a swarm (and later, a husk) between itself and the player. */
+  private handleSummon(boss: RemnantBoss): void {
+    const b = boss.position2D;
+    const toward = this.player.position2D.sub(b).normalize();
+    const base = b.clone().addScaledVector(toward, boss.stats.radius + 1.6);
+    const count = boss.phase >= 3 ? 4 : 3;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const p = base.clone().add(new THREE.Vector2(Math.cos(a), Math.sin(a)).multiplyScalar(0.7));
+      this.spawnNear("swarm", p);
+    }
+    if (boss.phase >= 3) this.spawnNear("husk", base);
+    this.services.sound.playEnemy("spit", 0.5, this.spatial(base));
+  }
+
+  private spawnNear(kind: "swarm" | "husk", p: THREE.Vector2): void {
+    const c = worldToCell(p.x, p.y);
+    if (isSolid(this.level, c.col, c.row)) return;
+    const e = this.enemies.spawn(kind, p);
+    e.alertTo(this.player.position2D);
+    this.brood.add(e);
   }
 
   // ------------------------------------------------------------------ scripting
@@ -441,40 +567,193 @@ export class LevelSession {
 
   // ------------------------------------------------------------------ combat & pickups
 
+  // ------------------------------------------------------------------ weapons
+
+  private addWeapon(id: WeaponId, ammo: WeaponAmmo): Weapon {
+    const { sound } = this.services;
+    const w = new Weapon(WEAPONS[id], ammo.reserve, ammo.mag);
+    w.onFire = () => sound.playGunshot(id);
+    w.onEmptyFire = () => sound.playEmptyClick();
+    w.onReloadStart = () => (w.config.reload === "single" ? undefined : sound.playReload(w.config.reloadTime));
+    w.onRoundLoaded = () => sound.playShellLoad();
+    this.weapons.set(id, w);
+    return w;
+  }
+
+  private refreshWeaponStrip(): void {
+    this.services.hud.setWeapons(
+      WEAPON_ORDER.map((id) => ({ slot: WEAPONS[id].slot, name: WEAPONS[id].name, owned: this.weapons.has(id) }))
+    );
+  }
+
+  private get busy(): boolean {
+    return this.switchTimer > 0 || this.healTimer > 0;
+  }
+
+  private updateCombat(dt: number, cmd: PlayerCommand): void {
+    this.switchTimer = Math.max(0, this.switchTimer - dt);
+    this.meleeCooldown = Math.max(0, this.meleeCooldown - dt);
+    if (this.healTimer > 0) {
+      this.healTimer -= dt;
+      if (this.healTimer <= 0) this.finishHeal();
+    }
+    this.weapon.update(dt);
+
+    if (cmd.selectSlot) {
+      const id = WEAPON_ORDER.find((w) => WEAPONS[w].slot === cmd.selectSlot);
+      if (id) this.switchTo(id);
+    } else if (cmd.cycleWeapon) {
+      const owned = WEAPON_ORDER.filter((w) => this.weapons.has(w));
+      const i = owned.indexOf(this.currentWeapon);
+      this.switchTo(owned[(i + cmd.cycleWeapon + owned.length) % owned.length]);
+    }
+    if (cmd.heal) this.startHeal();
+    if (cmd.melee) this.melee();
+    if (cmd.reload && !this.busy) this.weapon.tryReload();
+    if (cmd.fire) this.fire();
+  }
+
+  private switchTo(id: WeaponId): void {
+    if (id === this.currentWeapon || !this.weapons.has(id) || this.healTimer > 0) return;
+    this.weapon.cancelReload();
+    this.currentWeapon = id;
+    this.switchTimer = SWITCH_TIME;
+    this.services.viewmodel.equip(id);
+    this.services.sound.playWeaponSwitch();
+    this.services.hud.setMagSize(this.weapon.config.magSize);
+  }
+
+  private startHeal(): void {
+    const { hud, sound, viewmodel } = this.services;
+    const health = this.player.health;
+    if (this.healTimer > 0 || this.switchTimer > 0) return;
+    if (this.medkits <= 0) return this.throttledPrompt("NO MEDKITS");
+    if (health.current >= health.max) return this.throttledPrompt("HEALTH FULL");
+    this.medkits--;
+    this.healTimer = HEAL_TIME;
+    this.weapon.cancelReload();
+    viewmodel.heal(HEAL_TIME);
+    sound.playHeal();
+    hud.prompt("HEALING…", HEAL_TIME);
+  }
+
+  private finishHeal(): void {
+    const health = this.player.health;
+    const before = health.current;
+    health.heal(Math.round(ITEMS.medkit.amount * this.difficulty.pickupMultiplier));
+    this.services.hud.toast(`+${Math.round(health.current - before)} HEALTH`, "var(--ui-red)");
+  }
+
   private fire(): void {
     const { engine, sound, hud, viewmodel } = this.services;
-    if (this.player.isSprinting) return;
+    if (this.player.isSprinting || this.busy) return;
     const cam = engine.camera;
-    const shot = this.weapon.tryFire(
-      cam.getWorldPosition(new THREE.Vector3()),
-      cam.getWorldDirection(new THREE.Vector3()),
-      this.player.moveFactor
-    );
+    const w = this.weapon;
+    const shot = w.tryFire(cam.getWorldPosition(new THREE.Vector3()), cam.getWorldDirection(new THREE.Vector3()), this.player.moveFactor);
     if (!shot) return;
 
+    const cfg = w.config;
     this.stats.shots++;
     viewmodel.fire();
-    this.player.addRecoil(0.03 + Math.random() * 0.01);
-    this.player.addTrauma(0.12);
-    this.muzzleTime = MUZZLE_FLASH_TIME;
-    this.enemies.emitNoise(this.player.position2D, this.weapon.config.noiseRadius);
+    this.player.addRecoil(cfg.recoil * (1 + Math.random() * 0.3));
+    this.player.addTrauma(0.04 + cfg.recoil * 2.5);
+    // The rivet gun has no muzzle blast to light the room.
+    if (this.currentWeapon !== "rivet") this.muzzleTime = MUZZLE_FLASH_TIME;
+    this.enemies.emitNoise(this.player.position2D, cfg.noiseRadius);
 
-    const range = this.weapon.config.range;
-    const wall = raycastWorld(this.level, shot.origin, shot.dir, range);
-    const hit = this.enemies.raycast(new THREE.Ray(shot.origin, shot.dir), wall ? wall.distance : range);
-    if (hit) {
-      const dmg = this.weapon.config.damage * (hit.headshot ? this.weapon.config.headshotMultiplier : 1);
-      const killed = hit.enemy.takeDamage(dmg, this.player.position2D);
-      this.stats.hits++;
-      if (hit.headshot) this.stats.headshots++;
-      if (killed) this.stats.kills++;
-      this.effects.bloodBurst(hit.point, shot.dir.clone(), killed ? 28 : 14);
-      hud.hitMarker(hit.headshot, killed);
-      sound.playHitmarker(hit.headshot);
-    } else if (wall) {
-      this.effects.impact(wall.point, wall.normal);
-      sound.playImpact(this.spatial(new THREE.Vector2(wall.point.x, wall.point.z)));
+    let anyHit = false;
+    let anyHead = false;
+    let anyKill = false;
+    let impactSound = false;
+    for (const dir of shot.dirs) {
+      const wall = raycastWorld(this.level, shot.origin, dir, cfg.range);
+      const hit = this.enemies.raycast(new THREE.Ray(shot.origin, dir), wall ? wall.distance : cfg.range);
+      if (hit) {
+        const dmg = cfg.damage * (hit.headshot ? cfg.headshotMultiplier : 1);
+        const killed = this.damageEnemy(hit.enemy, dmg, hit.headshot ? "head" : "body");
+        this.effects.bloodBurst(hit.point, dir.clone(), (killed ? 28 : 14) / Math.sqrt(cfg.pellets));
+        anyHit = true;
+        anyHead ||= hit.headshot;
+        anyKill ||= killed;
+      } else if (wall) {
+        this.effects.impact(wall.point, wall.normal);
+        if (!impactSound) sound.playImpact(this.spatial(new THREE.Vector2(wall.point.x, wall.point.z)));
+        impactSound = true;
+      }
     }
+    if (anyHit) {
+      this.stats.hits++;
+      if (anyHead) this.stats.headshots++;
+      hud.hitMarker(anyHead, anyKill);
+      sound.playHitmarker(anyHead);
+    }
+  }
+
+  /** All player damage to creatures goes through here. Returns true on a kill. */
+  private damageEnemy(enemy: Enemy, amount: number, part: "head" | "body"): boolean {
+    const killed = enemy.takeDamage(amount, this.player.position2D, part);
+    if (killed) this.onEnemyKilled(enemy);
+    return killed;
+  }
+
+  private onEnemyKilled(enemy: Enemy): void {
+    this.stats.kills++;
+    if (enemy !== this.boss) return;
+    this.services.hud.toast("THE REMNANT IS DEAD", "var(--ui-red)");
+    this.player.addTrauma(0.8);
+    for (const e of this.brood) e.takeDamage(e.health + 1, enemy.position2D);
+    this.run(this.def.events?.bossDefeated ?? []);
+  }
+
+  /**
+   * Melee: a quick strike with the weapon in hand. From behind an unaware
+   * creature (or one frozen in the light) it's a silent takedown; otherwise
+   * it's a shove that buys a moment.
+   */
+  private melee(): void {
+    const { sound, hud, viewmodel } = this.services;
+    if (this.meleeCooldown > 0 || this.busy) return;
+    this.meleeCooldown = MELEE_COOLDOWN;
+    this.weapon.cancelReload();
+    viewmodel.melee();
+
+    const me = this.player.position2D;
+    const yaw = this.player.facing;
+    const fwd = new THREE.Vector2(-Math.sin(yaw), -Math.cos(yaw));
+    let target: Enemy | null = null;
+    let best = Infinity;
+    for (const e of this.enemies.enemies) {
+      if (e.isDead || e.onCeiling || e.state === "drop") continue;
+      const to = e.position2D.sub(me);
+      const d = to.length() - e.stats.radius;
+      if (d > MELEE_RANGE || d >= best) continue;
+      if (d > 0.3 && to.normalize().dot(fwd) < MELEE_FACING) continue;
+      if (!hasLineOfSight(this.level, me, e.position2D)) continue;
+      target = e;
+      best = d;
+    }
+    if (!target) {
+      sound.playMelee(false);
+      return;
+    }
+    const chest = new THREE.Vector3(target.root.position.x, 1.1 * target.stats.scale, target.root.position.z);
+    if (target.canBeTakenDown(me)) {
+      target.takedown();
+      this.stats.takedowns++;
+      this.onEnemyKilled(target);
+      sound.playTakedown();
+      this.effects.bloodBurst(chest, new THREE.Vector3(fwd.x, 0.2, fwd.y), 10);
+      hud.hitMarker(true, true);
+      this.enemies.emitNoise(me, TAKEDOWN_NOISE);
+      return;
+    }
+    sound.playMelee(true);
+    this.player.addTrauma(0.15);
+    const killed = this.damageEnemy(target, MELEE_DAMAGE, "body");
+    if (!killed) target.shove(fwd, 0.8, this.level);
+    this.effects.bloodBurst(chest, new THREE.Vector3(fwd.x, 0.2, fwd.y), 8);
+    hud.hitMarker(false, killed);
+    this.enemies.emitNoise(me, MELEE_NOISE);
   }
 
   private updatePickups(dt: number): void {
@@ -488,25 +767,42 @@ export class LevelSession {
       p.update(dt);
       if (p.distanceTo(px, pz) > PICKUP_RADIUS) continue;
 
-      switch (p.type) {
-        case "ammo": {
-          if (this.weapon.reserveAmmo >= this.weapon.config.reserveMax) {
-            this.throttledPrompt("AMMO FULL");
-            continue;
-          }
-          const got = this.weapon.addReserveAmmo(amount(ITEMS.ammo.amount));
-          hud.toast(`+${got} ROUNDS`);
-          break;
+      const item = ITEMS[p.type];
+      if (item.ammoFor) {
+        const w = this.weapons.get(item.ammoFor);
+        if (!w) {
+          this.throttledPrompt(`NEEDS THE ${WEAPONS[item.ammoFor].name.toUpperCase()}`);
+          continue;
         }
+        if (w.reserveAmmo >= w.config.reserveMax) {
+          this.throttledPrompt(`${AMMO_LABEL[item.ammoFor]} FULL`);
+          continue;
+        }
+        const got = w.addReserveAmmo(amount(w.config.ammoPickup));
+        hud.toast(`+${got} ${AMMO_LABEL[item.ammoFor]}`);
+        p.collect();
+        sound.playPickup(p.type);
+        continue;
+      }
+      if (item.weapon) {
+        this.pickUpWeapon(item.weapon, amount(WEAPONS[item.weapon].ammoPickup * 2));
+        p.collect();
+        sound.playPickup(p.type);
+        continue;
+      }
+
+      switch (p.type) {
         case "medkit": {
-          const health = this.player.health;
-          if (health.current >= health.max) {
-            this.throttledPrompt("HEALTH FULL");
+          if (this.medkits >= MAX_MEDKITS) {
+            this.throttledPrompt("MEDKITS FULL");
             continue;
           }
-          const before = health.current;
-          health.heal(amount(ITEMS.medkit.amount));
-          hud.toast(`+${Math.round(health.current - before)} HEALTH`, "var(--ui-red)");
+          this.medkits++;
+          hud.toast(`+ MEDKIT (${this.medkits}/${MAX_MEDKITS})`, "var(--ui-red)");
+          if (!this.healHintShown) {
+            this.healHintShown = true;
+            hud.prompt(`MEDKITS ARE CARRIED — PRESS ${this.services.keyFor("heal")} TO USE ONE`, 4);
+          }
           break;
         }
         case "battery":
@@ -535,9 +831,28 @@ export class LevelSession {
     }
   }
 
+  private pickUpWeapon(id: WeaponId, rounds: number): void {
+    const { hud } = this.services;
+    const have = this.weapons.get(id);
+    if (have) {
+      const got = have.addReserveAmmo(rounds);
+      hud.toast(`+${got} ${AMMO_LABEL[id]}`);
+      return;
+    }
+    const def = WEAPONS[id];
+    this.addWeapon(id, { mag: def.magSize, reserve: Math.min(def.reserveMax, rounds) });
+    this.refreshWeaponStrip();
+    this.switchTo(id);
+    hud.toast(`${def.name.toUpperCase()} ACQUIRED`, "var(--ui-green)");
+    const key = this.keyLabel(`weapon${def.slot}`) ?? String(def.slot);
+    const tip = id === "rivet" ? "Almost silent, but weak — " : id === "shotgun" ? "Devastating up close, and very loud — " : "";
+    hud.prompt(`${tip}press ${key} to select it`.toUpperCase(), 5);
+  }
+
   // ------------------------------------------------------------------ exit & endings
 
   private exitLockReason(): string | null {
+    if (this.boss && !this.boss.isDead) return "SEALED — THE REMNANT HOLDS THE DOOR";
     if (this.keycardLocksExit && !this.hasKeycard) return "LOCKED — FIND THE KEYCARD";
     if (!this.powerOn) return "NO POWER — START THE GENERATORS";
     return null;
@@ -578,6 +893,7 @@ export class LevelSession {
     if (this.finished) return;
     this.finished = true;
     this.radio.clear();
+    this.services.hud.boss(null);
     this.services.sound.playDeath();
     this.onDeath?.();
   }
@@ -598,11 +914,22 @@ export class LevelSession {
       magSize: this.weapon.config.magSize,
       reserve: this.weapon.reserveAmmo,
       reloading: this.weapon.isReloading,
+      singleLoad: this.weapon.config.reload === "single",
+      weapon: this.weapon.config.name,
+      slot: this.weapon.config.slot,
+      medkits: this.medkits,
+      healing: this.healTimer > 0,
       noise: this.weapon.bloom > 0.6 ? 5 : noiseBars,
       threat: this.enemies.threat,
       spreadPx: (Math.tan(spread) / halfFov) * (window.innerHeight / 2),
       hasKeycard: this.hasKeycard,
     });
+  }
+
+  private updateBossBar(): void {
+    const b = this.boss;
+    if (b && b.awake && !b.isDead) this.services.hud.boss(b.stats.name, b.health / b.maxHealth);
+    else this.services.hud.boss(null);
   }
 
   private throttledPrompt(text: string): void {

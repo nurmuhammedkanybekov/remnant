@@ -1,7 +1,7 @@
-import { aida, objective, op, radio } from "../../game/script";
+import { aida, hint, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
-/** Level 5 — the original Zenit laboratories. Doors everywhere, and something behind each one. */
+/** Level 5 — the original Zenit laboratories, and the Watchers: light is now a weapon and a risk. */
 export const CONTAINMENT_LABS: LevelDef = {
   id: "containment-labs",
   name: "Sublevel 6",
@@ -13,13 +13,13 @@ export const CONTAINMENT_LABS: LevelDef = {
     "##############################",
     "#S.......#.......L.#.........#",
     "#.....L..#.C.....C.#...E.....#",
-    "#..1.....#....E....#.2....A..#",
+    "#..1.....#....W....#.2....A..#",
     "#..A.....#.C..3..C.#.........#",
     "#####D#########D########D#####",
-    "#...a.........L..........*...#",
+    "#...a.........L.c........*...#",
     "#####D#########D#####=########",
     "#.........#....b.H..#........#",
-    "#..E...L..#..C...C..#...L....#",
+    "#..W...L..#..C...C..#...L....#",
     "#....M....#....K....#......X.#",
     "#.4.......#..C...C..#..R.....#",
     "#.........#.E.....B.#........#",
@@ -44,5 +44,13 @@ export const CONTAINMENT_LABS: LevelDef = {
   triggers: {
     a: [radio(op("Every door you open makes noise. Open them, then move."))],
     b: [radio(aida("Something big in here. Breathing slow."))],
+    c: [
+      radio(
+        op("Some of them in the labs can't stand light. Keep your torch on one and it locks up."),
+        aida("And when the battery dies?"),
+        op("Then don't let it die.")
+      ),
+      hint("Watchers freeze while your flashlight is on them — and they're fast when it isn't"),
+    ],
   },
 };

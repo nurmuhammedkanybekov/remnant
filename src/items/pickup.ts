@@ -80,6 +80,46 @@ function buildItem(type: PickupType): THREE.Object3D {
       }
       break;
     }
+    case "shells": {
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3, 0.14, 0.2),
+        new THREE.MeshStandardMaterial({ color: 0x6a1a14, roughness: 0.7 })
+      );
+      g.add(box);
+      for (let i = 0; i < 4; i++) {
+        const shell = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.024, 0.024, 0.09, 10),
+          new THREE.MeshStandardMaterial({ color: 0xc8361e, roughness: 0.5, emissive: 0x3a0a04 })
+        );
+        shell.position.set(-0.09 + i * 0.06, 0.11, 0);
+        const brass = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.025, 0.025, 0.025, 10),
+          new THREE.MeshStandardMaterial({ color: 0xc9a040, metalness: 0.9, roughness: 0.3 })
+        );
+        brass.position.y = -0.04;
+        shell.add(brass);
+        g.add(shell);
+      }
+      break;
+    }
+    case "rivets": {
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.1, 0.18),
+        new THREE.MeshStandardMaterial({ color: 0xc89a1a, roughness: 0.55, metalness: 0.2 })
+      );
+      g.add(box);
+      const strip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 0.02, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0x9a9a9a, metalness: 0.9, roughness: 0.3 })
+      );
+      strip.position.y = 0.06;
+      g.add(strip);
+      break;
+    }
+    case "shotgun":
+    case "rivetGun":
+      g.add(buildWeaponProp(type));
+      break;
     case "medkit": {
       const box = new THREE.Mesh(
         new THREE.BoxGeometry(0.36, 0.24, 0.16),
@@ -137,6 +177,46 @@ function buildItem(type: PickupType): THREE.Object3D {
       g.add(paper);
       break;
     }
+  }
+  return g;
+}
+
+/** A weapon lying on the floor, big enough to notice. */
+function buildWeaponProp(type: "shotgun" | "rivetGun"): THREE.Object3D {
+  const g = new THREE.Group();
+  const dark = new THREE.MeshStandardMaterial({ color: 0x26282c, metalness: 0.6, roughness: 0.5 });
+  if (type === "shotgun") {
+    const wood = new THREE.MeshStandardMaterial({ color: 0x4a3222, roughness: 0.75, emissive: 0x100804 });
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.6, 10), dark);
+    barrel.rotation.z = Math.PI / 2;
+    barrel.position.set(-0.15, 0.02, 0);
+    g.add(barrel);
+    const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.07, 0.05), dark);
+    receiver.position.x = 0.15;
+    g.add(receiver);
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.08, 0.045), wood);
+    stock.position.set(0.38, -0.02, 0);
+    stock.rotation.z = -0.1;
+    g.add(stock);
+    const pump = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.14, 10), wood);
+    pump.rotation.z = Math.PI / 2;
+    pump.position.set(-0.12, -0.012, 0);
+    g.add(pump);
+  } else {
+    const yellow = new THREE.MeshStandardMaterial({ color: 0xc89a1a, roughness: 0.55, emissive: 0x201804 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.07), yellow);
+    g.add(body);
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 10), dark);
+    nozzle.rotation.z = Math.PI / 2;
+    nozzle.position.x = -0.16;
+    g.add(nozzle);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.04), dark);
+    grip.position.set(0.06, -0.09, 0);
+    grip.rotation.z = 0.25;
+    g.add(grip);
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.1, 10), new THREE.MeshStandardMaterial({ color: 0x8a1a14 }));
+    can.position.set(0.1, -0.08, 0.05);
+    g.add(can);
   }
   return g;
 }

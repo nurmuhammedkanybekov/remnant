@@ -1,7 +1,7 @@
-import { checkpoint, objective, radio, unknown, aida } from "../../game/script";
+import { aida, checkpoint, hint, objective, radio, unknown } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
-/** Level 9 — the Remnant has grown into the whole sublevel. The Operator stops pretending. */
+/** Level 9 — the Remnant has grown into the whole sublevel. The Operator stops pretending, and the mass itself blocks the lift. */
 export const HIVE: LevelDef = {
   id: "hive",
   name: "Sublevel 2",
@@ -19,26 +19,26 @@ export const HIVE: LevelDef = {
     fillIntensity: 0.9,
   },
   map: [
-    "##############################",
-    "#S..L....#.....O...#....R....#",
-    "#.#####..#.###...#.#.######..#",
-    "#.#1..#....#E..#.#...#..A#...#",
-    "#.#..A#.####.###.#####.###.#.#",
-    "#.##.##.#..R...#.......#...#.#",
-    "#....a..#.####.#.#####.#.###.#",
-    "######.##.#..#.#.#...#.#.#...#",
-    "#......#..#H.#...#.E.#...#.#.#",
-    "#.####.#.##..#####.###.###.#.#",
-    "#.#..*.#....L......#...#...#.#",
-    "#.#.##.###.#######.#.#.#.###.#",
-    "#.#.#M...#...O.#...#.#...#.E.#",
-    "#...#.##.#.###.#.###.#####.#.#",
-    "###.#..#...#2#.#.#.....H...#.#",
-    "#...##.#####.#.#.#.###.###.#.#",
-    "#.E....R.......#...#b..*.....#",
-    "#.####.#######.#####.#.####..#",
-    "#......B.....#.......#....X..#",
-    "##############################",
+    "############################################",
+    "#S..L....#.....O...#....R....###############",
+    "#.#####..#.###...#.#.######..###############",
+    "#.#1..#....#U..#.#...#..A#...###############",
+    "#.#..A#.####.###.#####.###.#.###############",
+    "#.##.##.#..R...#.......#...#.###############",
+    "#....a..#.####.#.#####.#.###.###.R..X..R.###",
+    "######.##.#..#.#.#...#.#.#...###.........###",
+    "#......#..#H.#...#.W.#...#.#.###.C.....C.###",
+    "#.####.#.##..#####.###.###.#.###....@....###",
+    "#.#..*.#....L......#...#...#.###.........###",
+    "#.#.##.###.#######.#.#.#.###.###L.O...O.L###",
+    "#.#.#MJ..#...O.#...#.#...#.P.###.........###",
+    "#...#.##.#.###.#.###.#####.#.###..C...C..###",
+    "###.#..#...#2#.#.#.....H...#.###....R....###",
+    "#...##.#####.#.#.#.###.###.#.###.O.....O.###",
+    "#.V....R.......#...#b..*.....###.........###",
+    "#.####.#######.#####.#.####..*cD.........###",
+    "#.T....B.....#.......#.......###T.A.M.A.T###",
+    "############################################",
   ],
   notes: {
     "1": "It isn't eating them. It's keeping them. You can hear them in there, talking. All of them at once.",
@@ -46,6 +46,17 @@ export const HIVE: LevelDef = {
   },
   events: {
     start: [radio(aida("The walls are... soft. Warm. It's grown through everything."), unknown("Keep going, Aida. You're nearly home."))],
+    bossPhase2: [radio(unknown("You can't kill forty-one people twice, Aida."))],
+    bossPhase3: [radio(unknown("Stop. Stop. We only wanted to see the sky."))],
+    bossDefeated: [
+      radio(
+        aida("It's down. It's not moving."),
+        unknown("That was only a part of us, Aida. We are in every wall. We are waiting at the top."),
+        aida("...Then I'll see you there.")
+      ),
+      objective("Reach the lift shaft."),
+      checkpoint(),
+    ],
   },
   triggers: {
     a: [radio(aida("You're not in a control room. Are you."), unknown("We are in every room.")), checkpoint()],
@@ -55,7 +66,12 @@ export const HIVE: LevelDef = {
         unknown("The blast doors only open for an unchanged crew member. Only for you."),
         aida("So that's it. You need me to carry you out.")
       ),
-      objective("Reach the lift shaft."),
+      objective("Find a way through to the lift."),
+    ],
+    c: [
+      radio(unknown("Come in, Aida. Come and see us. All of us."), aida("That's it. That's the core. And the lift is right behind it.")),
+      objective("Kill the Remnant. Shoot the core when it opens."),
+      hint("The hide soaks up bullets — hit the core while it's open, just after it attacks"),
     ],
   },
 };

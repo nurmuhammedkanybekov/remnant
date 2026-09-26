@@ -3,7 +3,8 @@
  * events; `LevelSession` runs them. Kept as plain data so levels stay
  * declarative and testable.
  */
-export type Speaker = "operator" | "aida" | "unknown";
+/** "echo" is the Operator's voice coming from somewhere nearby instead of the radio (a Mimic). */
+export type Speaker = "operator" | "aida" | "unknown" | "echo";
 
 export interface RadioLine {
   speaker: Speaker;

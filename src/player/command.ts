@@ -21,6 +21,12 @@ export interface PlayerCommand {
   reload: boolean;
   toggleFlashlight: boolean;
   interact: boolean;
+  melee: boolean;
+  heal: boolean;
+  /** -1 previous, +1 next, 0 none. */
+  cycleWeapon: number;
+  /** Weapon slot picked with a number key (1-based), or 0. */
+  selectSlot: number;
 }
 
 export function emptyCommand(): PlayerCommand {
@@ -35,6 +41,10 @@ export function emptyCommand(): PlayerCommand {
     reload: false,
     toggleFlashlight: false,
     interact: false,
+    melee: false,
+    heal: false,
+    cycleWeapon: 0,
+    selectSlot: 0,
   };
 }
 
@@ -68,5 +78,9 @@ export function buildCommand(input: InputSource, bindings: Bindings, look: LookS
     reload: pressed("reload"),
     toggleFlashlight: pressed("flashlight"),
     interact: pressed("interact"),
+    melee: pressed("melee"),
+    heal: pressed("heal"),
+    cycleWeapon: (pressed("nextWeapon") ? 1 : 0) - (pressed("prevWeapon") ? 1 : 0),
+    selectSlot: pressed("weapon1") ? 1 : pressed("weapon2") ? 2 : pressed("weapon3") ? 3 : 0,
   };
 }

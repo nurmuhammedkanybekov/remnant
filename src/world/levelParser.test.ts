@@ -15,8 +15,7 @@ describe("parseLevel", () => {
     expect(level.startCell).toEqual({ col: 1, row: 1 });
     expect(level.exitCell).toEqual({ col: 5, row: 2 });
     expect(level.spawns.playerStart.x).toBe(1.5 * CELL_SIZE);
-    expect(level.spawns.ammo).toHaveLength(1);
-    expect(level.spawns.keycards).toHaveLength(1);
+    expect(level.spawns.items.map((i) => i.type)).toEqual(["ammo", "keycard"]);
     expect(level.spawns.lamps).toHaveLength(1);
     expect(level.spawns.notes[0].text).toBe("hello");
     expect(level.spawns.enemies.map((e) => e.kind)).toEqual(["husk", "brute"]);
@@ -58,6 +57,24 @@ describe("parseLevel", () => {
     expect(level.solid[1][4]).toBe(true); // closed door blocks
     expect(level.solid[1][6]).toBe(true); // generator blocks
     expect(level.solid[1][2]).toBe(false); // water is walkable
+  });
+
+  it("reads the new creatures, weapons and ammo types", () => {
+    const level = parseLevel(def(["##########", "#S..UWVPQX#", "#.!^TJ...#", "##########"]));
+    expect(level.spawns.enemies.map((e) => e.kind)).toEqual(["listener", "watcher", "crawler", "spitter", "mimic"]);
+    expect(level.spawns.items.map((i) => i.type)).toEqual(["shotgun", "rivetGun", "shells", "rivets"]);
+  });
+
+  it("spreads a swarm glyph into a pack inside its cell", () => {
+    const level = parseLevel(def(["#######", "#S..%X#", "#######"]));
+    const pack = level.spawns.enemies;
+    expect(pack.length).toBeGreaterThan(1);
+    expect(new Set(pack.map((e) => e.kind))).toEqual(new Set(["swarm"]));
+    for (const e of pack) expect(Math.floor(e.pos.x / CELL_SIZE)).toBe(4);
+  });
+
+  it("allows at most one boss", () => {
+    expect(() => parseLevel(def(["########", "#S..@@X#", "########"]))).toThrow(/more than one boss/);
   });
 
   it("requires every trigger letter and intercom to have a script", () => {

@@ -48,17 +48,20 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] Per-level visual themes
 - [x] Save format v2, with migration of v1 saves
 
-## Phase 3 — Creatures and combat
+## Phase 3 — Creatures and combat ✅
 
-Levels 4–9 currently use Husks and Brutes as stand-ins for the creatures
-`STORY.md` introduces there; this phase replaces them.
-
-- [ ] Listener, Watcher, Crawler, Spitter, Swarm, Mimic
-- [ ] Boss: the Remnant (multi-phase)
-- [ ] Quiet melee takedowns from behind
-- [ ] Shotgun, and one more weapon to be designed
-- [ ] Weapon switching and a small inventory
-- [ ] Improved creature visuals: emissive veins, silhouettes, per-type rigs
+- [x] Listener, Watcher, Crawler, Spitter, Swarm, Mimic — each introduced on
+      the level `STORY.md` gives it
+- [x] Boss: the Remnant (three phases, armoured hide, a core that opens when
+      it attacks, summoned swarms) in a new arena on Sublevel 2
+- [x] Quiet melee takedowns from behind (and a shove from the front)
+- [x] Shotgun (shell-by-shell loading), and the rivet gun: a nearly silent
+      stealth weapon found in the ducts
+- [x] Weapon switching (number keys, cycle key, mouse wheel) and a small
+      inventory: carried medkits, used on demand
+- [x] Improved creature visuals: glowing veins, per-type silhouettes and
+      rigs (humanoid variants, rats, the Remnant's mass)
+- [x] Save format v3 (multi-weapon loadouts), with migration of v2 saves
 
 ## Phase 4 — Sound, music, interface
 

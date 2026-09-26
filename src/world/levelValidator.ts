@@ -24,7 +24,8 @@ export function validateLevel(level: ParsedLevel): string[] {
 
   const beforeKeycard = flood(false);
   const reachedBefore = (c: Cell) => beforeKeycard.has(key(c));
-  const keycardCells = s.keycards.map((p) => worldToCell(p.x, p.y));
+  const keycards = s.items.filter((i) => i.type === "keycard");
+  const keycardCells = keycards.map((i) => worldToCell(i.pos.x, i.pos.y));
   const keycardReachable = keycardCells.length > 0 && keycardCells.every(reachedBefore);
   const reachable = hasSecurity && keycardReachable ? flood(true) : beforeKeycard;
   const canReach = (c: Cell) => reachable.has(key(c));
@@ -46,18 +47,15 @@ export function validateLevel(level: ParsedLevel): string[] {
   }
 
   if (!canReach(level.exitCell)) problems.push(`${id}: exit is not reachable from the spawn`);
-  if (s.keycards.length > 1) problems.push(`${id}: more than one keycard`);
-  if (hasSecurity && s.keycards.length === 0) problems.push(`${id}: security doors but no keycard`);
-  if (hasSecurity && s.keycards.length > 0 && !keycardReachable) problems.push(`${id}: keycard is locked behind a security door`);
+  if (keycards.length > 1) problems.push(`${id}: more than one keycard`);
+  if (hasSecurity && keycards.length === 0) problems.push(`${id}: security doors but no keycard`);
+  if (hasSecurity && keycards.length > 0 && !keycardReachable) problems.push(`${id}: keycard is locked behind a security door`);
 
   const check = (label: string, cells: Cell[], test = canReach) => {
     for (const c of cells) if (!test(c)) problems.push(`${id}: ${label} at ${c.col},${c.row} is not reachable`);
   };
   const cellsOf = (points: { x: number; y: number }[]) => points.map((p) => worldToCell(p.x, p.y));
-  check("keycard", keycardCells);
-  check("ammo", cellsOf(s.ammo));
-  check("medkit", cellsOf(s.medkits));
-  check("battery", cellsOf(s.batteries));
+  for (const item of s.items) check(item.type, cellsOf([item.pos]));
   check("note", cellsOf(s.notes.map((n) => n.pos)));
   check(
     "intercom",

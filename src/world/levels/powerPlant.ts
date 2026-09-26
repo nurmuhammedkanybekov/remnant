@@ -1,7 +1,7 @@
-import { aida, checkpoint, objective, op, radio } from "../../game/script";
+import { aida, checkpoint, hint, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
-/** Level 7 — restart three generators. Each one is loud, and keeps being loud. */
+/** Level 7 — restart three generators. Each one is loud, and keeps being loud. Spitters guard them. */
 export const POWER_PLANT: LevelDef = {
   id: "power-plant",
   name: "Sublevel 4",
@@ -13,16 +13,16 @@ export const POWER_PLANT: LevelDef = {
     "##############################",
     "#S....L.....#.........L....X.#",
     "#.C......C..#..O.........O...#",
-    "#......a....#......E.........#",
+    "#......a....#......P.........#",
     "#.C..G...C..D....G.....C.....#",
-    "#...........#................#",
+    "#...........#.b..............#",
     "######.######.......L........#",
     "#...........##########D#######",
     "#.1....E....#................#",
     "#......L....D......H.........#",
     "#..O.....O..#....O.......O...#",
     "#.....G.....#.......*........#",
-    "#...........#......L.....E...#",
+    "#...........#......L.....P...#",
     "#####D#######.............2..#",
     "#...........#................#",
     "#.A...M..B..D......A.........#",
@@ -49,5 +49,9 @@ export const POWER_PLANT: LevelDef = {
   },
   triggers: {
     a: [radio(aida("The exit's right there. Dead. No power."))],
+    b: [
+      radio(op("There are ones in the plant that spit. It eats through steel. Don't let it touch you."), aida("Of course there are.")),
+      hint("Spitters lob acid from a distance — sidestep it and close in"),
+    ],
   },
 };

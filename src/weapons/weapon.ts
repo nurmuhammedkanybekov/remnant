@@ -3,10 +3,15 @@ import type { WeaponDef } from "../content/weapons";
 
 export interface Shot {
   origin: THREE.Vector3;
-  dir: THREE.Vector3;
+  /** One direction per pellet. */
+  dirs: THREE.Vector3[];
 }
 
-/** Ammo, cooldown, reload and spread for any `WeaponDef`. */
+/**
+ * Ammo, cooldown, reload and spread for any `WeaponDef`. Magazine weapons
+ * reload in one go; single-loading weapons (the shotgun) take one round at a
+ * time and can fire mid-reload.
+ */
 export class Weapon {
   ammoInMag: number;
   reserveAmmo: number;
@@ -20,6 +25,8 @@ export class Weapon {
   onEmptyFire: (() => void) | null = null;
   onReloadStart: (() => void) | null = null;
   onReloadEnd: (() => void) | null = null;
+  /** Single-loading weapons: each round going in. */
+  onRoundLoaded: (() => void) | null = null;
 
   constructor(
     readonly config: WeaponDef,
@@ -34,9 +41,9 @@ export class Weapon {
     return this.reloading;
   }
 
-  /** 0..1 progress of the current reload (for the viewmodel animation). */
+  /** 0..1 progress of the current reload (per round for single loading), for the viewmodel animation. */
   get reloadProgress(): number {
-    return this.reloading ? 1 - this.reloadRemaining / this.config.reloadTime : 0;
+    return this.reloading ? 1 - Math.max(0, this.reloadRemaining) / this.config.reloadTime : 0;
   }
 
   addReserveAmmo(amount: number): number {
@@ -48,16 +55,24 @@ export class Weapon {
   update(dt: number): void {
     if (this.cooldownRemaining > 0) this.cooldownRemaining -= dt;
     this.bloom = Math.max(0, this.bloom - dt * 2.5);
-    if (this.reloading) {
-      this.reloadRemaining -= dt;
-      if (this.reloadRemaining <= 0) {
-        const taken = Math.min(this.config.magSize - this.ammoInMag, this.reserveAmmo);
-        this.ammoInMag += taken;
-        this.reserveAmmo -= taken;
-        this.reloading = false;
-        this.onReloadEnd?.();
+    if (!this.reloading) return;
+    this.reloadRemaining -= dt;
+    if (this.reloadRemaining > 0) return;
+    if (this.config.reload === "single") {
+      this.ammoInMag += 1;
+      this.reserveAmmo -= 1;
+      this.onRoundLoaded?.();
+      if (this.ammoInMag < this.config.magSize && this.reserveAmmo > 0) {
+        this.reloadRemaining += this.config.reloadTime;
+        return;
       }
+    } else {
+      const taken = Math.min(this.config.magSize - this.ammoInMag, this.reserveAmmo);
+      this.ammoInMag += taken;
+      this.reserveAmmo -= taken;
     }
+    this.reloading = false;
+    this.onReloadEnd?.();
   }
 
   tryReload(): boolean {
@@ -68,17 +83,24 @@ export class Weapon {
     return true;
   }
 
+  /** Stops a reload in progress (switching weapons). Rounds already loaded stay loaded. */
+  cancelReload(): void {
+    this.reloading = false;
+  }
+
   /** Current cone half-angle given how fast the player is moving (0..1). */
   currentSpread(moveFactor: number): number {
     return this.config.spread * (1 + moveFactor * 3 + this.bloom * 4);
   }
 
   /**
-   * Attempts to fire from `origin` along `aim` (unit vector). Returns the shot
-   * ray with spread applied, or null if the weapon can't fire right now.
+   * Attempts to fire from `origin` along `aim` (unit vector). Returns one ray
+   * per pellet with spread applied, or null if the weapon can't fire right now.
    * `random` is injectable so tests can make spread deterministic.
    */
   tryFire(origin: THREE.Vector3, aim: THREE.Vector3, moveFactor: number, random: () => number = Math.random): Shot | null {
+    // A single-loading weapon can fire mid-reload if there's a round in it.
+    if (this.reloading && this.config.reload === "single" && this.ammoInMag > 0) this.reloading = false;
     if (this.reloading || this.cooldownRemaining > 0) return null;
     if (this.ammoInMag <= 0) {
       this.cooldownRemaining = 0.25;
@@ -89,22 +111,26 @@ export class Weapon {
     this.ammoInMag -= 1;
     this.cooldownRemaining = this.config.fireCooldown;
 
-    const dir = aim.clone();
     const spread = this.currentSpread(moveFactor);
     this.bloom = Math.min(1, this.bloom + 0.35);
-    if (spread > 0) {
-      // Random point in a cone around `dir`.
-      const up = Math.abs(dir.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-      const right = new THREE.Vector3().crossVectors(dir, up).normalize();
-      const realUp = new THREE.Vector3().crossVectors(right, dir).normalize();
-      const r = Math.sqrt(random()) * Math.tan(spread);
-      const a = random() * Math.PI * 2;
-      dir
-        .addScaledVector(right, Math.cos(a) * r)
-        .addScaledVector(realUp, Math.sin(a) * r)
-        .normalize();
-    }
+    const dirs: THREE.Vector3[] = [];
+    for (let i = 0; i < this.config.pellets; i++) dirs.push(scatter(aim, spread, random));
     this.onFire?.();
-    return { origin: origin.clone(), dir };
+    return { origin: origin.clone(), dirs };
   }
+}
+
+/** A random direction within `spread` radians of `aim` (unit vector). */
+function scatter(aim: THREE.Vector3, spread: number, random: () => number): THREE.Vector3 {
+  const dir = aim.clone();
+  if (spread <= 0) return dir;
+  const up = Math.abs(dir.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+  const right = new THREE.Vector3().crossVectors(dir, up).normalize();
+  const realUp = new THREE.Vector3().crossVectors(right, dir).normalize();
+  const r = Math.sqrt(random()) * Math.tan(spread);
+  const a = random() * Math.PI * 2;
+  return dir
+    .addScaledVector(right, Math.cos(a) * r)
+    .addScaledVector(realUp, Math.sin(a) * r)
+    .normalize();
 }
