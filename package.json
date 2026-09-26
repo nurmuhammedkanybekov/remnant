@@ -2,7 +2,7 @@
   "name": "remnant",
   "private": true,
   "version": "0.4.0",
-  "description": "First-person survival horror shooter in the browser — TypeScript + Three.js, zero asset files.",
+  "description": "First-person survival horror shooter in the browser \u2014 TypeScript + Three.js, zero asset files.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run typecheck && npm run format:check && npm test"
+    "check": "npm run typecheck && npm run format:check && npm test",
+    "playtest": "node tools/playtest/run.mjs"
   },
   "devDependencies": {
     "@types/three": "^0.166.0",
