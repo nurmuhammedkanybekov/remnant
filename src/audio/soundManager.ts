@@ -527,7 +527,7 @@ export class SoundManager {
     const t = this.ctx.currentTime;
     const o = this.out(CENTER, 1, 0.3)!;
     this.tone(o, "sine", 150, 45, t, 0.3, 0.9);
-    // Aida's voice, if there's a recording; otherwise a breathy grunt.
+    // Nur's voice, if there's a recording; otherwise a breathy grunt.
     if (!this.sample("playerHurt", t + 0.02, CENTER, 1, 0.2)) this.burst(o, "bandpass", 900, 1.5, t, 0.25, 0.35, 0.02);
   }
 

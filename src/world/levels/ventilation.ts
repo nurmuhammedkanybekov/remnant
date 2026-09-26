@@ -1,4 +1,4 @@
-import { aida, hint, objective, op, radio } from "../../game/script";
+import { nur, hint, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 6 — a maze of ducts, Crawlers overhead, a rivet gun, and the first time the radio lies. */
@@ -39,27 +39,27 @@ export const VENTILATION: LevelDef = {
   intercoms: [
     [
       radio(
-        op("Aida. I can see you on the cameras. Go back to the west duct. Hurry — there's something coming up behind you."),
-        aida("...Cameras? Nothing down here has had power for eleven days.")
+        op("Nur. I can see you on the cameras. Go back to the west duct. Hurry — there's something coming up behind you."),
+        nur("...Cameras? Nothing down here has had power for eleven days.")
       ),
     ],
   ],
   triggers: {
     a: [
-      radio(aida("Tight in here. If one of them finds me in a duct, there's nowhere to go.")),
+      radio(nur("Tight in here. If one of them finds me in a duct, there's nowhere to go.")),
       hint("Get behind a creature that hasn't noticed you and press {melee} for a silent takedown"),
     ],
     c: [
       radio(
         op("Listen for clicking above you. The crews who stayed in the vents... they don't walk on the floor any more."),
-        aida("Great. Look up. Noted.")
+        nur("Great. Look up. Noted.")
       ),
       hint("Crawlers cling to the ceiling and drop when you pass beneath — sneak by, or shoot them down first"),
     ],
     b: [
       radio(
-        op("Aida? Are you still there? I haven't said anything for ten minutes."),
-        aida("You told me to go back. On the intercom."),
+        op("Nur? Are you still there? I haven't said anything for ten minutes."),
+        nur("You told me to go back. On the intercom."),
         op("That wasn't me. Whatever you heard, it wasn't me. Keep going. Please.")
       ),
       objective("Reach the stairwell."),

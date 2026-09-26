@@ -169,15 +169,26 @@ Per playing frame, `Game` builds a `PlayerCommand` and calls
 
 |                                       | Story   | Normal  | Nightmare | Ironman |
 | ------------------------------------- | ------- | ------- | --------- | ------- |
-| Enemy health                          | ×0.7    | ×1      | ×1.3      | ×1      |
-| Enemy damage                          | ×0.5    | ×1      | ×1.5      | ×1      |
-| Enemy sight & hearing                 | ×0.75   | ×1      | ×1.25     | ×1      |
+| Extra creatures per level             | —       | +60%    | +100%     | +60%    |
+| Enemy health                          | ×0.7    | ×1      | ×1.35     | ×1      |
+| Enemy damage                          | ×0.5    | ×1.25   | ×1.75     | ×1.25   |
+| Enemy sight & hearing                 | ×0.75   | ×1.1    | ×1.3      | ×1.1    |
+| Enemy chase speed                     | ×0.9    | ×1.1    | ×1.2      | ×1.1    |
 | Pickup amounts                        | ×1.5    | ×1      | ×0.75     | ×1      |
 | Flashlight drain                      | ×0.6    | ×1      | ×1.3      | ×1      |
 | Starting reserve ammo                 | 32      | 16      | 8         | 16      |
 | Starting medkits                      | 2       | 1       | 0         | 1       |
 | Health / battery floor between levels | 70 / 50 | 40 / 30 | 25 / 20   | 40 / 30 |
 | Lives                                 | ∞       | ∞       | ∞         | **1**   |
+
+**Extra creatures** (`world/reinforcements.ts`) come on top of each level's
+hand-placed ones: that fraction of its own count (at most 10 more), plus
+another +40% in co-op, where creatures also have ×1.3 health. Placement is
+seeded by the level and amount, so it's the same every time (and for both
+co-op players, and checkpoint indices stay valid): only kinds already on the
+level (the story's introductions hold), at least 6 cells' walk from the
+start, 6 m apart, 16 m from the boss, never on doors, machines, checkpoints
+or the exit.
 
 ---
 
@@ -294,7 +305,7 @@ player is looking, and shows `[E] OPEN DOOR`.
 ### Scripting (`game/script.ts`)
 
 Story beats are data. Triggers, intercoms and level events hold lists of
-actions: `radio` (subtitled lines from the Operator, Aida or an unknown
+actions: `radio` (subtitled lines from the Operator, Nur or an unknown
 voice), `objective`, `hint` (with `{action}` placeholders replaced by the
 player's current key binding), `checkpoint` and `alarm`. The radio plays one
 line at a time on the simulation clock, so pausing pauses the conversation.
@@ -642,14 +653,39 @@ connection offer, answer and ICE candidates; nothing about the game goes
 through it, and the connection is closed once the players are linked. The
 host registers as `remnant-v<protocol>-<code>`, so different versions never
 meet. `?signal=wss://your-server/peerjs` points the game at a self-hosted
-PeerJS server instead. STUN comes from Google's public servers; there's no
-TURN relay (not free), so the rare networks that block direct connections
-between browsers get a clear message after 20 s. Room codes use 31
-characters with no look-alikes (no 0/O, 1/I/L).
+PeerJS server instead. Room codes use 31 characters with no look-alikes
+(no 0/O, 1/I/L); if a code is somehow taken, the host silently opens the
+room under another.
+
+**Getting through strict networks** (`net/ice.ts`). STUN (Google's and
+Metered's public servers) finds a direct path on almost every network. For
+the rest — networks that block direct browser-to-browser traffic — the game
+supports a **TURN relay**, configured at build time: Metered's free Open
+Relay (`VITE_METERED_APP` + `VITE_METERED_API_KEY`, credentials fetched per
+game) or any TURN server (`VITE_TURN_URLS`, `VITE_TURN_USERNAME`,
+`VITE_TURN_CREDENTIAL`). The deploy workflow passes these from repository
+variables. WebRTC always prefers the direct path; the lobby says which one
+was used ("Connected directly" / "through the relay", from the selected
+candidate pair). For testing, `?turn=…&turnUser=…&turnPass=…` sets a relay
+from the URL and `?relayOnly` forbids direct paths. With no relay, a
+connection that can't be made fails after 30 s with a message that says so.
 
 Two channels: **reliable** (ordered; every event) and **fast** (unordered,
 no retransmits; the state streams, where a late packet is worthless). A
 ping every second and 8 s of silence detect a partner who vanished.
+
+**Robustness.** Each level attempt (start, next level, retry) is numbered
+(`ep`); in-level messages carry it and ones from an earlier attempt are
+dropped, so nothing from before a retry — a summoned creature, a pickup —
+leaks into the next. The `hello` exchange compares both the protocol and the
+game's version, so a stale cached copy refuses to play rather than drift.
+While a co-op tab is in the background (where browsers stop animation
+frames), a worker timer keeps the game ticking at 20 Hz without drawing, so
+the host's world doesn't freeze for the guest. A guest whose connection
+never completes doesn't hold the host's room (it frees after 30 s); a guest
+leaving the lobby reopens the room under a new code; a second guest is
+turned away; Start can't be triggered twice. Browsers without WebRTC get a
+clear message.
 
 **Who decides what.** The host's game is the authority on the world:
 
@@ -745,13 +781,13 @@ See [`ROADMAP.md`](ROADMAP.md) for the full plan.
 4. **Creatures are primitives.** Per-type rigs and glowing veins make them
    readable in the dark, but a proper model pipeline (see the roadmap's
    asset rule) would be the next step up.
-5. **No touch input.**
-6. **Co-op has no relay server**, so it can't connect across the few
-   networks that block direct browser-to-browser connections, and it
-   depends on the free public PeerJS signaling server being up (or a
-   self-hosted one via `?signal=`). Joining needs a keyboard to type the
-   code. There's no host migration: if the host leaves, the guest's game
-   ends.
+5. **No touch input.** Touch-only devices are told so on the title screen.
+6. **Co-op** needs a relay to be configured (free, see the README) to
+   connect across the few networks that block direct browser-to-browser
+   connections, and depends on the free public PeerJS signaling server
+   being up (or a self-hosted one via `?signal=`). Joining needs a keyboard
+   to type the code. There's no host migration: if the host leaves, the
+   guest's game ends.
 7. **Performance** hasn't been profiled on real low-end GPUs; the Low
    preset is the lever if it's needed.
 8. **The gamepad layout isn't rebindable** (the keyboard is).

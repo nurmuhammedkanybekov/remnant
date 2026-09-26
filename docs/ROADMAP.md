@@ -110,3 +110,9 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] Graceful failure: clear messages for a wrong code, a full room,
       blocked connections, version mismatch; the host plays on alone if
       the guest leaves
+- [x] A free relay (TURN) for networks that block direct connections,
+      switched on with two repository variables; the lobby says whether
+      you're connected directly or through it
+- [x] Hardening: level attempts are numbered so stale messages can't leak
+      into a retry, background tabs keep the world running, rooms reopen
+      when a guest drops out, same-version check

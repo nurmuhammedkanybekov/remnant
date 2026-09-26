@@ -1,4 +1,4 @@
-import { aida, checkpoint, hint, objective, op, radio, unknown } from "../../game/script";
+import { nur, checkpoint, hint, objective, op, radio, unknown } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 1 — the tutorial. Wake up, meet the Operator, learn to be quiet. */
@@ -29,10 +29,10 @@ export const INFIRMARY: LevelDef = {
   ],
   notes: {
     "1": "PATIENT 14 — KESSLER, T. Drilling crew. Admitted with 'mineral dermatitis'. Refuses light. Asked for the lamps off. Asked us to be quiet. Asked, and asked, and asked.",
-    "2": "Aida — if you wake up before I get back: I've gone up to find the others. Keep your light off when you can. They follow it. — Mara",
+    "2": "Nur — if you wake up before I get back: I've gone up to find the others. Keep your light off when you can. They follow it. — Mara",
   },
   events: {
-    start: [radio(unknown("...is anyone on ten? Anyone at all? Pick up the intercom."), aida("My head. How long was I out?"))],
+    start: [radio(unknown("...is anyone on ten? Anyone at all? Pick up the intercom."), nur("My head. How long was I out?"))],
   },
   intercoms: [
     [
@@ -49,7 +49,7 @@ export const INFIRMARY: LevelDef = {
   triggers: {
     a: [hint("Press {flashlight} for your flashlight — it drains fast")],
     b: [hint("Hold {crouch} to crouch. Crouching is nearly silent")],
-    c: [radio(op("Something is moving in the east ward. Stay low. Don't run."), aida("Is that... Kessler? From drilling?")), checkpoint()],
+    c: [radio(op("Something is moving in the east ward. Stay low. Don't run."), nur("Is that... Kessler? From drilling?")), checkpoint()],
     d: [radio(op("The stairwell. Nine is the old maintenance wing. Stay off the main corridors."))],
   },
 };

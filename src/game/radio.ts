@@ -49,7 +49,7 @@ export class RadioChannel {
     this.current = line;
     this.remaining = lineDuration(line.text);
     this.hud.subtitle(line);
-    if (line.speaker !== "aida") this.sound.playRadioVoice(this.remaining, line.speaker === "unknown", from);
+    if (line.speaker !== "nur") this.sound.playRadioVoice(this.remaining, line.speaker === "unknown", from);
   }
 
   clear(): void {

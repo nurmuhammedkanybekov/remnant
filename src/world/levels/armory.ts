@@ -1,4 +1,4 @@
-import { aida, checkpoint, hint, objective, op, radio } from "../../game/script";
+import { nur, checkpoint, hint, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 8 — the consortium's security floor. A shotgun, a big open hall, and the Swarm. */
@@ -38,18 +38,18 @@ export const ARMORY: LevelDef = {
     start: [
       radio(
         op("Three. Consortium security. There's ammunition on this floor. Take all of it."),
-        aida("Why? What's on two?"),
+        nur("Why? What's on two?"),
         op("Take all of it.")
       ),
     ],
     keycard: [
-      radio(aida("Armory card. The stairwell is right below the main hall.")),
+      radio(nur("Armory card. The stairwell is right below the main hall.")),
       objective("Open the security door in the main hall."),
     ],
   },
   triggers: {
     b: [
-      radio(aida("That's a lot of them. Too many to fight."), aida("And the floor's moving. Rats. Dozens of them.")),
+      radio(nur("That's a lot of them. Too many to fight."), nur("And the floor's moving. Rats. Dozens of them.")),
       hint("A Swarm is fast but fragile — the shotgun, or a boot, deals with it"),
       checkpoint(),
     ],
