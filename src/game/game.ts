@@ -16,7 +16,12 @@ import { hasRelay, relayState } from "../net/ice";
 import { describeClose, PeerLink } from "../net/link";
 import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg } from "../net/protocol";
 import { buildCommand, emptyCommand, type PlayerCommand } from "../player/command";
-import { Hud } from "../ui/hud";
+import { LOOKS } from "../content/characters";
+import { MAX_MEDKITS } from "../content/items";
+import { WEAPON_ORDER, WEAPONS } from "../content/weapons";
+import { MAX_BATTERY } from "../player/flashlight";
+import { Hud, SPEAKER_NAMES } from "../ui/hud";
+import type { InventoryView } from "../ui/inventory";
 import { Screens, type MenuItem } from "../ui/menu";
 import { Viewmodel } from "../weapons/viewmodel";
 import { LEVELS } from "../world/levels";
@@ -81,6 +86,9 @@ export class Game {
   private backdrop: MenuBackdrop | null = null;
   /** Debug harness: fire on the next simulated frame. */
   private scriptedFire = false;
+  /** "Use Medkit" was picked in the inventory: heal on the next frame of play. */
+  private pendingHeal = false;
+  private inventoryOpen = false;
   /** Co-op: the connection to the other player, while there is one. */
   private link: PeerLink | null = null;
   /** Bumped whenever the co-op menu is shown or left, so a late relay check can't redraw another screen. */
@@ -116,6 +124,8 @@ export class Game {
       },
       quality: () => QUALITY[this.settings.quality],
       motionScale: () => (this.settings.reducedShake ? REDUCED_MOTION : 1),
+      noteRead: (key) => this.save.noteRead(key),
+      look: () => this.settings.look,
     };
     this.hud.setVisible(false);
     this.sound.setVolume(this.settings.volume);
@@ -155,6 +165,7 @@ export class Game {
 
   /** Settings that change how the HUD and camera behave. */
   private applyDisplaySettings(): void {
+    this.viewmodel.setSkin(LOOKS[this.settings.look].skin);
     this.hud.applyDisplay(this.settings.hudScale, this.settings.subtitleSize);
     this.container.classList.toggle("cb", this.settings.colorBlind);
     this.session?.applySettings();
@@ -317,7 +328,72 @@ export class Game {
     show();
   }
 
+  /** The inventory: gear, the journal of notes, the radio log. Pauses the game offline; online the world keeps going. */
+  private openInventory(): void {
+    if (!this.run || !this.session) return;
+    this.state = "paused";
+    this.inventoryOpen = true;
+    if (!this.run.coop) this.sound.setPaused(true);
+    this.input.exitLock();
+    this.screens.inventory(() => this.inventoryView(), {
+      onClose: () => this.resume(),
+      onHeal: () => {
+        this.pendingHeal = true;
+        this.resume();
+      },
+      closeCodes: this.settings.bindings.inventory.filter((c): c is string => c !== null),
+    });
+  }
+
+  private inventoryView(): InventoryView {
+    const s = this.session!;
+    const loadout = s.loadout;
+    const byId = new Map(LEVELS.map((d) => [d.id, d]));
+    const notes = this.save.progress.notes.flatMap((key) => {
+      const [levelId, ch] = key.split(":");
+      const def = byId.get(levelId);
+      const text = def?.notes[ch];
+      return def && text
+        ? [{ place: `${def.name} · ${def.subtitle}`, text, fresh: s.notesFound.has(key), order: LEVELS.indexOf(def) }]
+        : [];
+    });
+    // Newest level first, so this level's notes are at the top.
+    notes.sort((a, b) => b.order - a.order);
+    return {
+      place: `${s.def.name} · ${s.def.subtitle}`,
+      objective: s.objectiveText,
+      difficulty: this.run!.difficulty.name,
+      health: loadout.health,
+      maxHealth: s.player.health.max,
+      battery: loadout.battery,
+      maxBattery: MAX_BATTERY,
+      medkits: loadout.medkits,
+      maxMedkits: MAX_MEDKITS,
+      keycard: s.hasKeycard,
+      weapons: WEAPON_ORDER.map((id) => {
+        const w = WEAPONS[id];
+        const a = loadout.weapons[id];
+        return {
+          name: w.name,
+          slot: w.slot,
+          owned: !!a,
+          inHand: loadout.current === id,
+          mag: a?.mag ?? 0,
+          magSize: w.magSize,
+          reserve: a?.reserve ?? 0,
+          reserveMax: w.reserveMax,
+        };
+      }),
+      notes,
+      radio: [...s.radioLog].reverse().map((l) => ({ who: SPEAKER_NAMES[l.speaker], speaker: l.speaker, text: l.text })),
+      healKey: this.services.keyFor("heal"),
+      closeKey: this.services.keyFor("inventory"),
+      live: this.run!.coop,
+    };
+  }
+
   private resume(): void {
+    this.inventoryOpen = false;
     this.screens.hide();
     this.sound.setPaused(false);
     if (!this.input.usingPad) this.input.requestLock();
@@ -437,6 +513,7 @@ export class Game {
 
   private leaveGameplay(): void {
     this.input.exitLock();
+    this.inventoryOpen = false;
     this.hud.hideTransient();
     this.viewmodel.setVisible(false);
   }
@@ -451,7 +528,7 @@ export class Game {
       window.setTimeout(() => {
         if (this.state !== "dead") return;
         this.hud.setVisible(false);
-        this.screens.death(stats, this.isGuest ? this.waitForHost() : this.coopRetryItems(), false);
+        this.screens.death(stats, this.isGuest ? this.waitForHost() : this.coopRetryItems(), null);
       }, DEATH_SCREEN_DELAY_MS);
       return;
     }
@@ -469,7 +546,7 @@ export class Game {
               ...(run.checkpoint ? [{ label: "Restart Level", action: () => this.restartLevelFresh() }] : []),
               { label: "Quit to Menu", action: () => this.showMainMenu() },
             ],
-        runOver
+        runOver ? run.difficulty.name : null
       );
     }, DEATH_SCREEN_DELAY_MS);
   }
@@ -900,6 +977,8 @@ export class Game {
     if (!active) cmd.fire = false;
     if (this.scriptedFire) cmd.fire = true;
     this.scriptedFire = false;
+    if (this.pendingHeal) cmd.heal = true;
+    this.pendingHeal = false;
     return cmd;
   }
 
@@ -910,7 +989,7 @@ export class Game {
       if (i.padPressed(PAD.START)) this.pause();
       return;
     }
-    if (this.state === "paused" && i.padPressed(PAD.START)) {
+    if (this.state === "paused" && (i.padPressed(PAD.START) || (this.inventoryOpen && i.padPressed(PAD.BACK)))) {
       this.resume();
       return;
     }
@@ -952,7 +1031,11 @@ export class Game {
       case "playing":
         // Pointer lock can be refused (e.g. resuming too quickly after Esc) — tell the player to click.
         if (!this.input.locked && !this.debug && !this.input.usingPad) this.hud.prompt("CLICK TO RESUME", 0.25);
-        this.session?.step(dt, this.readCommand(dt));
+        {
+          const cmd = this.readCommand(dt);
+          if (cmd.inventory) this.openInventory();
+          else this.session?.step(dt, cmd);
+        }
         break;
       case "dead":
         this.session?.stepDead(dt);

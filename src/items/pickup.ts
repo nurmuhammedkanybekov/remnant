@@ -15,7 +15,8 @@ export class Pickup {
     private readonly scene: THREE.Scene,
     readonly type: PickupType,
     pos: THREE.Vector2,
-    readonly noteText?: string
+    readonly noteText?: string,
+    readonly noteKey?: string
   ) {
     this.item = buildItem(type);
     this.group.add(this.item);

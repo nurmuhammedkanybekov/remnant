@@ -73,6 +73,8 @@ export interface PlayerState {
   down: boolean;
   /** Seconds of bleed-out left while down. */
   bleed: number;
+  /** Their chosen look (`CharacterLook`); checked on arrival. */
+  look?: string;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { isCharacterLook, type CharacterLook } from "../content/characters";
 import { normalizeBindings, type Bindings } from "./actions";
 import { isQualityId, type QualityId } from "./quality";
 import { readJson, writeJson } from "./storage";
@@ -25,6 +26,8 @@ export interface Settings {
   reducedShake: boolean;
   /** Swaps the HUD's red/green signals for a colour-blind safe palette. */
   colorBlind: boolean;
+  /** How you look to your co-op partner, and your own hands. */
+  look: CharacterLook;
   bindings: Bindings;
 }
 
@@ -43,6 +46,7 @@ export function defaultSettings(): Settings {
     hudScale: 1,
     reducedShake: false,
     colorBlind: false,
+    look: "light",
     bindings: normalizeBindings(null),
   };
 }
@@ -68,6 +72,7 @@ export function normalizeSettings(raw: unknown): Settings {
     hudScale: clamp(s.hudScale, 0.8, 1.4, d.hudScale),
     reducedShake: bool(s.reducedShake, d.reducedShake),
     colorBlind: bool(s.colorBlind, d.colorBlind),
+    look: isCharacterLook(s.look) ? s.look : d.look,
     bindings: normalizeBindings(s.bindings),
   };
 }

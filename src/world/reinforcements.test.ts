@@ -13,11 +13,11 @@ describe("extra creatures (harder difficulties, co-op)", () => {
     const start = level.spawns.playerStart;
 
     it(`${def.id}: placed sensibly, only familiar kinds, same every time`, () => {
-      for (const amount of [0.6, 1, 1.4]) {
+      for (const amount of [0.8, 1.3, 1.8, 2.2]) {
         const extras = reinforcements(level, amount);
         expect(extras).toEqual(reinforcements(level, amount));
         const base = level.spawns.enemies.filter((e) => enemyDef(e.kind).behaviour !== "boss").length;
-        expect(extras.length).toBeLessThanOrEqual(Math.min(10, Math.round(base * amount)));
+        expect(extras.length).toBeLessThanOrEqual(Math.min(14, Math.round(Math.max(base, 4) * amount)));
         for (const e of extras) {
           const c = worldToCell(e.pos.x, e.pos.y);
           expect(isSolid(level, c.col, c.row)).toBe(false);
@@ -30,6 +30,12 @@ describe("extra creatures (harder difficulties, co-op)", () => {
       }
     });
   }
+
+  it("fills small levels too: more difficulty, more creatures", () => {
+    const small = parseLevel(LEVELS[0]);
+    expect(reinforcements(small, 0.8).length).toBeGreaterThanOrEqual(3);
+    expect(reinforcements(small, 1.8).length).toBeGreaterThan(reinforcements(small, 0.8).length);
+  });
 
   it("adds nothing at 0", () => {
     expect(reinforcements(parseLevel(LEVELS[3]), 0)).toEqual([]);

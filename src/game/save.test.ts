@@ -22,7 +22,7 @@ describe("parseSave", () => {
     const data = {
       version: SAVE_VERSION,
       campaign: { ...campaign, updatedAt: 5 },
-      progress: { unlockedLevel: 1, completed: ["story"], bestTimes: { a: 12 }, endings: ["seal"] },
+      progress: { unlockedLevel: 1, completed: ["story"], bestTimes: { a: 12 }, endings: ["seal"], notes: ["infirmary:1"] },
     };
     expect(parseSave(JSON.parse(JSON.stringify(data)), LEVELS)).toEqual(data);
   });
@@ -32,7 +32,12 @@ describe("parseSave", () => {
       {
         version: SAVE_VERSION,
         campaign: { ...campaign, loadout: { health: 500, battery: -3, medkits: 1, weapons: { pistol: { mag: 2.7, reserve: "lots" } } } },
-        progress: { unlockedLevel: 99, completed: ["normal", "normal", "godmode"], bestTimes: { a: -1, b: 30 } },
+        progress: {
+          unlockedLevel: 99,
+          completed: ["normal", "normal", "godmode"],
+          bestTimes: { a: -1, b: 30 },
+          notes: ["infirmary:1", "infirmary:1", 7, "junk"],
+        },
       },
       LEVELS
     );
@@ -46,6 +51,7 @@ describe("parseSave", () => {
     expect(s.progress.unlockedLevel).toBe(LEVELS - 1);
     expect(s.progress.completed).toEqual(["normal"]);
     expect(s.progress.bestTimes).toEqual({ b: 30 });
+    expect(s.progress.notes).toEqual(["infirmary:1"]);
   });
 
   it("migrates a v1 save: levels shifted by one, ids renamed", () => {
@@ -70,7 +76,7 @@ describe("parseSave", () => {
         loadout: { health: 70, battery: 40, mag: 5, reserve: 20 },
         checkpoint: { x: 1, z: 2, yaw: 0, loadout: { health: 70, battery: 40, mag: 5, reserve: 20 }, objective: "Go." },
       },
-      progress: { unlockedLevel: 4, completed: [], bestTimes: {}, endings: [] },
+      progress: { unlockedLevel: 4, completed: [], bestTimes: {}, endings: [], notes: [] },
     };
     const s = parseSave(v2, 10);
     expect(s.version).toBe(SAVE_VERSION);

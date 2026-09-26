@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { textures } from "../fx/textures";
+import { isCharacterLook, LOOKS, type CharacterLook } from "../content/characters";
 import type { PlayerState } from "../net/protocol";
+import { buildCharacter } from "./characterModel";
 import type { Gait } from "../player/playerController";
 
 const STAND_EYE = 1.7;
@@ -10,8 +12,8 @@ const SNAP_DISTANCE = 4;
 const MUZZLE_TIME = 0.06;
 
 /**
- * The other player, as you see them: a figure in a work coverall and a
- * hard hat with a headlamp, walking, crouching, firing and falling down
+ * The other player, as you see them: a figure in their chosen look (see
+ * `characterModel.ts`), hard hat and headlamp on, walking, crouching, firing and falling down
  * according to the states that arrive 20 times a second.
  *
  * Their torch is a real light, so their beam lights up the corridor for
@@ -28,18 +30,19 @@ export class RemotePlayer {
 
   private readonly root = new THREE.Group();
   private readonly body = new THREE.Group();
-  private readonly hips = new THREE.Group();
-  private readonly legL: THREE.Group;
-  private readonly legR: THREE.Group;
-  private readonly torso = new THREE.Group();
-  private readonly head = new THREE.Group();
-  private readonly arms = new THREE.Group();
+  private hips = new THREE.Group();
+  private legL = new THREE.Group();
+  private legR = new THREE.Group();
+  private torso = new THREE.Group();
+  private head = new THREE.Group();
+  private arms = new THREE.Group();
   private readonly lamp: THREE.SpotLight;
   private readonly lampTarget = new THREE.Object3D();
   private readonly lens: THREE.MeshBasicMaterial;
   private readonly flash: THREE.Sprite;
   private readonly flashLight: THREE.PointLight;
   private readonly marker: THREE.Sprite;
+  private look: CharacterLook | null = null;
   private eye = STAND_EYE;
   private walkPhase = 0;
   private stride = 0;
@@ -48,71 +51,7 @@ export class RemotePlayer {
   private muzzleTime = 0;
 
   constructor(private readonly scene: THREE.Scene) {
-    const coverall = new THREE.MeshStandardMaterial({ color: 0x4a4f3c, roughness: 0.85 });
-    const vest = new THREE.MeshStandardMaterial({ color: 0xa8741a, roughness: 0.7, emissive: 0x1a0f00 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.6, metalness: 0.3 });
-    const skin = new THREE.MeshStandardMaterial({ color: 0x9a7a66, roughness: 0.8 });
-    const helmet = new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.45 });
-    const box = (w: number, h: number, d: number, m: THREE.Material, y = 0) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-      mesh.position.y = y;
-      return mesh;
-    };
-
-    // Legs hang from the hips, so rotating a leg group swings it.
-    const leg = (x: number) => {
-      const g = new THREE.Group();
-      g.position.set(x, 0.92, 0);
-      g.add(box(0.17, 0.5, 0.2, coverall, -0.25));
-      const shin = box(0.15, 0.46, 0.17, coverall, -0.7);
-      g.add(shin);
-      const boot = box(0.17, 0.12, 0.3, dark, -0.9);
-      boot.position.z = -0.05;
-      g.add(boot);
-      this.hips.add(g);
-      return g;
-    };
-    this.legL = leg(-0.11);
-    this.legR = leg(0.11);
-    this.body.add(this.hips);
-
-    this.torso.position.y = 0.92;
-    this.torso.add(box(0.44, 0.58, 0.26, coverall, 0.3));
-    this.torso.add(box(0.46, 0.4, 0.28, vest, 0.38));
-    const pack = box(0.34, 0.4, 0.14, dark, 0.35);
-    pack.position.z = 0.2;
-    this.torso.add(pack);
-
-    // Head: face, hard hat, headlamp.
-    this.head.position.y = 0.72;
-    this.head.add(box(0.2, 0.24, 0.22, skin, 0.1));
-    const hat = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), helmet);
-    hat.position.y = 0.18;
-    hat.scale.set(1, 0.8, 1.1);
-    this.head.add(hat);
-    this.head.add(box(0.36, 0.02, 0.36, helmet, 0.18));
     this.lens = new THREE.MeshBasicMaterial({ color: 0xfff4d8 });
-    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.035, 12), this.lens);
-    lens.position.set(0, 0.24, -0.16);
-    lens.rotation.y = Math.PI;
-    this.head.add(lens);
-    this.torso.add(this.head);
-
-    // Arms out front, holding the gun.
-    this.arms.position.y = 0.5;
-    for (const x of [-0.2, 0.2]) {
-      const arm = box(0.11, 0.11, 0.42, coverall);
-      arm.position.set(x * 0.8, 0, -0.2);
-      arm.rotation.y = -x * 0.6;
-      this.arms.add(arm);
-    }
-    const gun = box(0.07, 0.12, 0.34, dark);
-    gun.position.set(0, 0.03, -0.46);
-    this.arms.add(gun);
-    this.torso.add(this.arms);
-    this.body.add(this.torso);
-    this.root.add(this.body);
-
     this.flash = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: textures().flash,
@@ -123,19 +62,19 @@ export class RemotePlayer {
       })
     );
     this.flash.scale.setScalar(0.45);
-    this.flash.position.set(0, 0.03, -0.7);
+    this.flash.position.set(0, 0.03, -0.72);
     this.flash.visible = false;
-    this.arms.add(this.flash);
     this.flashLight = new THREE.PointLight(0xffb060, 0, 10, 1.6);
     this.flashLight.position.copy(this.flash.position);
-    this.arms.add(this.flashLight);
 
     // Their headlamp: a real light, aimed where they look.
     this.lamp = new THREE.SpotLight(0xe8eeff, 0, 26, Math.PI / 6.5, 0.6, 0.9);
-    this.lamp.position.set(0, 0.24, -0.16);
-    this.lampTarget.position.set(0, 0.24, -6);
-    this.head.add(this.lamp, this.lampTarget);
+    this.lamp.position.set(0, 0.25, -0.16);
+    this.lampTarget.position.set(0, 0.25, -6);
     this.lamp.target = this.lampTarget;
+
+    this.root.add(this.body);
+    this.setLook("light");
 
     // A faint glow above them, so you can find each other in the dark.
     this.marker = new THREE.Sprite(
@@ -156,6 +95,19 @@ export class RemotePlayer {
     this.root.visible = false;
     this.root.rotation.order = "YXZ";
     scene.add(this.root);
+  }
+
+  /** Dresses the figure in the partner's chosen look (rebuilt only when it changes). */
+  setLook(look: CharacterLook): void {
+    if (look === this.look) return;
+    this.look = look;
+    for (const c of [...this.body.children]) this.body.remove(c);
+    const parts = buildCharacter(LOOKS[look]);
+    ({ hips: this.hips, legL: this.legL, legR: this.legR, torso: this.torso, head: this.head, arms: this.arms } = parts);
+    this.body.add(parts.hips, parts.torso);
+    this.body.scale.setScalar(LOOKS[look].height);
+    this.head.add(this.lamp, this.lampTarget, lensMesh(this.lens));
+    this.arms.add(this.flash, this.flashLight);
   }
 
   get visible(): boolean {
@@ -186,6 +138,7 @@ export class RemotePlayer {
       this.pitch = s.pitch;
     }
     this.state = s;
+    if (isCharacterLook(s.look)) this.setLook(s.look);
     this.root.visible = true;
   }
 
@@ -259,6 +212,14 @@ export class RemotePlayer {
   dispose(): void {
     this.scene.remove(this.root);
   }
+}
+
+/** The headlamp's glass, on the front of the hard hat. */
+function lensMesh(mat: THREE.MeshBasicMaterial): THREE.Mesh {
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.035, 12), mat);
+  lens.position.set(0, 0.25, -0.175);
+  lens.rotation.y = Math.PI;
+  return lens;
 }
 
 function wrap(a: number): number {

@@ -38,6 +38,7 @@ export const PAD_BINDINGS: Record<Action, number[]> = {
   interact: [PAD.A],
   melee: [PAD.RB, PAD.R3],
   heal: [PAD.UP],
+  inventory: [PAD.BACK],
   nextWeapon: [PAD.Y, PAD.RIGHT],
   prevWeapon: [PAD.LEFT],
   weapon1: [PAD.DOWN],

@@ -30,4 +30,10 @@ describe("normalizeSettings", () => {
     expect(s.reducedShake).toBe(false);
     expect(s.colorBlind).toBe(true);
   });
+
+  it("keeps a valid character look and drops an unknown one", () => {
+    expect(normalizeSettings({ look: "woman" }).look).toBe("woman");
+    expect(normalizeSettings({ look: "dark" }).look).toBe("dark");
+    expect(normalizeSettings({ look: "alien" }).look).toBe(defaultSettings().look);
+  });
 });
