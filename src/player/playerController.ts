@@ -90,6 +90,11 @@ export class PlayerController {
     return this.yaw;
   }
 
+  /** Up/down look angle (radians, up positive). */
+  get lookPitch(): number {
+    return this.pitch;
+  }
+
   addTrauma(amount: number): void {
     this.trauma = Math.min(1, this.trauma + amount * this.motionScale);
   }

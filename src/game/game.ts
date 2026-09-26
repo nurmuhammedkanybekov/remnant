@@ -11,7 +11,10 @@ import { Input } from "../core/input";
 import { SaveStore } from "./save";
 import { loadSettings, saveSettings, type Settings } from "../core/settings";
 import type { Enemy } from "../enemies/enemy";
-import { buildCommand, type PlayerCommand } from "../player/command";
+import { CLOSE_REASONS, PeerLink } from "../net/link";
+import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg, type SessionMsg } from "../net/protocol";
+import { DEFAULT_SIGNAL_URL } from "../net/signaling";
+import { buildCommand, emptyCommand, type PlayerCommand } from "../player/command";
 import { Hud } from "../ui/hud";
 import { Screens, type MenuItem } from "../ui/menu";
 import { Viewmodel } from "../weapons/viewmodel";
@@ -45,6 +48,8 @@ interface Run {
   stats: RunStats;
   /** Mid-level checkpoint in the current level, if one was reached. */
   checkpoint: CheckpointState | null;
+  /** A co-op run: nothing is written to the save, and the host drives the flow. */
+  coop: boolean;
 }
 
 /**
@@ -75,6 +80,10 @@ export class Game {
   private backdrop: MenuBackdrop | null = null;
   /** Debug harness: fire on the next simulated frame. */
   private scriptedFire = false;
+  /** Co-op: the connection to the other player, while there is one. */
+  private link: PeerLink | null = null;
+  /** Matchmaking server; `?signal=wss://…` points at a self-hosted one. */
+  private readonly signalUrl = new URLSearchParams(location.search).get("signal") ?? DEFAULT_SIGNAL_URL;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -142,6 +151,7 @@ export class Game {
   }
 
   private showMainMenu(): void {
+    this.endCoop();
     this.state = "menu";
     this.music.setMode("silent");
     this.hud.setVisible(false);
@@ -167,6 +177,7 @@ export class Game {
     items.push(
       { label: "New Game", primary: !saved, action: () => this.confirmReplaceRun(() => this.showDifficulty(0)) },
       { label: "Chapters", disabled: this.save.progress.unlockedLevel === 0, action: () => this.showChapters() },
+      { label: "Co-op", detail: "Two players, online", action: () => this.showCoopMenu() },
       { label: "Settings", action: () => this.showSettings(() => this.showMainMenu()) },
       { label: "Controls", action: () => this.showControls(() => this.showMainMenu()) }
     );
@@ -250,6 +261,21 @@ export class Game {
     this.state = "paused";
     this.sound.setPaused(true);
     this.hud.hideTransient();
+    if (this.run.coop) {
+      // Online, the world doesn't stop for a menu.
+      const show = () =>
+        this.screens.pause(
+          [
+            { label: "Resume", primary: true, action: () => this.resume() },
+            { label: "Settings", action: () => this.showSettings(show) },
+            { label: "Controls", action: () => this.showControls(show) },
+            { label: "Leave Game", detail: "Your partner is left on their own", action: () => this.showMainMenu() },
+          ],
+          `${this.run!.difficulty.name} · CO-OP — THE GAME KEEPS RUNNING`
+        );
+      show();
+      return;
+    }
     const show = () =>
       this.screens.pause(
         [
@@ -282,7 +308,7 @@ export class Game {
       LEVELS.map((l) => l.id),
       levelIndex
     );
-    this.run = { difficulty: def, levelIndex, loadout, stats: freshStats(), checkpoint: null };
+    this.run = { difficulty: def, levelIndex, loadout, stats: freshStats(), checkpoint: null, coop: false };
     this.startLevel(true);
   }
 
@@ -295,6 +321,7 @@ export class Game {
       loadout: cloneLoadout(saved.loadout),
       stats: { ...saved.stats },
       checkpoint: saved.checkpoint ? structuredClone(saved.checkpoint) : null,
+      coop: false,
     };
     this.startLevel(true);
   }
@@ -307,7 +334,7 @@ export class Game {
 
   private persistRun(): void {
     const run = this.run;
-    if (!run) return;
+    if (!run || run.coop) return;
     this.save.checkpoint({
       difficulty: run.difficulty.id,
       levelIndex: run.levelIndex,
@@ -331,7 +358,14 @@ export class Game {
     this.backdrop = null;
     this.screens.hide();
     this.hud.hideTransient();
-    const session = new LevelSession(this.services, LEVELS[run.levelIndex], run.difficulty, run.loadout, run.checkpoint);
+    const session = new LevelSession(
+      this.services,
+      LEVELS[run.levelIndex],
+      run.difficulty,
+      run.loadout,
+      run.checkpoint,
+      run.coop ? this.link : null
+    );
     session.onDeath = () => this.onDeath();
     session.onExit = (ending) => this.onLevelComplete(ending);
     session.onCheckpoint = (state) => {
@@ -341,7 +375,8 @@ export class Game {
     this.session = session;
     this.music.setMode("game");
 
-    if (card && !this.debug) {
+    // Co-op skips the card: the other player is already on their way in.
+    if (card && !this.debug && !run.coop) {
       this.state = "card";
       const def = LEVELS[run.levelIndex];
       this.screens.levelCard(
@@ -385,9 +420,17 @@ export class Game {
     this.state = "dead";
     this.music.setMode("silent");
     this.leaveGameplay();
+    const stats = { ...this.session!.stats };
+    if (run.coop) {
+      window.setTimeout(() => {
+        if (this.state !== "dead") return;
+        this.hud.setVisible(false);
+        this.screens.death(stats, this.isGuest ? this.waitForHost() : this.coopRetryItems(), false);
+      }, DEATH_SCREEN_DELAY_MS);
+      return;
+    }
     const runOver = run.difficulty.permadeath;
     if (runOver) this.save.clearCampaign();
-    const stats = { ...this.session!.stats };
     window.setTimeout(() => {
       if (this.state !== "dead") return;
       this.hud.setVisible(false);
@@ -411,13 +454,13 @@ export class Game {
     this.leaveGameplay();
     this.hud.setVisible(false);
     addStats(run.stats, session.stats);
-    const newBest = this.save.recordLevelTime(session.def.id, session.stats.time);
+    const newBest = !run.coop && this.save.recordLevelTime(session.def.id, session.stats.time);
     this.music.setMode("silent");
 
     if (run.levelIndex >= LEVELS.length - 1) {
       this.state = "victory";
       const id = ending ?? "leave";
-      this.save.completeCampaign(run.difficulty.id, id);
+      if (!run.coop) this.save.completeCampaign(run.difficulty.id, id);
       this.screens.ending(ENDINGS[id], run.stats, run.difficulty.name, [
         { label: "Main Menu", primary: true, action: () => this.showMainMenu() },
       ]);
@@ -430,10 +473,219 @@ export class Game {
     run.checkpoint = null;
     // Save now, so quitting from the results screen resumes at the next level.
     this.persistRun();
-    this.screens.levelComplete(session.def.name, session.def.subtitle, session.stats, newBest, [
-      { label: "Continue", primary: true, action: () => this.startLevel(true) },
-      { label: "Quit to Menu", action: () => this.showMainMenu() },
-    ]);
+    const next: MenuItem[] = !run.coop
+      ? [
+          { label: "Continue", primary: true, action: () => this.startLevel(true) },
+          { label: "Quit to Menu", action: () => this.showMainMenu() },
+        ]
+      : this.isGuest
+        ? this.waitForHost()
+        : [
+            {
+              label: "Continue",
+              primary: true,
+              action: () => {
+                this.link?.send({ t: "start", level: run.levelIndex, difficulty: run.difficulty.id, fresh: false });
+                this.startLevel(true);
+              },
+            },
+            { label: "Leave Game", action: () => this.showMainMenu() },
+          ];
+    this.screens.levelComplete(session.def.name, session.def.subtitle, session.stats, newBest, next);
+  }
+
+  // ------------------------------------------------------------------ co-op
+
+  private get isGuest(): boolean {
+    return this.link?.role === "guest";
+  }
+
+  private showCoopMenu(): void {
+    this.endCoop();
+    this.state = "menu";
+    this.screens.lobby(
+      "CO-OP",
+      "TWO PLAYERS · ONLINE",
+      "One of you hosts and picks the sublevel; the other joins with the host's room code.\nYou leave each sublevel together — and when one of you goes down, the other has 45 seconds to get them back up.",
+      [
+        { label: "Host a Game", primary: true, action: () => this.showCoopChapters() },
+        { label: "Join a Game", action: () => this.showJoin() },
+        { label: "Back", action: () => this.showMainMenu() },
+      ]
+    );
+  }
+
+  private showCoopChapters(): void {
+    const { unlockedLevel, bestTimes } = this.save.progress;
+    this.screens.chapters(
+      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, unlocked: i <= unlockedLevel, bestTime: bestTimes[def.id] })),
+      (level) =>
+        this.screens.difficulty(
+          (difficulty) => this.hostGame(level, difficulty),
+          () => this.showCoopChapters(),
+          this.save.progress.completed
+        ),
+      () => this.showCoopMenu()
+    );
+  }
+
+  /** Opens a room and waits for the partner. Returns the room code. */
+  private hostGame(level: number, difficulty: DifficultyId): string {
+    const code = makeRoomCode();
+    const link = this.openLink("host", code);
+    this.screens.lobby(
+      "HOST",
+      "ROOM CODE",
+      "Send this code to your partner.\nWaiting for them to join…",
+      [{ label: "Cancel", action: () => this.showCoopMenu() }],
+      code
+    );
+    link.onOpen = () => {
+      link.send({ t: "hello", v: PROTOCOL_VERSION });
+      this.sound.playCheckpoint();
+      const def = LEVELS[level];
+      this.screens.lobby(
+        "PARTNER CONNECTED",
+        `${def.name.toUpperCase()} · ${def.subtitle.toUpperCase()} · ${DIFFICULTIES[difficulty].name.toUpperCase()}`,
+        "Start when you're both ready.",
+        [
+          {
+            label: "Start",
+            primary: true,
+            action: () => {
+              link.send({ t: "start", level, difficulty, fresh: true });
+              this.startCoopRun(level, difficulty);
+            },
+          },
+          { label: "Cancel", action: () => this.showCoopMenu() },
+        ],
+        code
+      );
+    };
+    return code;
+  }
+
+  private showJoin(error = "", typed = ""): void {
+    this.screens.joinForm(
+      (input) => this.joinGame(input),
+      () => this.showCoopMenu(),
+      error,
+      typed
+    );
+  }
+
+  private joinGame(input: string): void {
+    const code = normalizeRoomCode(input);
+    if (!code) return this.showJoin("Room codes are 5 letters and numbers.", input);
+    const link = this.openLink("guest", code);
+    this.screens.lobby("JOINING", `ROOM ${code}`, "Connecting to your partner…", [{ label: "Cancel", action: () => this.showCoopMenu() }]);
+    link.onOpen = () => {
+      link.send({ t: "hello", v: PROTOCOL_VERSION });
+      this.sound.playCheckpoint();
+      this.screens.lobby("CONNECTED", `ROOM ${code}`, "Waiting for the host to start the game…", [
+        { label: "Leave", action: () => this.showCoopMenu() },
+      ]);
+    };
+  }
+
+  private openLink(role: "host" | "guest", code: string): PeerLink {
+    this.endCoop();
+    const link = new PeerLink(role, code, this.signalUrl);
+    this.link = link;
+    link.onMessage = (m) => {
+      if (this.link === link) this.onNet(m as NetMsg);
+    };
+    link.onClose = (reason) => {
+      if (this.link === link) this.onLinkClosed(link, reason);
+    };
+    link.start();
+    return link;
+  }
+
+  /** Hangs up (if connected). Safe to call any time. */
+  private endCoop(): void {
+    const link = this.link;
+    this.link = null;
+    link?.close("left");
+  }
+
+  private onLinkClosed(link: PeerLink, reason: string): void {
+    this.link = null;
+    const text = CLOSE_REASONS[reason] ?? CLOSE_REASONS.lost;
+    const playing = this.run?.coop && this.state !== "menu" && this.state !== "title";
+    if (!playing) {
+      this.screens.lobby("CO-OP", "NOT CONNECTED", text, [{ label: "Back", primary: true, action: () => this.showCoopMenu() }]);
+      return;
+    }
+    // The host carries on alone (the session notices the partner is gone).
+    if (link.role === "host") {
+      if (this.state === "dead" || this.state === "levelComplete") this.hud.toast("YOUR PARTNER LEFT", "var(--ui-red)");
+      return;
+    }
+    // The guest's world was the host's: it can't go on.
+    this.leaveGameplay();
+    this.hud.setVisible(false);
+    this.music.setMode("silent");
+    this.state = "menu";
+    this.screens.lobby("CONNECTION LOST", "CO-OP", text, [{ label: "Main Menu", primary: true, action: () => this.showMainMenu() }]);
+  }
+
+  private onNet(m: NetMsg): void {
+    switch (m.t) {
+      case "hello":
+        if (m.v !== PROTOCOL_VERSION) this.link?.close("version");
+        return;
+      case "start":
+        if (!this.isGuest) return;
+        if (m.fresh || !this.run) this.startCoopRun(m.level, m.difficulty);
+        else {
+          this.run.levelIndex = m.level;
+          this.run.checkpoint = null;
+          this.startLevel(true);
+        }
+        return;
+      case "restart":
+        if (!this.isGuest || !this.run) return;
+        if (!m.checkpoint) this.run.checkpoint = null;
+        this.startLevel();
+        return;
+      default:
+        this.session?.receive(m as SessionMsg);
+    }
+  }
+
+  private startCoopRun(level: number, difficulty: DifficultyId): void {
+    const def = DIFFICULTIES[difficulty];
+    const loadout = startingLoadout(
+      def,
+      LEVELS.map((l) => l.id),
+      level
+    );
+    this.run = { difficulty: def, levelIndex: level, loadout, stats: freshStats(), checkpoint: null, coop: true };
+    this.startLevel(true);
+  }
+
+  /** Host, after a wipe: both of you go again. */
+  private coopRetryItems(): MenuItem[] {
+    const run = this.run!;
+    const retry = (checkpoint: boolean) => () => {
+      if (!checkpoint) run.checkpoint = null;
+      this.link?.send({ t: "restart", checkpoint });
+      this.startLevel();
+    };
+    return [
+      { label: run.checkpoint ? "Retry from Checkpoint" : "Retry Level", primary: true, action: retry(!!run.checkpoint) },
+      ...(run.checkpoint ? [{ label: "Restart Level", action: retry(false) }] : []),
+      { label: "Leave Game", action: () => this.showMainMenu() },
+    ];
+  }
+
+  /** Guest: the host picks what happens next. */
+  private waitForHost(): MenuItem[] {
+    return [
+      { label: "Waiting for the host…", disabled: true, action: () => {} },
+      { label: "Leave Game", action: () => this.showMainMenu() },
+    ];
   }
 
   // ------------------------------------------------------------------ loop
@@ -524,6 +776,11 @@ export class Game {
       case "dead":
         this.session?.stepDead(dt);
         break;
+      case "paused":
+        // Co-op keeps running under the pause menu (you just stand there).
+        if (this.run?.coop) this.session?.step(dt, emptyCommand());
+        else this.engine.setPostFx(0, 0, performance.now() / 1000);
+        break;
       default:
         this.engine.setPostFx(0, 0, performance.now() / 1000);
     }
@@ -572,5 +829,9 @@ export class Game {
   }
   debugState(): string {
     return this.state;
+  }
+  /** Leave a co-op game as if from the pause menu. */
+  debugLeave(): void {
+    this.showMainMenu();
   }
 }

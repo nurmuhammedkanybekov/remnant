@@ -61,6 +61,12 @@ const CSS = /* css */ `
 .medkits.none { opacity: .35; }
 .keycard { margin-top: 10px; font-size: 12px; letter-spacing: 2px; color: var(--ui-green); display: none; }
 .keycard.show { display: block; }
+.partner { margin-top: 12px; font-size: 11px; letter-spacing: 2px; color: #7ab8ff; display: none; align-items: center; gap: 8px; }
+.partner.show { display: flex; }
+.partner .pbar { flex: 0 0 90px; height: 4px; background: rgba(255,255,255,.12); }
+.partner .pbar b { display: block; height: 100%; background: #7ab8ff; transition: width .2s; }
+.partner.down { color: var(--ui-red); animation: pulse 1s infinite; }
+.partner.down .pbar b { background: var(--ui-red); }
 
 /* ---- ammo ---- */
 .ammo { position: absolute; right: 30px; bottom: 24px; text-align: right; }
@@ -162,6 +168,14 @@ const CSS = /* css */ `
 .menu button:hover, .menu button:focus-visible { color: #fff; letter-spacing: 8px; outline: none; }
 .menu button:hover::before, .menu button:focus-visible::before { content: "›"; position: absolute; left: 12px; color: var(--ui-red); }
 .menu button.primary { color: var(--ui-fg); }
+.room-code { display: flex; gap: 10px; margin: -18px 0 26px; }
+.room-code b { font-family: var(--font-display); font-weight: 400; font-size: clamp(40px, 8vw, 72px); width: 1.1em; padding: 4px 0; text-align: center;
+  border: 1px solid rgba(255,255,255,.25); background: rgba(0,0,0,.35); letter-spacing: 0; }
+.code-input { font-family: var(--font-display); font-size: clamp(36px, 7vw, 60px); letter-spacing: .35em; text-align: center; text-transform: uppercase;
+  width: min(420px, 86vw); padding: 10px 0 10px .35em; margin: -14px 0 14px; color: inherit; background: rgba(0,0,0,.4);
+  border: 1px solid rgba(255,255,255,.3); outline: none; }
+.code-input:focus { border-color: var(--ui-green); }
+.screen .sub.err { color: var(--ui-red); min-height: 1.7em; margin-bottom: 18px; }
 .story { width: min(620px, 88vw); text-align: left; margin: 6px 0 30px; }
 .story p { font-family: "Special Elite", var(--font-mono); font-size: 15px; line-height: 1.75; color: rgba(232,226,214,.88); margin: 0 0 16px;
   opacity: 0; animation: storyin 1.4s ease forwards; }

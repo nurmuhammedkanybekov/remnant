@@ -216,3 +216,60 @@ describe("the Remnant", () => {
     expect(summons).toBeGreaterThan(0);
   });
 });
+
+describe("co-op", () => {
+  it("hunts the closer of two players, and ignores one who is down", () => {
+    const e = spawn("husk", 5);
+    const near = perceive(7, { playerNoise: 12 });
+    const far = perceive(10, { playerNoise: 12 });
+    e.update(1 / 30, level, [far, near], [e]);
+    expect(e.target).toBe(1);
+    e.update(1 / 30, level, [far, { ...near, playerDead: true }], [e]);
+    expect(e.target).toBe(0);
+  });
+
+  it("doesn't flip between players who are about as close", () => {
+    const e = spawn("husk", 5);
+    e.update(1 / 30, level, [perceive(7), perceive(8)], [e]);
+    expect(e.target).toBe(0);
+    // Player 2 is now a metre closer: not enough to switch.
+    const p1 = perceive(7);
+    const p2 = perceive(7);
+    p1.playerPos = p1.playerPos.clone().add(new THREE.Vector2(1, 0));
+    e.update(1 / 30, level, [p1, p2], [e]);
+    expect(e.target).toBe(0);
+  });
+
+  it("either player's flashlight holds a Watcher", () => {
+    const e = spawn("watcher", 5);
+    const dark = perceive(8);
+    const lit = perceive(2, { torchOn: true, look: new THREE.Vector3(1, 0, 0) });
+    e.update(1 / 30, level, [dark, lit], [e]);
+    expect(e.frozen).toBe(true);
+  });
+
+  it("a guest's puppet copies the host's creature, down to its death", () => {
+    const host = spawn("husk", 3);
+    run(host, perceive(8, { playerNoise: 12 }), 1.5);
+    const guest = spawn("husk", 3);
+    guest.puppet = true;
+    guest.applyNet(host.netState());
+    for (let t = 0; t < 1; t += 1 / 30) guest.updatePuppet(1 / 30);
+    expect(guest.state).toBe(host.state);
+    expect(guest.position2D.distanceTo(host.position2D)).toBeLessThan(0.05);
+    host.takeDamage(999, cellCenter(8, 2));
+    guest.applyNet(host.netState());
+    expect(guest.isDead).toBe(true);
+  });
+
+  it("the boss's puppet shares its phase and whether it's awake", () => {
+    const host = spawn("remnant", 6) as RemnantBoss;
+    host.takeDamage(host.maxHealth * 0.5, cellCenter(2, 2), "head");
+    run(host, perceive(2), 0.5);
+    const guest = spawn("remnant", 6) as RemnantBoss;
+    guest.puppet = true;
+    guest.applyNet(host.netState());
+    expect(guest.awake).toBe(true);
+    expect(guest.phase).toBe(host.phase);
+  });
+});
