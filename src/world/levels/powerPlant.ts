@@ -1,4 +1,4 @@
-import { aida, checkpoint, hint, objective, op, radio } from "../../game/script";
+import { nur, checkpoint, hint, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 7 — restart three generators. Each one is loud, and keeps being loud. Spitters guard them. */
@@ -38,20 +38,20 @@ export const POWER_PLANT: LevelDef = {
     start: [
       radio(
         op("Four. The power plant. The lift to the surface needs all three generators running."),
-        aida("And the noise?"),
+        nur("And the noise?"),
         op("The noise will bring them. Start a generator, then get out of the way.")
       ),
     ],
     power: [
-      radio(op("Power. Good. The lift is waking up."), op("Now come up to me, Aida. Come up."), aida("...Why does that sound different?")),
+      radio(op("Power. Good. The lift is waking up."), op("Now come up to me, Nur. Come up."), nur("...Why does that sound different?")),
       objective("Take the stairwell up."),
       checkpoint(),
     ],
   },
   triggers: {
-    a: [radio(aida("The exit's right there. Dead. No power."))],
+    a: [radio(nur("The exit's right there. Dead. No power."))],
     b: [
-      radio(op("There are ones in the plant that spit. It eats through steel. Don't let it touch you."), aida("Of course there are.")),
+      radio(op("There are ones in the plant that spit. It eats through steel. Don't let it touch you."), nur("Of course there are.")),
       hint("Spitters lob acid from a distance — sidestep it and close in"),
     ],
   },

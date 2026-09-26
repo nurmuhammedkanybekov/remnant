@@ -1,4 +1,4 @@
-import { aida, checkpoint, hint, objective, radio, unknown } from "../../game/script";
+import { nur, checkpoint, hint, objective, radio, unknown } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 9 — the Remnant has grown into the whole sublevel. The Operator stops pretending, and the mass itself blocks the lift. */
@@ -43,34 +43,34 @@ export const HIVE: LevelDef = {
   ],
   notes: {
     "1": "It isn't eating them. It's keeping them. You can hear them in there, talking. All of them at once.",
-    "2": "Aida. It's me. It's Mara. It doesn't hurt. Come and see. It's warm here and nobody is ever alone.",
+    "2": "Nur. It's me. It's Mara. It doesn't hurt. Come and see. It's warm here and nobody is ever alone.",
   },
   events: {
-    start: [radio(aida("The walls are... soft. Warm. It's grown through everything."), unknown("Keep going, Aida. You're nearly home."))],
-    bossPhase2: [radio(unknown("You can't kill forty-one people twice, Aida."))],
+    start: [radio(nur("The walls are... soft. Warm. It's grown through everything."), unknown("Keep going, Nur. You're nearly home."))],
+    bossPhase2: [radio(unknown("You can't kill forty-one people twice, Nur."))],
     bossPhase3: [radio(unknown("Stop. Stop. We only wanted to see the sky."))],
     bossDefeated: [
       radio(
-        aida("It's down. It's not moving."),
-        unknown("That was only a part of us, Aida. We are in every wall. We are waiting at the top."),
-        aida("...Then I'll see you there.")
+        nur("It's down. It's not moving."),
+        unknown("That was only a part of us, Nur. We are in every wall. We are waiting at the top."),
+        nur("...Then I'll see you there.")
       ),
       objective("Reach the lift shaft."),
       checkpoint(),
     ],
   },
   triggers: {
-    a: [radio(aida("You're not in a control room. Are you."), unknown("We are in every room.")), checkpoint()],
+    a: [radio(nur("You're not in a control room. Are you."), unknown("We are in every room.")), checkpoint()],
     b: [
       radio(
         unknown("You were always going to come up. We need you to. We need someone whole."),
         unknown("The blast doors only open for an unchanged crew member. Only for you."),
-        aida("So that's it. You need me to carry you out.")
+        nur("So that's it. You need me to carry you out.")
       ),
       objective("Find a way through to the lift."),
     ],
     c: [
-      radio(unknown("Come in, Aida. Come and see us. All of us."), aida("That's it. That's the core. And the lift is right behind it.")),
+      radio(unknown("Come in, Nur. Come and see us. All of us."), nur("That's it. That's the core. And the lift is right behind it.")),
       objective("Kill the Remnant. Shoot the core when it opens."),
       hint("The hide soaks up bullets — hit the core while it's open, just after it attacks"),
     ],

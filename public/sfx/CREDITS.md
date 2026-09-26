@@ -83,6 +83,8 @@ everyone who recorded and shared them.
 | `flashlight_1.mp3`     | [Flashlight Switch Click](https://freesound.org/people/Ralph0o7/sounds/690300/)                                     | Ralph0o7         | CC0 1.0 |
 | `flashlight_2.mp3`     | [Small_Flashlight_Click_on_02.wav](https://freesound.org/people/Rudmer_Rotteveel/sounds/457463/)                    | Rudmer_Rotteveel | CC0 1.0 |
 | `ammoPickup_1.mp3`     | [pickup_ammo.wav](https://freesound.org/people/BBBBilly/sounds/653032/)                                             | BBBBilly         | CC0 1.0 |
-| `playerHurt_1.mp3`     | [Woman getting pain](https://freesound.org/people/Guinamun/sounds/796094/)                                          | Guinamun         | CC0 1.0 |
-| `playerHurt_2.mp3`     | [Woman expressing pain](https://freesound.org/people/hetsumani/sounds/475296/)                                      | hetsumani        | CC0 1.0 |
+| `playerHurt_1.mp3`     | [Voice_AdultMale_PainGrunts_09.wav](https://freesound.org/people/MrFossy/sounds/547209/)                            | MrFossy          | CC0 1.0 |
+| `playerHurt_2.mp3`     | [Male Grunting In Pain](https://freesound.org/people/elynch0901/sounds/464486/)                                     | elynch0901       | CC0 1.0 |
+| `playerHurt_3.mp3`     | [WoundedMaleShort.wav](https://freesound.org/people/AncientWarrior/sounds/567989/)                                  | AncientWarrior   | CC0 1.0 |
+| `playerHurt_4.mp3`     | [WoundedMaleShort.wav](https://freesound.org/people/AncientWarrior/sounds/567989/)                                  | AncientWarrior   | CC0 1.0 |
 | `door_1.mp3`           | [G31-45-Very Heavy Metal Sliding Door.wav](https://freesound.org/people/craigsmith/sounds/438483/)                  | craigsmith       | CC0 1.0 |

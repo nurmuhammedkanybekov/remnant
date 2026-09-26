@@ -7,7 +7,7 @@ export const PROLOGUE = {
     "1987. At the bottom of the deepest shaft, the drill breaks into a cavity lined with something that is neither rock nor tissue. The researchers call it the Remnant.",
     "1991. The station is sealed and struck from every record.",
     "Now. A mining consortium reopens Object 9 to strip it for rare earth metals. Forty-one contractors go down. Eleven days ago, the shafts collapsed behind them.",
-    "You are Aida Serik, structural engineer. You wake up on Sublevel 10.",
+    "You are Nur Kanybekov, structural engineer. You wake up on Sublevel 10.",
   ],
 };
 
@@ -45,18 +45,18 @@ export const ENDINGS: Record<EndingId, Ending> = {
  * listening to the radio too.
  */
 export const MIMIC_LINES = [
-  "Aida. Over here.",
+  "Nur. Over here.",
   "This way. Quickly. I found a way up.",
-  "Aida? Can you hear me? Follow my voice.",
+  "Nur? Can you hear me? Follow my voice.",
   "It's safe in here. Come and see.",
-  "Keep going, Aida. Nearly there. This way.",
+  "Keep going, Nur. Nearly there. This way.",
 ];
 
 /** Radio fragments that scroll along the bottom of the main menu. */
 export const TRANSMISSIONS = [
   "…is anyone on ten? Anyone at all? Pick up the intercom…",
   "…stay off the main corridors. They follow the noise…",
-  "…the lift needs all three generators. Come up to me, Aida…",
+  "…the lift needs all three generators. Come up to me, Nur…",
   "…this is Voss. If you're reading this, don't answer the radio…",
   "…forty-one on the manifest. Forty-one voices on the channel…",
   "…Zenit control, do you copy. Zenit control. Zenit…",

@@ -143,8 +143,8 @@ const CSS = /* css */ `
 .subtitle.show { opacity: 1; }
 .subtitle .who { font-size: 10px; letter-spacing: 4px; color: var(--ui-amber); margin-bottom: 5px; }
 .subtitle .line { display: inline-block; font-size: 17px; line-height: 1.5; padding: 6px 14px; background: rgba(0,0,0,.55); border-radius: 2px; }
-.subtitle.aida .who { color: var(--ui-dim); }
-.subtitle.aida .line { font-style: italic; color: rgba(232,226,214,.85); }
+.subtitle.nur .who { color: var(--ui-dim); }
+.subtitle.nur .line { font-style: italic; color: rgba(232,226,214,.85); }
 .subtitle.unknown .who { color: var(--ui-red); }
 .subtitle.unknown .line { color: #f0c8c0; letter-spacing: 1px; }
 .subtitle.echo .who { color: #d88ab0; }

@@ -1,3 +1,4 @@
+import { hasRelay, iceConfig, iceServers } from "./ice";
 import { roomPeerId } from "./protocol";
 import { DEFAULT_SIGNAL_URL, Signaling, type SignalMessage } from "./signaling";
 
@@ -12,9 +13,8 @@ import { DEFAULT_SIGNAL_URL, Signaling, type SignalMessage } from "./signaling";
 
 export type Role = "host" | "guest";
 
-const ICE_SERVERS: RTCIceServer[] = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
-/** Give up on a connection that hasn't opened by then. */
-const CONNECT_TIMEOUT_MS = 20000;
+/** Give up on a connection that hasn't opened by then (a relay takes a little longer to set up). */
+const CONNECT_TIMEOUT_MS = 30000;
 /** No message at all for this long means the other side is gone. */
 const SILENCE_TIMEOUT_MS = 8000;
 const PING_MS = 1000;
@@ -27,7 +27,10 @@ export const CLOSE_REASONS: Record<string, string> = {
   unreachable: "Couldn't reach the matchmaking server. Check your connection.",
   server: "The matchmaking server refused the connection. Try again in a moment.",
   closed: "Lost the connection to the matchmaking server.",
-  timeout: "Couldn't connect to the other player. Some networks block direct connections between browsers — try another network.",
+  timeout: hasRelay()
+    ? "Couldn't connect to the other player, even through the relay. Check both connections and try again."
+    : "Couldn't connect to the other player. Some networks (school, office, some mobile data) block direct connections between browsers — try another network, or turn on the free relay (see the README).",
+  unsupported: "This browser can't make direct connections (WebRTC). Try an up-to-date Chrome, Edge or Firefox.",
   version: "The other player is running a different version of REMNANT. Both refresh the page and try again.",
   left: "The other player left the game.",
   lost: "The connection to the other player was lost.",
@@ -43,9 +46,12 @@ export class PeerLink {
   onMessage: ((data: unknown) => void) | null = null;
   /** The link ended (or never started); `reason` is a key of CLOSE_REASONS. */
   onClose: ((reason: string) => void) | null = null;
+  /** Host: someone tried to join but the connection couldn't be made. The room stays open for another try. */
+  onJoinFailed: (() => void) | null = null;
 
   private readonly signaling: Signaling;
   private pc: RTCPeerConnection | null = null;
+  /** Set as soon as a partner is chosen (before the connection exists), so a second one is turned away. */
   private remoteId: string | null = null;
   private reliable: RTCDataChannel | null = null;
   private fast: RTCDataChannel | null = null;
@@ -82,6 +88,11 @@ export class PeerLink {
   }
 
   start(): void {
+    if (typeof RTCPeerConnection === "undefined") {
+      // Let the caller finish wiring up before hearing about it.
+      window.setTimeout(() => this.close("unsupported"));
+      return;
+    }
     this.signaling.connect();
     if (this.role === "guest") this.timers.push(window.setTimeout(() => !this.isOpen && this.close("timeout"), CONNECT_TIMEOUT_MS));
   }
@@ -113,16 +124,47 @@ export class PeerLink {
 
   // ------------------------------------------------------------------ WebRTC
 
-  private newConnection(remoteId: string): RTCPeerConnection {
+  /** Whether this link is direct or goes through a TURN relay (null if it can't tell). */
+  async route(): Promise<"direct" | "relay" | null> {
+    const pc = this.pc;
+    if (!pc || !this.isOpen) return null;
+    try {
+      const stats = await pc.getStats();
+      let pairId: string | undefined;
+      stats.forEach((r: { type: string; selectedCandidatePairId?: string }) => {
+        if (r.type === "transport" && r.selectedCandidatePairId) pairId = r.selectedCandidatePairId;
+      });
+      const pair = pairId ? (stats.get(pairId) as { localCandidateId?: string } | undefined) : undefined;
+      const local = pair?.localCandidateId ? (stats.get(pair.localCandidateId) as { candidateType?: string } | undefined) : undefined;
+      if (!local?.candidateType) return null;
+      return local.candidateType === "relay" ? "relay" : "direct";
+    } catch {
+      return null;
+    }
+  }
+
+  private async newConnection(remoteId: string): Promise<RTCPeerConnection> {
     this.remoteId = remoteId;
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const cfg = iceConfig();
+    const servers = await iceServers(cfg);
+    const pc = new RTCPeerConnection({ iceServers: servers, iceTransportPolicy: cfg.relayOnly ? "relay" : "all" });
+    if (this.closed) {
+      pc.close();
+      return pc;
+    }
     this.pc = pc;
     pc.onicecandidate = (e) => {
       if (e.candidate) this.signaling.send(remoteId, "CANDIDATE", { candidate: e.candidate.toJSON() });
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed") this.close(this.isOpen ? "lost" : "timeout");
+      if (pc.connectionState !== "failed") return;
+      if (this.isOpen) this.close("lost");
+      else if (this.role === "host") this.dropPending();
+      else this.close("timeout");
     };
+    // Host: a guest that never gets through mustn't hold the room.
+    if (this.role === "host")
+      this.timers.push(window.setTimeout(() => this.pc === pc && !this.isOpen && this.dropPending(), CONNECT_TIMEOUT_MS));
     pc.ondatachannel = (e) => this.adopt(e.channel);
     return pc;
   }
@@ -166,7 +208,8 @@ export class PeerLink {
 
   /** Guest: open the channels and send an offer to the room's host. */
   private async call(): Promise<void> {
-    const pc = this.newConnection(roomPeerId(this.code));
+    const pc = await this.newConnection(roomPeerId(this.code));
+    if (this.closed) return;
     this.adopt(pc.createDataChannel("reliable", { ordered: true }));
     this.adopt(pc.createDataChannel("fast", { ordered: false, maxRetransmits: 0 }));
     const offer = await pc.createOffer();
@@ -179,12 +222,13 @@ export class PeerLink {
     switch (m.type) {
       case "OFFER": {
         if (this.role !== "host" || !m.src) return;
-        if (this.pc) {
-          // Someone else is already in: turn the newcomer away.
-          this.signaling.send(m.src, "ANSWER", { full: true });
+        if (this.remoteId) {
+          // Someone else is already in (or on their way in): turn the newcomer away.
+          if (m.src !== this.remoteId) this.signaling.send(m.src, "ANSWER", { full: true });
           return;
         }
-        const pc = this.newConnection(m.src);
+        const pc = await this.newConnection(m.src);
+        if (this.closed) return;
         await pc.setRemoteDescription((payload as unknown as Offer).sdp);
         await this.flushCandidates();
         const answer = await pc.createAnswer();
@@ -211,6 +255,17 @@ export class PeerLink {
         if (this.role === "guest" && !this.isOpen) this.close("no-room");
         break;
     }
+  }
+
+  /** Host: forget a half-made connection so the next guest can try. */
+  private dropPending(): void {
+    if (this.isOpen || this.closed) return;
+    this.pc?.close();
+    this.pc = null;
+    this.reliable = this.fast = null;
+    this.remoteId = null;
+    this.pendingCandidates = [];
+    this.onJoinFailed?.();
   }
 
   private async flushCandidates(): Promise<void> {

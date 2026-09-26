@@ -24,6 +24,8 @@ export interface EnemyModifiers {
   damage: number;
   /** Scales sight range and hearing. */
   perception: number;
+  /** Scales how fast they run once they're hunting you. Optional: 1 if left out. */
+  speed?: number;
 }
 
 export const NO_MODIFIERS: EnemyModifiers = { health: 1, damage: 1, perception: 1 };
@@ -473,7 +475,7 @@ export class Enemy {
       return;
     }
     const target = this.sinceContact < 0.2 ? p.playerPos : this.lastKnown;
-    const speed = s.chaseSpeed * (1 - this.stagger * 0.7);
+    const speed = s.chaseSpeed * (this.mods.speed ?? 1) * (1 - this.stagger * 0.7);
     const r = s.behaviour === "ranged" ? s.ranged : undefined;
     if (dist < s.attackRange && los) {
       this.startAttack("melee");

@@ -15,7 +15,8 @@
  */
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? "playwright");
 const signal = process.env.SIGNAL_URL ?? "ws://127.0.0.1:9000/peerjs";
-const URL = `${process.env.GAME_URL ?? "http://localhost:5173/"}?debug&signal=${encodeURIComponent(signal)}`;
+// COOP_QUERY adds URL options, e.g. "&turn=turn:127.0.0.1:3478&turnUser=u&turnPass=p&relayOnly" to play through a relay.
+const URL = `${process.env.GAME_URL ?? "http://localhost:5173/"}?debug&signal=${encodeURIComponent(signal)}${process.env.COOP_QUERY ?? ""}`;
 const launch = () =>
   chromium.launch({
     args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--autoplay-policy=no-user-gesture-required"],
