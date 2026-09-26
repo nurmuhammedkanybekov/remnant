@@ -65,6 +65,8 @@ export class MeteredSignaling {
   onOpen: ((reconnected: boolean) => void) | null = null;
   onMessage: ((msg: SignalMessage) => void) | null = null;
   onError: ((reason: string) => void) | null = null;
+  /** Something worth showing while connecting (the service dropped us and is reconnecting, and why). */
+  onNote: ((note: string) => void) | null = null;
 
   private client: RealtimeClient | null = null;
   private closed = false;
@@ -111,8 +113,9 @@ export class MeteredSignaling {
       const code = String(e.code ?? "").toLowerCase();
       if (/auth|key|unauthori|forbidden|permission/.test(code)) this.fail("server");
     }) as (p: never) => void);
-    client.on("disconnected", ((e: { willReconnect?: boolean }) => {
-      if (!e.willReconnect) this.fail(this.everOpened ? "closed" : "unreachable");
+    client.on("disconnected", ((e: { willReconnect?: boolean; code?: number }) => {
+      if (e.willReconnect) this.onNote?.(`matchmaking dropped (code ${e.code ?? "?"}), reconnecting`);
+      else this.fail(this.everOpened ? "closed" : "unreachable");
     }) as (p: never) => void);
 
     try {
