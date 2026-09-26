@@ -142,15 +142,21 @@ free for 20 GB a month. A two-player game uses roughly 30–40 MB an hour, so
 that's hundreds of hours of play.
 
 1. Sign up at [metered.ca/tools/openrelay](https://www.metered.ca/tools/openrelay/)
-   (free, no credit card) and create an app. Note its domain — something like
-   `remnant.metered.live` — and copy the **API key** from the dashboard.
-2. In this repository on GitHub: **Settings → Secrets and variables →
+   (free, no credit card). Your app gets a domain like `remnant.metered.live`.
+2. Get the right key. In the Metered dashboard open your TURN project, press
+   **Manage TURN Credentials** → **Add Credential**, then **Show API Key**
+   next to the new credential and copy that key. (Other keys in the
+   dashboard, such as ones starting with `pk_live_` or the secret key, won't
+   work — the relay refuses them.)
+3. In this repository on GitHub: **Settings → Secrets and variables →
    Actions → Variables → New repository variable**. Add:
    - `METERED_APP` = your app domain, e.g. `remnant.metered.live`
-   - `METERED_API_KEY` = the API key
-     (Saving them as **Secrets** instead works too.)
-3. Re-run the deploy: **Actions → Deploy to GitHub Pages → Run workflow**.
-4. Open **Co-op** in the game: it says **Relay: on** when it worked.
+   - `METERED_API_KEY` = the credential's API key from step 2
+
+   (Saving them as **Secrets** instead works too.)
+
+4. Re-run the deploy: **Actions → Deploy to GitHub Pages → Run workflow**.
+5. Open **Co-op** in the game: it checks the relay and says **Relay: on** when the key works, or **Relay: key refused** if it doesn't.
 
 Any other TURN server works too: set `TURN_URLS` (comma-separated),
 `TURN_USERNAME` and `TURN_CREDENTIAL` instead.
