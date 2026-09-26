@@ -212,27 +212,86 @@ export class SoundManager {
       this.burst(o, "lowpass", 600, 1, t + 0.06, 0.12, 0.08, 0.02); // air bleed
       return;
     }
-    const o = this.out(CENTER, 1, weapon === "shotgun" ? 1.6 : 1.2)!;
     if (weapon === "shotgun") {
-      this.burst(o, "highpass", 1200, 0.6, t, 0.12, 1.0);
-      this.burst(o, "bandpass", 400, 0.6, t, 0.4, 1.0);
-      this.tone(o, "sine", 90, 28, t, 0.5, 1.0);
-      // Pump: back, then forward
-      this.burst(o, "bandpass", 1400, 3, t + 0.34, 0.05, 0.3);
-      this.tone(o, "square", 700, 400, t + 0.34, 0.03, 0.12);
-      this.burst(o, "bandpass", 1800, 3, t + 0.5, 0.05, 0.35);
-      this.tone(o, "square", 900, 500, t + 0.5, 0.03, 0.14);
-      this.tone(this.out(CENTER, 1, 0.2)!, "sine", 2300, 2100, t + 0.75, 0.08, 0.05); // shell hits the floor
+      this.blast(t, { boom: 48, body: 1500, bodyDecay: 0.32, crack: 0.9, size: 1.6 });
+      // Pump: back, then forward — heavy steel on steel.
+      this.action(t + 0.36, 1100, 0.35);
+      this.action(t + 0.52, 1500, 0.4);
+      this.casings(t + 0.8, 1, 1500);
       return;
     }
-    this.burst(o, "highpass", 1800, 0.7, t, 0.08, 1.0); // crack
-    this.burst(o, "bandpass", 700, 0.8, t, 0.22, 0.9); // body
-    this.tone(o, "sine", 120, 38, t, 0.3, 1.0); // boom
-    this.tone(o, "square", 1800, 600, t, 0.03, 0.12); // mechanical click
-    // Shell casing tinkle
-    const tc = t + 0.35 + Math.random() * 0.1;
-    this.tone(this.out(CENTER, 1, 0.2)!, "sine", 4200, 3900, tc, 0.06, 0.05);
-    this.tone(this.out(CENTER, 1, 0.2)!, "sine", 5100, 4800, tc + 0.09, 0.05, 0.03);
+    this.blast(t, { boom: 70, body: 2400, bodyDecay: 0.18, crack: 1, size: 1 });
+    this.action(t + 0.035, 2600, 0.22); // the slide cycling
+    this.casings(t + 0.38 + Math.random() * 0.08, 1, 3800);
+  }
+
+  private shaperCurve: Float32Array<ArrayBuffer> | null = null;
+
+  /** Soft clipping for the overdriven punch of a gunshot. Voices go into `input`; `output` carries the result. */
+  private distortion(drive: number): { input: GainNode; output: WaveShaperNode } {
+    const ctx = this.ctx!;
+    if (!this.shaperCurve) {
+      const n = 1024;
+      const c = new Float32Array(n);
+      for (let i = 0; i < n; i++) c[i] = Math.tanh(((i / (n - 1)) * 2 - 1) * 3);
+      this.shaperCurve = c;
+    }
+    const input = ctx.createGain();
+    input.gain.value = drive;
+    const output = ctx.createWaveShaper();
+    output.curve = this.shaperCurve;
+    output.oversample = "2x";
+    input.connect(output);
+    return { input, output };
+  }
+
+  /**
+   * A gunshot in a concrete corridor: an overdriven blast (crack, body and
+   * low punch), a hard slap of early reflections off the walls, and a
+   * rumble that rolls away down the level.
+   */
+  private blast(t: number, v: { boom: number; body: number; bodyDecay: number; crack: number; size: number }): void {
+    const ctx = this.ctx!;
+    const o = this.out(CENTER, 1, 1.4 * v.size)!;
+    const drive = this.distortion(2.2);
+    const post = ctx.createGain();
+    post.gain.value = 0.55;
+    drive.output.connect(post).connect(o);
+    // The crack: a few milliseconds of everything at once.
+    this.burst(drive.input, "highpass", 900, 0.5, t, 0.012, 1.3 * v.crack, 0.0005);
+    // The body: the gas and the room, a dark roar that dies fast.
+    this.burst(drive.input, "lowpass", v.body, 0.8, t, v.bodyDecay, 1.0, 0.001);
+    // The punch you feel in your chest.
+    this.tone(drive.input, "sine", v.boom * 2.2, v.boom, t, 0.22 * v.size, 1.2, 0.002);
+    this.tone(o, "sine", v.boom * 0.7, 30, t, 0.35 * v.size, 0.6, 0.004);
+    // Early reflections: the walls slapping it back, darker and quieter each time.
+    [0.019, 0.037, 0.061, 0.094].forEach((d, i) => {
+      this.burst(o, "lowpass", v.body * (0.8 - i * 0.15), 0.7, t + d * v.size, 0.07, 0.42 * Math.pow(0.62, i), 0.001);
+    });
+    // The tail: the shot rolling away through the facility.
+    this.burst(o, "lowpass", 380, 0.6, t + 0.05, 1.3 * v.size, 0.22, 0.05);
+    // Your ears ring, a little.
+    this.tone(this.out(CENTER, 1, 0)!, "sine", 5200 + Math.random() * 600, 5100, t + 0.02, 0.9 * v.size, 0.012, 0.05);
+  }
+
+  /** A slide or pump moving: a short metallic clack. */
+  private action(t: number, f: number, vol: number): void {
+    const o = this.out(CENTER, 1, 0.15)!;
+    this.burst(o, "bandpass", f, 4, t, 0.035, vol, 0.001);
+    this.burst(o, "bandpass", f * 2.3, 6, t + 0.004, 0.02, vol * 0.6, 0.001);
+    this.burst(o, "lowpass", 500, 1, t, 0.04, vol * 0.5, 0.001);
+  }
+
+  /** Brass (or a plastic shell) hitting concrete and bouncing. */
+  private casings(t: number, vol: number, f: number): void {
+    const o = this.out(CENTER, 1, 0.25)!;
+    let at = t;
+    for (let i = 0; i < 3; i++) {
+      const v = 0.05 * vol * Math.pow(0.5, i);
+      this.tone(o, "sine", f * (1 + Math.random() * 0.05), f * 0.98, at, 0.07, v, 0.001);
+      this.tone(o, "sine", f * 2.71, f * 2.65, at, 0.05, v * 0.5, 0.001);
+      at += 0.09 * Math.pow(0.6, i) + Math.random() * 0.02;
+    }
   }
 
   /** One shotgun shell pushed into the tube. */
@@ -334,21 +393,36 @@ export class SoundManager {
     click(duration * 0.9, 1500, 0.25); // slide forward
   }
 
+  /** Your round going into flesh: a wet, heavy thud, and a crunch for a headshot. */
   playHitmarker(headshot: boolean): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    const o = this.out(CENTER, 1, 0)!;
-    this.tone(o, "triangle", headshot ? 1900 : 1300, headshot ? 1700 : 1100, t, 0.05, headshot ? 0.2 : 0.12);
-    this.burst(o, "lowpass", 400, 1, t, 0.08, 0.35); // wet thud
+    const o = this.out(CENTER, 1, 0.1)!;
+    this.burst(o, "lowpass", 420, 1.2, t, 0.1, 0.5, 0.002); // the thud
+    this.burst(o, "bandpass", 900, 3, t + 0.01, 0.06, 0.18, 0.003); // wet
+    if (headshot) {
+      this.burst(o, "bandpass", 2400, 2, t, 0.04, 0.3, 0.001); // bone giving way
+      this.burst(o, "highpass", 3000, 1, t + 0.02, 0.05, 0.12, 0.002);
+    }
+    // A faint tick so you always know it landed.
+    this.tone(o, "triangle", headshot ? 1500 : 1100, headshot ? 1300 : 950, t, 0.03, 0.05);
   }
 
+  /** A round hitting concrete: a crack, a thud, grit falling, and now and then a ricochet. */
   playImpact(sp: Spatial): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    const o = this.out(sp, 40, 0.5);
+    const o = this.out(sp, 40, 0.6);
     if (!o) return;
-    this.burst(o, "bandpass", 2500 + Math.random() * 1500, 3, t, 0.06, 0.25);
-    this.tone(o, "sine", 3000 + Math.random() * 2000, 1500, t, 0.08, 0.05);
+    this.burst(o, "bandpass", 1600 + Math.random() * 800, 1.2, t, 0.03, 0.35, 0.0005);
+    this.burst(o, "lowpass", 300, 1, t, 0.07, 0.3, 0.001);
+    for (let i = 0; i < 5; i++) {
+      this.burst(o, "highpass", 4000 + Math.random() * 3000, 1, t + 0.04 + Math.random() * 0.3, 0.012, 0.06 * Math.random(), 0.0005);
+    }
+    if (Math.random() < 0.18) {
+      // Ricochet: a thin whine tearing off into the dark.
+      this.tone(o, "sine", 2600 + Math.random() * 900, 900, t + 0.01, 0.35, 0.05, 0.005);
+    }
   }
 
   // ---------------------------------------------------------------- player
@@ -559,18 +633,30 @@ export class SoundManager {
     const t = this.ctx.currentTime;
     switch (kind) {
       case "alert": {
-        // A rising, wavering shriek.
+        // It has you: a ragged scream torn out of a throat that isn't built for it.
         const o = this.out(sp, 34, 0.9);
         if (!o) return;
-        const osc = this.tone(o, "sawtooth", 260 * p, 520 * p, t, 0.7, 0.35, 0.05);
+        // Breath and rasp through two vocal-tract resonances, sliding a little as it opens up.
+        for (const [f0, f1, peak] of [
+          [700, 1100, 0.45],
+          [1900, 2600, 0.3],
+        ]) {
+          const f = this.burst(o, "bandpass", f0 * p, 6, t, 0.75, peak, 0.04);
+          f.frequency.setValueAtTime(f0 * p, t);
+          f.frequency.linearRampToValueAtTime(f1 * p, t + 0.25);
+          f.frequency.linearRampToValueAtTime(f1 * 0.8 * p, t + 0.75);
+        }
+        // Vocal folds straining: a buzzy tone with an irregular flutter, not a clean siren.
+        const osc = this.tone(o, "sawtooth", 170 * p, 150 * p, t, 0.7, 0.12, 0.05);
         const lfo = this.ctx.createOscillator();
-        lfo.frequency.value = 17;
+        lfo.type = "square";
+        lfo.frequency.value = 31;
         const lg = this.ctx.createGain();
-        lg.gain.value = 40 * p;
+        lg.gain.value = 18 * p;
         lfo.connect(lg).connect(osc.frequency);
         lfo.start(t);
         lfo.stop(t + 0.8);
-        this.burst(o, "bandpass", 1600 * p, 2, t, 0.6, 0.25, 0.05);
+        this.burst(o, "lowpass", 260 * p, 1, t, 0.8, 0.35, 0.03); // chest growl underneath
         break;
       }
       case "idle": {

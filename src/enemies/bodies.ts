@@ -132,6 +132,7 @@ class HumanoidBody implements CreatureBody {
   private readonly scale: number;
   /** 0 = upright, 1 = on all fours. Crawlers rear up to strike. */
   private crawl = 0;
+  private deathPose: { lean: number; head: number } | null = null;
 
   constructor(def: EnemyDef) {
     const look: Required<CreatureLook> = {
@@ -421,12 +422,35 @@ class HumanoidBody implements CreatureBody {
   }
 
   die(k: number): void {
-    this.group.rotation.x = -k * (Math.PI / 2 - 0.1);
-    this.group.position.y = k * 0.15 * this.scale;
-    this.legL.rotation.x = k * -0.4;
-    this.legR.rotation.x = k * 0.3;
-    this.armL.rotation.x = -1.5 * k;
-    this.armR.rotation.x = -0.4 * k;
+    // Remember the pose it died in, and go limp from there: without this the
+    // hunched torso stays bent forward and the corpse ends up sitting upright.
+    if (!this.deathPose) this.deathPose = { lean: this.torso.rotation.x, head: this.head.rotation.x };
+    const lerp = (a: number, b: number) => a + (b - a) * k;
+    if (this.look.gait === "crawl") {
+      // On all fours it just rolls over onto its side.
+      this.group.rotation.z = k * (Math.PI / 2 - 0.15);
+      this.group.position.y = k * 0.1 * this.scale;
+    } else {
+      // Falls back flat: legs straight, torso in line with them, arms flung out.
+      this.group.rotation.x = -k * (Math.PI / 2 - 0.08);
+      this.group.position.y = k * 0.12 * this.scale;
+      this.torso.rotation.x = lerp(this.deathPose.lean, -0.08);
+    }
+    this.body.position.y = lerp(this.body.position.y, this.pelvisY);
+    this.head.rotation.x = lerp(this.deathPose.head, -this.look.hunch - 0.2 + 0.5);
+    this.head.rotation.z = lerp(this.head.rotation.z, 0.5);
+    this.jaw.rotation.x = lerp(this.jaw.rotation.x, 0.45);
+    this.legL.rotation.x = lerp(this.legL.rotation.x, -0.08);
+    this.legR.rotation.x = lerp(this.legR.rotation.x, 0.12);
+    this.shinL.rotation.x = lerp(this.shinL.rotation.x, 0.05);
+    this.shinR.rotation.x = lerp(this.shinR.rotation.x, 0.3);
+    // Arms splayed out along the floor, not reaching up.
+    this.armL.rotation.x = lerp(this.armL.rotation.x, -0.3);
+    this.armR.rotation.x = lerp(this.armR.rotation.x, -0.1);
+    this.armL.rotation.z = lerp(this.armL.rotation.z, -1.3);
+    this.armR.rotation.z = lerp(this.armR.rotation.z, 1.0);
+    this.foreL.rotation.x = lerp(this.foreL.rotation.x, -0.4);
+    this.foreR.rotation.x = lerp(this.foreR.rotation.x, -0.15);
     for (const e of this.eyes) (e.material as THREE.MeshBasicMaterial).color.setRGB(1 - k * 0.9, 0.2 * (1 - k), 0.1 * (1 - k));
     for (const g of this.eyeGlow) g.visible = false;
     this.skin.emissiveIntensity = 0.1 * (1 - k);
