@@ -19,7 +19,7 @@ ten-level campaign. See [`STORY.md`](STORY.md) for the narrative and
 
 ---
 
-## Phase 1 — Foundations ✅
+## Phase 1 — Foundations (done)
 
 Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 
@@ -32,13 +32,13 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
       (prerequisite for co-op and replays)
 - [x] `LevelSession` extracted from `Game`: the game shell handles flow and
       menus; the session handles one level of gameplay
-- [x] Difficulty modes: Story, Normal, Nightmare, Ironman
+- [x] Difficulty modes: Story, Normal, Nightmare, Ironman, Aizi
 - [x] Save system: continue a campaign, chapter select for unlocked levels,
       versioned save format with migration
 - [x] Unit tests (Vitest) + CI on every push and pull request
 - [x] Prettier formatting, EditorConfig
 
-## Phase 2 — Campaign ✅
+## Phase 2 — Campaign (done)
 
 - [x] Level format v2: doors, security doors, generators, intercoms, water,
       checkpoints and invisible script triggers
@@ -51,7 +51,7 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] Per-level visual themes
 - [x] Save format v2, with migration of v1 saves
 
-## Phase 3 — Creatures and combat ✅
+## Phase 3 — Creatures and combat (done)
 
 - [x] Listener, Watcher, Crawler, Spitter, Swarm, Mimic — each introduced on
       the level `STORY.md` gives it
@@ -66,7 +66,7 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
       rigs (humanoid variants, rats, the Remnant's mass)
 - [x] Save format v3 (multi-weapon loadouts), with migration of v2 saves
 
-## Phase 4 — Sound, music, interface ✅
+## Phase 4 — Sound, music, interface (done)
 
 - [x] Adaptive music: calm / tension / chase layers driven by threat level,
       one synthesized piece on a shared clock
@@ -90,7 +90,7 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [ ] Cloud save sync; local saves keep working offline
 - [ ] Per-level best times
 
-## Phase 6 — Two-player co-op ✅
+## Phase 6 — Two-player co-op (done)
 
 - [x] Host-authoritative world: the host runs creatures, doors, generators,
       the boss and the level's end and streams them; the guest's creatures
@@ -116,3 +116,15 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] Hardening: level attempts are numbered so stale messages can't leak
       into a retry, background tabs keep the world running, rooms reopen
       when a guest drops out, same-version check
+
+## Phase 7 — Depth and polish (done)
+
+- [x] Aizi: a sixth difficulty after Ironman — harder than Nightmare on every
+      axis, the fewest supplies, one life
+- [x] More creatures on every difficulty, and small levels fill up too
+- [x] Inventory (Tab / I / View): condition, medkits, keycard, weapons and
+      ammo, a journal of every note found, and the level's radio log
+- [x] Character looks: light-skinned man, dark-skinned man, woman — seen by
+      your partner in co-op and in your own hands
+- [x] Scarier creatures: teeth and gullet, sunken glowing eyes, bone through
+      the skin, growths, claws, breathing, neck spasms, jaw chatter
