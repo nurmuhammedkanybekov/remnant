@@ -24,3 +24,20 @@ export function steadyInterval(ms: number, fn: () => void): () => void {
     return () => clearInterval(id);
   }
 }
+
+/** A one-off `setTimeout` that also keeps its pace in a background tab. Returns a function that cancels it. */
+export function steadyTimeout(ms: number, fn: () => void): () => void {
+  let done = false;
+  const start = performance.now();
+  // Checked on a steady tick rather than trusting one long, throttleable timeout.
+  const stop = steadyInterval(Math.min(250, ms), () => {
+    if (done || performance.now() - start < ms) return;
+    done = true;
+    stop();
+    fn();
+  });
+  return () => {
+    done = true;
+    stop();
+  };
+}
