@@ -34,12 +34,12 @@ describe("music mix", () => {
     const calm = mixFor("game", 0);
     const tense = mixFor("game", 0.6);
     const chase = mixFor("game", 1);
-    expect(calm.bells).toBe(1);
+    expect(calm.texture).toBe(1);
     expect(calm.tension).toBe(0);
     expect(tense.tension).toBeGreaterThan(0.9);
     expect(tense.chase).toBe(0);
-    expect(tense.bells).toBeLessThan(calm.bells);
+    expect(tense.texture).toBeLessThan(calm.texture);
     expect(chase.chase).toBe(1);
-    expect(chase.bells).toBe(0);
+    expect(chase.texture).toBe(0);
   });
 });
