@@ -3,6 +3,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import type { QualityPreset } from "./quality";
 
 /**
  * Final full-screen pass, applied after tone mapping (so it works in
@@ -16,6 +17,7 @@ const PostShader = {
     uDamage: { value: 0 }, // 0..1, spikes on hit and decays
     uLowHealth: { value: 0 }, // 0..1, persistent
     uGrain: { value: 0.045 },
+    uFilm: { value: 1 }, // 0 turns off grain and the resting chromatic aberration (quality)
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -30,6 +32,7 @@ const PostShader = {
     uniform float uDamage;
     uniform float uLowHealth;
     uniform float uGrain;
+    uniform float uFilm;
     varying vec2 vUv;
 
     float hash(vec2 p) {
@@ -44,7 +47,7 @@ const PostShader = {
       float d = length(c);
 
       // Chromatic aberration grows toward the edges and with damage.
-      float ca = 0.0015 + uDamage * 0.012 + uLowHealth * 0.003;
+      float ca = 0.0015 * uFilm + uDamage * 0.012 + uLowHealth * 0.003;
       vec2 off = c * ca;
       vec3 col;
       col.r = texture2D(tDiffuse, uv + off).r;
@@ -63,7 +66,7 @@ const PostShader = {
 
       // Grain (animated)
       float g = hash(uv * vec2(1920.0, 1080.0) + fract(uTime * 13.7) * 100.0) - 0.5;
-      col += g * uGrain;
+      col += g * uGrain * uFilm;
 
       gl_FragColor = vec4(col, 1.0);
     }
@@ -121,6 +124,15 @@ export class Engine {
     }
     this.camera.clear();
     this.scene.fog = null;
+  }
+
+  /** Applies a graphics quality preset (resolution and film effects; the rest is read when a level is built). */
+  setQuality(q: QualityPreset): void {
+    const ratio = Math.min(window.devicePixelRatio, q.pixelRatioCap);
+    this.renderer.setPixelRatio(ratio);
+    this.composer.setPixelRatio(ratio);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+    this.post.uniforms.uFilm.value = q.filmEffects ? 1 : 0;
   }
 
   setFov(fov: number): void {

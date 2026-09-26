@@ -18,5 +18,16 @@ describe("normalizeSettings", () => {
   it("upgrades v1 settings saved before key rebinding existed", () => {
     const s = normalizeSettings({ sensitivity: 1.5, volume: 0.5, fov: 80, invertY: false });
     expect(s.bindings.fire).toEqual(["Mouse0", null]);
+    expect(s.quality).toBe("high");
+    expect(s.musicVolume).toBe(defaultSettings().musicVolume);
+  });
+
+  it("validates the display and accessibility options", () => {
+    const s = normalizeSettings({ quality: "ultra", subtitleSize: "huge", hudScale: 5, reducedShake: "yes", colorBlind: true });
+    expect(s.quality).toBe(defaultSettings().quality);
+    expect(s.subtitleSize).toBe("medium");
+    expect(s.hudScale).toBe(1.4);
+    expect(s.reducedShake).toBe(false);
+    expect(s.colorBlind).toBe(true);
   });
 });

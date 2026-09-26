@@ -6,6 +6,7 @@ export const LIFT_SHAFT: LevelDef = {
   id: "lift-shaft",
   name: "Surface",
   subtitle: "Lift Shaft",
+  tagline: "Daylight, or the dark. Nobody else gets to choose.",
   objective: "Reach the blast door.",
   spawnYaw: -Math.PI / 2,
   finale: true,

@@ -52,6 +52,8 @@ export class PlayerController {
   private roll = 0;
   /** Set by the level each frame from the cell under the player. */
   terrain: Terrain = DRY;
+  /** Scales camera shake and head bob (the "reduced camera shake" setting). */
+  motionScale = 1;
   onFootstep: ((gait: Gait, wet: boolean) => void) | null = null;
 
   constructor(
@@ -89,7 +91,7 @@ export class PlayerController {
   }
 
   addTrauma(amount: number): void {
-    this.trauma = Math.min(1, this.trauma + amount);
+    this.trauma = Math.min(1, this.trauma + amount * this.motionScale);
   }
 
   addRecoil(amount: number): void {
@@ -181,19 +183,20 @@ export class PlayerController {
   }
 
   private applyCamera(time: number): void {
-    const bobY = Math.abs(Math.sin(this.bobPhase)) * 0.06 * this.bobAmount;
-    const bobX = Math.cos(this.bobPhase) * 0.035 * this.bobAmount;
+    const bob = this.bobAmount * (0.3 + 0.7 * this.motionScale);
+    const bobY = Math.abs(Math.sin(this.bobPhase)) * 0.06 * bob;
+    const bobX = Math.cos(this.bobPhase) * 0.035 * bob;
     const shake = this.trauma * this.trauma;
     const sx = (Math.sin(time * 37.1) + Math.sin(time * 23.3)) * 0.5 * shake;
     const sy = (Math.sin(time * 41.7) + Math.sin(time * 19.9)) * 0.5 * shake;
 
     const rx = Math.cos(this.yaw);
     const rz = -Math.sin(this.yaw);
-    this.camera.position.set(this.position.x + rx * bobX, this.position.y + bobY - 0.03 * this.bobAmount, this.position.z + rz * bobX);
+    this.camera.position.set(this.position.x + rx * bobX, this.position.y + bobY - 0.03 * bob, this.position.z + rz * bobX);
     this.camera.rotation.set(
       this.pitch + this.recoil + sy * 0.05,
       this.yaw + sx * 0.05,
-      this.roll + Math.sin(this.bobPhase) * 0.004 * this.bobAmount + sx * 0.03
+      this.roll + Math.sin(this.bobPhase) * 0.004 * bob + sx * 0.03
     );
   }
 

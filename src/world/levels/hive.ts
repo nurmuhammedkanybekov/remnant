@@ -6,6 +6,7 @@ export const HIVE: LevelDef = {
   id: "hive",
   name: "Sublevel 2",
   subtitle: "The Hive",
+  tagline: "The walls are warm here.",
   objective: "Get through the hive.",
   spawnYaw: -Math.PI / 2,
   theme: {
