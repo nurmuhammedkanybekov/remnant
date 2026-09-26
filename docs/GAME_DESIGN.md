@@ -533,16 +533,17 @@ compressor.
 
 ### Adaptive music (`audio/music.ts`)
 
-One piece in D minor (i – VI – iv – V, 72 bpm, four-bar loop), every note
-scheduled ahead on the audio clock so all layers stay in time however they
-are mixed:
+Horror sound design on a slow clock (72 bpm, four-bar loop) over low
+dissonant clusters built from semitones and tritones (D–E♭–A, C♯–D–G♯,
+D–F–G♯, C–C♯–F♯), so nothing ever resolves. Every sound is scheduled ahead
+on the audio clock so all layers stay in time however they are mixed:
 
-| Layer   | What it is                                             | Heard when                     |
-| ------- | ------------------------------------------------------ | ------------------------------ |
-| Pad     | Slow detuned chords with a sub                         | Always, thinning under a chase |
-| Bells   | Sparse music-box notes from the chord                  | Calm exploration               |
-| Tension | Low pulse on the eighths, a trembling semitone cluster | Something is suspicious        |
-| Chase   | Kick, snare, hats, a filtered 16th bass, chord stabs   | Something is hunting you       |
+| Layer   | What it is                                                                       | Heard when                     |
+| ------- | -------------------------------------------------------------------------------- | ------------------------------ |
+| Pad     | The cluster as a low drone whose voices drift in and out of tune                 | Always, thinning under a chase |
+| Texture | Bowed and struck metal (inharmonic partials, bending flat) and distant booms     | Calm exploration               |
+| Tension | A lub-dub heartbeat on every beat, a high trembling semitone cluster             | Something is suspicious        |
+| Chase   | A pounding low throb, a grinding semitone bass, metal clangs, screeching strings | Something is hunting you       |
 
 Outside levels (title, menus, results, endings) there's no music, only the
 ambient drone with its distant drips, groans and clanks.

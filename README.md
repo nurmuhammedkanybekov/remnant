@@ -144,9 +144,11 @@ Nine kinds of creature, each built to break a habit the last one taught you:
   through walls and convolution reverb.
 - Ambient drone with distant drips and metal groans, and a heartbeat at low
   health.
-- **Adaptive music**, synthesized too: one piece in layers (a slow pad,
-  music-box notes, a tense pulse and clashing strings, then drums and a
-  driving bass) that fade in and out with how much danger you're in. The
+- **Adaptive music**, synthesized too, closer to horror sound design than
+  a tune: a low drone that drifts out of tune, bowed metal and distant
+  booms, then a heartbeat under trembling strings, then a pounding throb,
+  metal clangs and screeching strings, fading in and out with how much
+  danger you're in. The
   menus keep only the ambient drone.
 
 ### Campaign

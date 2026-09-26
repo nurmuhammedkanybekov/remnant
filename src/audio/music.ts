@@ -1,14 +1,15 @@
 import type { MusicOutput } from "./soundManager";
 
 /**
- * Adaptive music, synthesized like everything else. One piece in D minor
- * (i – VI – iv – V, 72 bpm) arranged in layers that fade in and out with
+ * Adaptive music, synthesized like everything else. Less a tune than
+ * horror sound design on a slow clock (72 bpm, four-bar loop over
+ * dissonant low clusters), arranged in layers that fade in and out with
  * how much danger the player is in:
  *
- *   pad      — slow chords; the bed under everything
- *   bells    — sparse music-box notes (calm exploration)
- *   tension  — a low pulse and a high, clashing string drone (something is looking for you)
- *   chase    — drums and a driving bass (something has found you)
+ *   pad      — a low cluster drone that drifts out of tune; the bed under everything
+ *   texture  — bowed-metal tones and distant booms (calm exploration)
+ *   tension  — a heartbeat and a high, trembling semitone cluster (something is looking for you)
+ *   chase    — a pounding throb, metal clangs, a grinding bass and string screeches (something has found you)
  *
  * All layers follow one clock, so they always fit together however they're
  * mixed. Outside a level the music is silent and the menus are left to the
@@ -18,7 +19,7 @@ export type MusicMode = "silent" | "game";
 
 export interface MusicMix {
   pad: number;
-  bells: number;
+  texture: number;
   tension: number;
   chase: number;
 }
@@ -28,16 +29,27 @@ const STEP = 60 / BPM / 4; // a sixteenth note
 const STEPS = 64; // four bars
 const LOOKAHEAD = 0.25;
 
-/** MIDI notes of each bar's chord: Dm, B♭, Gm, A. */
-const CHORDS = [
-  [50, 53, 57],
-  [46, 50, 53],
-  [43, 46, 50],
-  [45, 49, 52],
+/**
+ * Each bar's cluster (MIDI notes), all low and built from semitones and
+ * tritones so nothing ever resolves: D–E♭–A, C♯–D–G♯, D–F–G♯, C–C♯–F♯.
+ */
+const CLUSTERS = [
+  [38, 39, 45],
+  [37, 38, 44],
+  [38, 41, 44],
+  [36, 37, 42],
+];
+
+/** Partials of a struck or bowed metal plate: inharmonic, so it never sounds like a note. */
+const METAL_PARTIALS: [number, number][] = [
+  [1, 1],
+  [2.76, 0.5],
+  [5.4, 0.25],
+  [8.93, 0.12],
 ];
 
 /** Balance between layers at full mix. */
-const LAYER_LEVEL: MusicMix = { pad: 1, bells: 1, tension: 1, chase: 0.9 };
+const LAYER_LEVEL: MusicMix = { pad: 1, texture: 1, tension: 1, chase: 0.9 };
 
 const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -75,11 +87,11 @@ export class IntensityTracker {
 
 /** How loud each layer should be. Pure, so it can be tested. */
 export function mixFor(mode: MusicMode, intensity: number): MusicMix {
-  if (mode === "silent") return { pad: 0, bells: 0, tension: 0, chase: 0 };
+  if (mode === "silent") return { pad: 0, texture: 0, tension: 0, chase: 0 };
   const tension = smoothstep(0.2, 0.55, intensity);
   const chase = smoothstep(0.8, 0.97, intensity);
   const calm = 1 - smoothstep(0.3, 0.7, intensity);
-  return { pad: Math.min(1, calm * 0.9 + tension * 0.4), bells: calm, tension: tension * (1 - chase * 0.3), chase };
+  return { pad: Math.min(1, calm * 0.9 + tension * 0.4), texture: calm, tension: tension * (1 - chase * 0.3), chase };
 }
 
 const freq = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
@@ -102,7 +114,7 @@ export class MusicDirector {
       g.connect(out.out);
       return g;
     };
-    this.layers = { pad: make(), bells: make(), tension: make(), chase: make() };
+    this.layers = { pad: make(), texture: make(), tension: make(), chase: make() };
     this.nextStepTime = out.ctx.currentTime + 0.1;
   }
 
@@ -142,23 +154,28 @@ export class MusicDirector {
   private schedule(step: number, t: number): void {
     const bar = Math.floor(step / 16);
     const s = step % 16;
-    const chord = CHORDS[bar];
+    const cluster = CLUSTERS[bar];
+    const root = cluster[0];
     const m = this.mix;
     const L = this.layers!;
-    if (s === 0 && m.pad > 0.01) this.pad(L.pad, chord, t, 16 * STEP);
-    if (m.bells > 0.01 && s % 4 === 0 && Math.random() < 0.28) {
-      this.bell(L.bells, chord[Math.floor(Math.random() * 3)] + 24, t, 0.5);
+    const pick = () => cluster[Math.floor(Math.random() * cluster.length)];
+    if (s === 0 && m.pad > 0.01) this.drone(L.pad, cluster, t, 16 * STEP);
+    if (m.texture > 0.01) {
+      if (s % 4 === 0 && Math.random() < 0.16) this.metal(L.texture, pick() + (Math.random() < 0.5 ? 24 : 36), t, Math.random() < 0.5);
+      if (s === 8 && Math.random() < 0.35) this.boom(L.texture, t);
     }
     if (m.tension > 0.01) {
-      if (s % 2 === 0) this.pulse(L.tension, chord[0] - 12, t, s % 8 === 0 ? 1 : 0.55);
-      if (s === 0) this.strings(L.tension, chord[0] + 24, t, 16 * STEP);
+      // Lub-dub on every beat.
+      if (s % 4 === 0) this.thump(L.tension, root - 12, t, 1);
+      if (s % 4 === 1) this.thump(L.tension, root - 12, t + STEP * 0.2, 0.6);
+      if (s === 0) this.strings(L.tension, root + 36, t, 16 * STEP);
     }
     if (m.chase > 0.01) {
-      if (s % 4 === 0) this.kick(L.chase, t);
-      if (s === 4 || s === 12) this.snare(L.chase, t);
-      this.hat(L.chase, t, s % 2 === 1 ? 1 : 0.45);
-      this.bass(L.chase, chord[0] - 12 + (s % 4 === 2 ? 12 : 0), t);
-      if (s === 0) this.stab(L.chase, chord, t);
+      if (s % 2 === 0) this.throb(L.chase, t, s % 4 === 0 ? 1 : 0.6);
+      // Grinding bass: the root against the semitone above it.
+      this.grind(L.chase, root - 12 + (s % 4 === 3 ? 1 : 0), t);
+      if ((s + bar * 3) % 5 === 0) this.clang(L.chase, t, s % 2 === 0 ? 1 : 0.6);
+      if (s === 0 && bar % 2 === 1) this.screech(L.chase, root + 36, t);
     }
   }
 
@@ -204,92 +221,144 @@ export class MusicDirector {
     return g;
   }
 
-  private pad(dest: AudioNode, chord: number[], t: number, dur: number): void {
-    const g = this.gain(dest);
-    this.env(g, t, 0.05, 1.4, dur - 1.4, 2);
-    const lp = this.filter("lowpass", 700);
-    lp.connect(g);
-    for (const n of chord) for (const d of [-7, 7]) this.osc(lp, "sawtooth", freq(n), t, dur + 2, d);
-    this.osc(lp, "sine", freq(chord[0] - 12), t, dur + 2);
+  /** Slow LFO on an AudioParam. */
+  private wobble(param: AudioParam, rate: number, depth: number, t: number, dur: number): void {
+    const ctx = this.out!.ctx;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = rate;
+    const g = ctx.createGain();
+    g.gain.value = depth;
+    lfo.connect(g).connect(param);
+    lfo.start(t);
+    lfo.stop(t + dur + 0.1);
   }
 
-  private bell(dest: AudioNode, note: number, t: number, vol: number): void {
+  /** The bed: a low cluster whose voices drift in and out of tune against each other. */
+  private drone(dest: AudioNode, cluster: number[], t: number, dur: number): void {
     const g = this.gain(dest);
-    this.env(g, t, 0.09 * vol, 0.005, 0, 2.4);
-    this.osc(g, "sine", freq(note), t, 2.5);
-    const h = this.gain(g);
-    h.gain.value = 0.25;
-    this.osc(h, "triangle", freq(note + 12), t, 2.5);
+    this.env(g, t, 0.045, 2.5, dur - 2.5, 3);
+    const lp = this.filter("lowpass", 380, 1.2);
+    this.wobble(lp.frequency, 0.05 + Math.random() * 0.04, 140, t, dur + 3);
+    lp.connect(g);
+    for (const n of cluster) {
+      for (const d of [-9, 9]) {
+        const o = this.osc(lp, "sawtooth", freq(n), t, dur + 3, d);
+        this.wobble(o.detune, 0.06 + Math.random() * 0.1, 22, t, dur + 3);
+      }
+    }
+    this.osc(lp, "sine", freq(cluster[0] - 12), t, dur + 3);
   }
 
-  private pulse(dest: AudioNode, note: number, t: number, vol: number): void {
+  /** A bowed or struck metal plate: inharmonic partials, slowly bending flat. */
+  private metal(dest: AudioNode, note: number, t: number, bowed: boolean): void {
     const g = this.gain(dest);
-    this.env(g, t, 0.16 * vol, 0.005, 0.02, 0.22);
-    const lp = this.filter("lowpass", 260);
+    this.env(g, t, 0.03, bowed ? 0.9 : 0.004, 0, bowed ? 3 : 3.6);
+    const f = freq(note);
+    for (const [ratio, amp] of METAL_PARTIALS) {
+      const pg = this.gain(g);
+      pg.gain.value = amp;
+      const o = this.osc(pg, "sine", f * ratio, t, 4.2);
+      o.frequency.setValueAtTime(f * ratio, t);
+      o.frequency.exponentialRampToValueAtTime(f * ratio * 0.97, t + 4);
+    }
+    if (bowed) {
+      // Bow noise on the edge of the plate.
+      const bp = this.filter("bandpass", f * 2.76, 12);
+      const ng = this.gain(g);
+      ng.gain.value = 0.6;
+      bp.connect(ng);
+      this.noise(bp, t, 3.5);
+    }
+  }
+
+  /** Something heavy, far away, somewhere in the mountain. */
+  private boom(dest: AudioNode, t: number): void {
+    const g = this.gain(dest);
+    this.env(g, t, 0.12, 0.02, 0, 2.2);
+    const o = this.osc(g, "sine", 55, t, 2.4);
+    o.frequency.setValueAtTime(55, t);
+    o.frequency.exponentialRampToValueAtTime(28, t + 1.8);
+    const lp = this.filter("lowpass", 180);
+    const ng = this.gain(g);
+    ng.gain.value = 0.7;
+    lp.connect(ng);
+    this.noise(lp, t, 1.5);
+  }
+
+  /** One beat of a heart: a dull, low thump. */
+  private thump(dest: AudioNode, note: number, t: number, vol: number): void {
+    const g = this.gain(dest);
+    this.env(g, t, 0.2 * vol, 0.006, 0.02, 0.2);
+    const lp = this.filter("lowpass", 150);
     lp.connect(g);
-    this.osc(lp, "sawtooth", freq(note), t, 0.3);
-    this.osc(g, "sine", freq(note), t, 0.3);
+    const o = this.osc(lp, "sine", freq(note) * 1.6, t, 0.3);
+    o.frequency.setValueAtTime(freq(note) * 1.6, t);
+    o.frequency.exponentialRampToValueAtTime(freq(note), t + 0.12);
+    this.osc(lp, "triangle", freq(note), t, 0.3);
   }
 
   /** A high cluster a semitone apart, trembling. */
   private strings(dest: AudioNode, note: number, t: number, dur: number): void {
-    const ctx = this.out!.ctx;
     const g = this.gain(dest);
-    this.env(g, t, 0.022, 0.8, dur - 0.8, 1.2);
-    const bp = this.filter("bandpass", 1600, 0.8);
+    this.env(g, t, 0.02, 1.2, dur - 1.2, 1.5);
+    const bp = this.filter("bandpass", 1500, 0.8);
     bp.connect(g);
-    for (const n of [note, note + 1]) this.osc(bp, "sawtooth", freq(n), t, dur + 1.2, (Math.random() - 0.5) * 10);
-    const trem = ctx.createOscillator();
-    trem.frequency.value = 6.5;
-    const tg = ctx.createGain();
-    tg.gain.value = 0.012;
-    trem.connect(tg).connect(g.gain);
-    trem.start(t);
-    trem.stop(t + dur + 1.3);
+    for (const n of [note, note + 1]) this.osc(bp, "sawtooth", freq(n), t, dur + 1.5, (Math.random() - 0.5) * 14);
+    this.wobble(g.gain, 7, 0.012, t, dur + 1.5);
   }
 
-  private kick(dest: AudioNode, t: number): void {
+  /** The chase's pulse: a heavy, slightly overdriven low hit. */
+  private throb(dest: AudioNode, t: number, vol: number): void {
     const g = this.gain(dest);
-    this.env(g, t, 0.4, 0.003, 0, 0.3);
-    const o = this.osc(g, "sine", 120, t, 0.35);
-    o.frequency.setValueAtTime(120, t);
-    o.frequency.exponentialRampToValueAtTime(38, t + 0.25);
+    this.env(g, t, 0.38 * vol, 0.003, 0.02, 0.28);
+    const o = this.osc(g, "sine", 95, t, 0.35);
+    o.frequency.setValueAtTime(95, t);
+    o.frequency.exponentialRampToValueAtTime(34, t + 0.22);
+    const lp = this.filter("lowpass", 400);
+    const ng = this.gain(g);
+    ng.gain.value = 0.35;
+    lp.connect(ng);
+    this.noise(lp, t, 0.08);
   }
 
-  private snare(dest: AudioNode, t: number): void {
+  private grind(dest: AudioNode, note: number, t: number): void {
     const g = this.gain(dest);
-    this.env(g, t, 0.16, 0.002, 0, 0.16);
-    const bp = this.filter("bandpass", 1900, 0.9);
+    this.env(g, t, 0.09, 0.004, 0.04, 0.1);
+    const lp = this.filter("lowpass", 700, 6);
+    lp.frequency.setValueAtTime(1100, t);
+    lp.frequency.exponentialRampToValueAtTime(180, t + 0.14);
+    lp.connect(g);
+    this.osc(lp, "sawtooth", freq(note), t, 0.2);
+    this.osc(lp, "square", freq(note) * 1.005, t, 0.2);
+  }
+
+  /** A hit on something metal: a pipe, a grate, a door. */
+  private clang(dest: AudioNode, t: number, vol: number): void {
+    const g = this.gain(dest);
+    this.env(g, t, 0.06 * vol, 0.002, 0, 0.5);
+    const base = 180 + Math.random() * 160;
+    for (const [ratio, amp] of METAL_PARTIALS) {
+      const pg = this.gain(g);
+      pg.gain.value = amp;
+      this.osc(pg, "square", base * ratio, t, 0.6);
+    }
+    const bp = this.filter("bandpass", 3200, 3);
+    const ng = this.gain(g);
+    ng.gain.value = 0.8;
+    bp.connect(ng);
+    this.noise(bp, t, 0.08);
+  }
+
+  /** A string section screaming downwards. */
+  private screech(dest: AudioNode, note: number, t: number): void {
+    const g = this.gain(dest);
+    this.env(g, t, 0.035, 0.05, 0.4, 0.9);
+    const bp = this.filter("bandpass", 2400, 1.5);
     bp.connect(g);
-    this.noise(bp, t, 0.2);
-    const tg = this.gain(dest);
-    this.env(tg, t, 0.08, 0.002, 0, 0.08);
-    this.osc(tg, "triangle", 190, t, 0.1);
-  }
-
-  private hat(dest: AudioNode, t: number, vol: number): void {
-    const g = this.gain(dest);
-    this.env(g, t, 0.035 * vol, 0.001, 0, 0.04);
-    const hp = this.filter("highpass", 7000);
-    hp.connect(g);
-    this.noise(hp, t, 0.06);
-  }
-
-  private bass(dest: AudioNode, note: number, t: number): void {
-    const g = this.gain(dest);
-    this.env(g, t, 0.1, 0.004, 0.03, 0.1);
-    const lp = this.filter("lowpass", 900, 4);
-    lp.frequency.setValueAtTime(1400, t);
-    lp.frequency.exponentialRampToValueAtTime(220, t + 0.13);
-    lp.connect(g);
-    this.osc(lp, "sawtooth", freq(note), t, 0.18);
-  }
-
-  private stab(dest: AudioNode, chord: number[], t: number): void {
-    const g = this.gain(dest);
-    this.env(g, t, 0.05, 0.005, 0.05, 0.35);
-    const lp = this.filter("lowpass", 1800);
-    lp.connect(g);
-    for (const n of chord) this.osc(lp, "sawtooth", freq(n + 12), t, 0.5);
+    for (const d of [0, 1, 6]) {
+      const o = this.osc(bp, "sawtooth", freq(note + d), t, 1.5, (Math.random() - 0.5) * 20);
+      o.frequency.setValueAtTime(freq(note + d), t);
+      o.frequency.exponentialRampToValueAtTime(freq(note + d - 4), t + 1.3);
+    }
   }
 }
