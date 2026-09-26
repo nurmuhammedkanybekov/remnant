@@ -83,6 +83,17 @@ function glowSprite(color: number, size: number): THREE.Sprite {
 
 const FLASH = new THREE.Color(1, 0.25, 0.1);
 
+/** A small repeatable random stream, so every creature of a kind grows the same way. */
+function seeded(key: string): () => number {
+  let h = 2166136261;
+  for (const c of key) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
 /** Shared vein pulse + hit flash for any flesh material. */
 function applyGlow(skin: THREE.MeshStandardMaterial, veins: THREE.Color, flash: number, agitation: number, time: number): void {
   const pulse = 0.5 + 0.5 * Math.sin(time * (2 + agitation * 7));
@@ -129,6 +140,10 @@ class HumanoidBody implements CreatureBody {
   private readonly eyeGlow: THREE.Sprite[] = [];
   private readonly petals: THREE.Mesh[] = [];
   private readonly sac: THREE.Mesh | null = null;
+  private readonly chest: THREE.Mesh;
+  private readonly growths: THREE.MeshStandardMaterial;
+  /** Each creature spasms on its own rhythm. */
+  private readonly seed = Math.random() * 100;
   private readonly look: Required<CreatureLook>;
   private readonly pelvisY: number;
   private readonly scale: number;
@@ -156,7 +171,8 @@ class HumanoidBody implements CreatureBody {
     const skin = fleshMaterial(def.tint, look.veins);
     this.skin = skin;
     const dark = new THREE.MeshStandardMaterial({ color: 0x120c0a, roughness: 0.9 });
-    const bone = new THREE.MeshStandardMaterial({ color: 0xb8ab90, roughness: 0.6 });
+    const bone = new THREE.MeshStandardMaterial({ color: 0x9a8a6c, roughness: 0.55 });
+    const teethMat = new THREE.MeshStandardMaterial({ color: 0xc8b890, roughness: 0.3 });
     const inner = new THREE.MeshBasicMaterial({ color: look.veins });
 
     const L = look.legs;
@@ -185,17 +201,53 @@ class HumanoidBody implements CreatureBody {
     chest.position.y = 0.36;
     chest.scale.set(1.15 * look.build, 1, 0.75 * Math.sqrt(look.build));
     this.torso.add(chest);
-    // Exposed ribs / spine ridges
+    this.chest = chest;
+    // Shoulder blades pushing through the skin, and a knotted spine.
+    for (const x of [-1, 1]) {
+      const blade = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 4), bone);
+      blade.position.set(x * 0.13 * look.build, 0.5, -0.14 * Math.sqrt(look.build));
+      blade.rotation.set(-2.3, 0, x * 0.4);
+      blade.scale.set(1, 1, 0.35);
+      this.torso.add(blade);
+    }
+    for (let i = 0; i < 7; i++) {
+      const v = new THREE.Mesh(new THREE.SphereGeometry(0.03 - i * 0.002, 6, 5), bone);
+      v.position.set(0, 0.05 + i * 0.1, -0.16 * Math.sqrt(look.build) + Math.sin(i * 0.6) * 0.01);
+      v.scale.set(1.3, 0.8, 1);
+      this.torso.add(v);
+    }
+    // Growths: swollen, glowing pustules where the Remnant has taken hold.
+    this.growths = new THREE.MeshStandardMaterial({
+      color: 0x3a1a14,
+      roughness: 0.35,
+      emissive: look.veins,
+      emissiveIntensity: 0.35,
+      map: textures().flesh,
+    });
+    const rand = seeded(def.id);
+    for (let i = 0; i < 3 + Math.floor(rand() * 3); i++) {
+      const g = new THREE.Mesh(new THREE.SphereGeometry(0.05 + rand() * 0.05, 8, 6), this.growths);
+      const a = (rand() - 0.5) * 2.4;
+      g.position.set(Math.sin(a) * 0.2 * look.build, 0.2 + rand() * 0.45, -Math.cos(a) * 0.14 * Math.sqrt(look.build));
+      g.scale.set(1, 0.8 + rand() * 0.4, 0.7);
+      this.torso.add(g);
+    }
+    // Ribs showing through the flanks where the skin has split, and spine ridges.
     for (let i = 0; i < 4; i++) {
-      const rib = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.012, 4, 12, Math.PI), bone);
-      rib.position.set(0, 0.24 + i * 0.08, 0.02);
-      rib.rotation.set(Math.PI / 2, 0, 0);
-      rib.scale.set(1.15 * look.build, 0.8, 1);
-      this.torso.add(rib);
-      const ridge = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.08 + (look.build > 1.2 ? 0.08 : 0), 5), bone);
-      ridge.position.set(0, 0.22 + i * 0.1, -0.15 * Math.sqrt(look.build));
-      ridge.rotation.x = -1.2;
-      this.torso.add(ridge);
+      for (const start of [0.06, 0.62]) {
+        const rib = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.01, 4, 8, Math.PI * 0.32), bone);
+        rib.position.set(0, 0.24 + i * 0.08, 0.02);
+        rib.rotation.set(Math.PI / 2, 0, Math.PI * start);
+        rib.scale.set(1.15 * look.build, 0.8, 1);
+        this.torso.add(rib);
+      }
+      if (look.build > 1.2) {
+        // The Brute's spine has grown spikes.
+        const ridge = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.16, 5), bone);
+        ridge.position.set(0, 0.22 + i * 0.1, -0.17 * Math.sqrt(look.build));
+        ridge.rotation.x = -1.2;
+        this.torso.add(ridge);
+      }
     }
     if (look.build > 1.2) {
       // Fused shoulder masses: several bodies grown into one frame.
@@ -260,31 +312,52 @@ class HumanoidBody implements CreatureBody {
         this.petals.push(petal);
       }
     } else {
-      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), skin);
-      skull.scale.set(0.9, 1.05, 1.2);
+      // Long, narrow skull; a heavy brow of flesh over deep sockets.
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 12), skin);
+      skull.scale.set(0.82, 1.12, 1.32);
       this.head.add(skull);
-      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.08), dark);
-      brow.position.set(0, 0.03, 0.12);
+      const brow = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), skin);
+      brow.position.set(0, 0.035, 0.1);
+      brow.scale.set(1.05, 0.35, 0.7);
+      brow.rotation.x = 0.35;
       this.head.add(brow);
+      // Cheekbones pushing through, skin pulled tight.
+      for (const x of [-1, 1]) {
+        const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), skin);
+        cheek.position.set(x * 0.07, -0.025, 0.1);
+        cheek.scale.set(1.2, 0.6, 0.8);
+        this.head.add(cheek);
+      }
     }
 
     // Jaw on a hinge, so it can open (wide, for the split skulls)
     this.jaw = new THREE.Group();
     this.jaw.position.set(0, -0.07, 0.02);
     this.head.add(this.jaw);
-    const jawMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, look.skull === "split" ? 0.2 : 0.14), skin);
-    jawMesh.position.set(0, -0.03, 0.05 + (look.skull === "split" ? 0.03 : 0));
+    const jawMesh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), skin);
+    jawMesh.scale.set(0.95, 0.55, look.skull === "split" ? 1.5 : 1.15);
+    jawMesh.position.set(0, -0.01, 0.06 + (look.skull === "split" ? 0.03 : 0));
     this.jaw.add(jawMesh);
-    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.02), look.skull === "split" ? inner : dark);
-    mouth.position.set(0, -0.07, 0.15);
+    // The mouth: a glowing gullet behind rows of too many teeth, torn back into one cheek.
+    const gullet = new THREE.MeshBasicMaterial({ color: new THREE.Color(look.veins).multiplyScalar(0.14) });
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.05, 0.03), look.skull === "split" ? inner : gullet);
+    mouth.position.set(0, -0.075, 0.135);
     this.head.add(mouth);
-    if (look.skull === "split") {
-      for (let i = -2; i <= 2; i++) {
-        const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.04, 4), bone);
-        tooth.position.set(i * 0.025, -0.005, 0.14);
-        tooth.rotation.x = Math.PI;
-        this.jaw.add(tooth);
-      }
+    const tear = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.012, 0.02), dark);
+    tear.position.set(0.075, -0.065, 0.12);
+    tear.rotation.set(0, -0.6, 0.35);
+    this.head.add(tear);
+    const teeth = look.skull === "split" ? 7 : 6;
+    for (let i = 0; i < teeth; i++) {
+      const x = (i / (teeth - 1) - 0.5) * 0.12;
+      const len = 0.03 + ((i * 7) % 3) * 0.012;
+      const upper = new THREE.Mesh(new THREE.ConeGeometry(0.007, len, 4), teethMat);
+      upper.position.set(x, -0.055 - len / 2, 0.145 - Math.abs(x) * 0.25);
+      upper.rotation.x = Math.PI;
+      this.head.add(upper);
+      const lower = new THREE.Mesh(new THREE.ConeGeometry(0.006, len * 0.8, 4), teethMat);
+      lower.position.set(x, -0.01 + len * 0.4, 0.1 + (look.skull === "split" ? 0.04 : 0) - Math.abs(x) * 0.25);
+      this.jaw.add(lower);
     }
 
     // Eyes: pinpricks with additive glow so they read in the dark. Blind creatures have none.
@@ -298,7 +371,12 @@ class HumanoidBody implements CreatureBody {
       eye.position.set(x, y, 0.145 - row * 0.012);
       this.head.add(eye);
       this.eyes.push(eye);
-      const glow = glowSprite(def.light === "freezes" ? 0xd8f0ff : 0xff3a1a, 0.16 - row * 0.03);
+      const glow = glowSprite(def.light === "freezes" ? 0xd8f0ff : 0xff3a1a, 0.11 - row * 0.02);
+      glow.userData.size = 0.11 - row * 0.02;
+      // A sunken socket around each eye.
+      const socket = new THREE.Mesh(new THREE.SphereGeometry(0.03 - row * 0.004, 8, 6), dark);
+      socket.position.set(x, y, 0.13 - row * 0.012);
+      this.head.add(socket);
       glow.position.copy(eye.position).z += 0.01;
       this.head.add(glow);
       this.eyeGlow.push(glow);
@@ -312,10 +390,16 @@ class HumanoidBody implements CreatureBody {
     this.foreL = limb(this.armL, skin, 0.4 * A, 0.045 * look.build, -0.44 * A);
     this.foreR = limb(this.armR, skin, 0.4 * A, 0.045 * look.build, -0.44 * A);
     for (const fore of [this.foreL, this.foreR]) {
-      for (let i = -1; i <= 1; i++) {
-        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.14 * A, 5), bone);
-        claw.position.set(i * 0.025, -0.53 * A, 0.02);
-        claw.rotation.x = Math.PI + 0.3;
+      // Long fingers ending in hooked claws.
+      for (let i = 0; i < 4; i++) {
+        const x = (i - 1.5) * 0.022;
+        const finger = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.011, 0.12 * A, 5), skin);
+        finger.position.set(x, -0.5 * A, 0.015);
+        finger.rotation.x = 0.25;
+        fore.add(finger);
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.011, 0.12 * A, 5), bone);
+        claw.position.set(x, -0.6 * A, 0.045);
+        claw.rotation.x = Math.PI + 0.55;
         fore.add(claw);
       }
     }
@@ -339,7 +423,12 @@ class HumanoidBody implements CreatureBody {
   glow(flash: number, agitation: number, time: number): void {
     applyGlow(this.skin, this.veinColor, flash, agitation, time);
     const pulse = 0.6 + 0.4 * Math.sin(time * (agitation > 0.5 ? 12 : 3));
-    for (const g of this.eyeGlow) g.material.opacity = (0.6 + agitation * 0.4) * pulse;
+    for (const g of this.eyeGlow) {
+      g.material.opacity = (0.6 + agitation * 0.4) * pulse;
+      // Eyes flare when it has you.
+      g.scale.setScalar(g.userData.size * (1 + agitation * 0.6));
+    }
+    this.growths.emissiveIntensity = 0.25 + agitation * 0.5 + Math.sin(time * 2.1 + this.seed) * 0.12 + flash;
   }
 
   pose(p: Pose): void {
@@ -363,10 +452,17 @@ class HumanoidBody implements CreatureBody {
     this.shinR.rotation.x = Math.max(0, c) * 0.9 * stride + 0.1;
     this.body.position.y = this.pelvisY - Math.abs(c) * 0.06 * stride + Math.sin(t * 1.3) * 0.01;
 
-    // Idle twitch: the head jerks now and then.
-    const twitch = Math.sin(t * 7.3 + p.walkPhase) > 0.97 ? 0.25 : 0;
-    this.head.rotation.z = Math.sin(t * 0.9) * 0.15 + twitch;
-    let jawOpen = p.hunting ? 0.25 + Math.abs(Math.sin(t * 9)) * 0.15 : 0.05;
+    // Neck spasms: every few seconds the head snaps sideways and back, and it
+    // shivers constantly while hunting. Breathing heaves the chest.
+    const st = t + this.seed;
+    const spasm = Math.max(0, Math.sin(st * 0.9) * Math.sin(st * 2.3)) > 0.82 ? Math.sin(st * 31) * 0.5 : 0;
+    const tremor = p.hunting ? Math.sin(t * 43) * 0.03 : 0;
+    this.head.rotation.z = Math.sin(t * 0.9 + this.seed) * 0.18 + spasm + tremor;
+    this.head.rotation.y = spasm * 0.4;
+    const breath = 1 + Math.sin(t * (p.hunting ? 5 : 1.6)) * 0.035;
+    this.chest.scale.y = breath;
+    // Hunting: the jaw hangs open and chatters.
+    let jawOpen = p.hunting ? 0.35 + Math.abs(Math.sin(t * 17)) * 0.2 : 0.08 + Math.max(0, Math.sin(st * 0.7)) * 0.1;
 
     const hunch = this.look.hunch;
     let armBase = p.hunting ? -1.1 : -0.15;
@@ -456,6 +552,8 @@ class HumanoidBody implements CreatureBody {
     for (const e of this.eyes) (e.material as THREE.MeshBasicMaterial).color.setRGB(1 - k * 0.9, 0.2 * (1 - k), 0.1 * (1 - k));
     for (const g of this.eyeGlow) g.visible = false;
     this.skin.emissiveIntensity = 0.1 * (1 - k);
+    this.growths.emissiveIntensity = 0.3 * (1 - k);
+    this.head.rotation.y = 0;
   }
 }
 

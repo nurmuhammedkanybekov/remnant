@@ -264,17 +264,12 @@ function cyl(r: number, len: number, mat: THREE.Material, x = 0, y = 0, z = 0, s
   return m;
 }
 
-/** Fingerless-gloved hand on a grip + sleeve, shared by every weapon. */
+/** Gloved hand on a grip + sleeve, shared by every weapon. */
 function hand(g: THREE.Group, mats: Mats, gripY: number, gripZ: number, gripTilt: number): void {
   const h = box(0.06, 0.07, 0.07, mats.glove, 0.004, gripY - 0.01, gripZ + 0.01);
   h.rotation.x = gripTilt;
   g.add(h);
-  // Bare fingers wrapped round the front of the grip, and the wrist between glove and cuff.
-  for (let i = 0; i < 3; i++) {
-    const f = box(0.064, 0.016, 0.02, mats.skin, 0.003, gripY + 0.012 - i * 0.02, gripZ - 0.03);
-    f.rotation.x = gripTilt;
-    g.add(f);
-  }
+  // Bare wrist between glove and cuff.
   const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.032, 0.05, 12), mats.skin);
   wrist.position.set(0.018, gripY - 0.045, gripZ + 0.05);
   wrist.rotation.set(-0.55, 0, 0.45);
