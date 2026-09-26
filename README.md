@@ -76,16 +76,51 @@ TypeScript plus one runtime dependency, `three`.
 - **Scarcity.** No health regeneration, limited ammo and stamina, and your
   loadout carries over between levels.
 
+### Creatures
+
+Nine kinds of creature, each built to break a habit the last one taught you:
+
+| Creature        | What it does                                                                    |
+| --------------- | ------------------------------------------------------------------------------- |
+| **Husk**        | Fast, fragile hunter.                                                           |
+| **Brute**       | Slow, tough, hits hard. Can't be taken down quietly.                            |
+| **Listener**    | Blind. The flashlight means nothing to it; every footstep does.                 |
+| **Watcher**     | Freezes while your flashlight is on it, and is terrifyingly fast when it isn't. |
+| **Crawler**     | Clings upside down to the ceiling and drops on you.                             |
+| **Spitter**     | Keeps its distance and lobs acid you can sidestep.                              |
+| **Swarm**       | A pack of rewritten rats: fast, weak, everywhere.                               |
+| **Mimic**       | Hides and imitates footsteps, pickups — and the Operator's voice.               |
+| **The Remnant** | A three-phase boss: armoured hide, a core that only opens when it attacks.      |
+
+### Combat
+
+- **Three weapons:** the sidearm, a nearly silent **rivet gun**, and a
+  pump **shotgun** that loads shell by shell. Switch with 1–3, Q or the
+  mouse wheel.
+- **Quiet takedowns:** get behind a creature that hasn't noticed you and
+  melee for a silent kill. From the front, melee is a shove that buys a
+  second.
+- **A small inventory:** medkits are carried (up to three) and used when you
+  choose, which takes time you might not have.
+
 ### Enemy AI
 
-- **Six-state behaviour:** patrol → investigate → chase → attack → search →
-  patrol. Break line of sight and stay quiet, and they lose you.
+- **Eight-state behaviour:** lurk → patrol → investigate → chase → attack →
+  search, plus dropping from the ceiling. Break line of sight and stay
+  quiet, and they lose you.
+- **Traits, not special cases:** blindness, light sensitivity, ceiling
+  ambushes, ranged attacks and lures are data on a creature's definition,
+  layered on one shared state machine.
 - **Perception:** a vision cone where suspicion builds with distance, hearing
   that walls muffle, and attacks with a wind-up you can dodge.
 - **Navigation:** grid BFS pathfinding with line-of-sight path smoothing,
   wall collision and group separation.
-- **Procedural animation:** creatures built from primitives with walk
-  cycles driven by actual speed, attack poses, hit flinches and death
+- **Procedural bodies and animation:** every creature type has its own rig
+  built from primitives (a Brute's fused shoulders and second face, the
+  Listener's opened skull, the Watcher's height and six eyes, the Spitter's
+  throat sac, the Crawler's all-fours gait, rats, and the Remnant's mound of
+  tendrils), with the Remnant's veins glowing under the skin. Walk cycles
+  are driven by actual speed, with attack poses, hit flinches and death
   collapses.
 
 ### Graphics
@@ -138,17 +173,20 @@ TypeScript plus one runtime dependency, `three`.
 
 Every action can be rebound in **Controls**. Defaults:
 
-| Action         | Keys             |
-| -------------- | ---------------- |
-| Move           | W A S D / arrows |
-| Look           | Mouse            |
-| Fire           | Left click       |
-| Reload         | R                |
-| Sprint (loud)  | Shift            |
-| Crouch (quiet) | C / Ctrl         |
-| Flashlight     | F                |
-| Interact       | E                |
-| Pause          | Esc              |
+| Action           | Keys              |
+| ---------------- | ----------------- |
+| Move             | W A S D / arrows  |
+| Look             | Mouse             |
+| Fire             | Left click        |
+| Reload           | R                 |
+| Melee / takedown | V / Right click   |
+| Use medkit       | H                 |
+| Switch weapon    | 1 2 3 / Q / wheel |
+| Sprint (loud)    | Shift             |
+| Crouch (quiet)   | C / Ctrl          |
+| Flashlight       | F                 |
+| Interact         | E                 |
+| Pause            | Esc               |
 
 **Goal:** climb from Sublevel 10 to the surface. Find keycards, restore
 power, and listen to the radio, but don't believe everything it says.
@@ -216,7 +254,7 @@ src/
 ├── core/       renderer, input, actions & bindings, settings, storage
 ├── world/      level format, parser, validator, builder, grid queries, pathfinding
 ├── player/     commands, movement, flashlight, health
-├── enemies/    AI state machine, creature rig, enemy manager
+├── enemies/    AI state machine, creature bodies, boss, projectiles, enemy manager
 ├── weapons/    weapon logic, first-person viewmodel
 ├── items/      pickups
 ├── fx/         procedural textures, particles
@@ -283,8 +321,11 @@ npm test
 ```
 
 The Vitest suite covers the level parser and validator, collision,
-raycasts, pathfinding, player movement, the weapon, key bindings, input
-commands, settings and save migration. **Every shipped level is checked to be
+raycasts, pathfinding, player movement, weapons (pellets, shell-by-shell
+loading), creature AI (blindness, light-freezing, ceiling drops, spitting,
+lures, takedowns and the boss's phases, run headlessly with stand-in
+bodies), acid hit tests, loadouts, key bindings, input commands, settings
+and save migration. **Every shipped level is checked to be
 completable.** CI runs the typecheck, formatting check and tests on every
 push and pull request, and a failing check blocks deployment.
 
@@ -299,8 +340,8 @@ keeps growing.
 | ----------------------------------------------- | -------- |
 | 1. Foundations                                  | ✅ Done  |
 | 2. Campaign: 10 levels, radio dialogue, endings | ✅ Done  |
-| 3. New creatures, melee, more weapons           | ⏳ Next  |
-| 4. Adaptive music, interface redesign, gamepad  | Planned  |
+| 3. New creatures, melee, more weapons           | ✅ Done  |
+| 4. Adaptive music, interface redesign, gamepad  | ⏳ Next  |
 | 5. Cloud saves                                  | Optional |
 | 6. Two-player online co-op                      | Optional |
 

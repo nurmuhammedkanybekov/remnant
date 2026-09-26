@@ -53,6 +53,11 @@ const CSS = /* css */ `
 .vrow.battery .vbar > b.fill { background: linear-gradient(90deg, #8a6a20, var(--ui-amber)); }
 .vrow.battery.low .vbar > b.fill { background: var(--ui-red); animation: blink .6s steps(2) infinite; }
 .vrow.battery.off svg { opacity: .3; }
+.medkits { margin-top: 10px; font-size: 13px; letter-spacing: 2px; display: flex; align-items: center; gap: 8px; }
+.medkits b { color: var(--ui-red); font-size: 15px; }
+.medkits kbd { font-family: var(--font-mono); font-size: 10px; padding: 0 5px; border: 1px solid rgba(255,255,255,.3); border-radius: 2px;
+  color: var(--ui-dim); }
+.medkits.none { opacity: .35; }
 .keycard { margin-top: 10px; font-size: 12px; letter-spacing: 2px; color: var(--ui-green); display: none; }
 .keycard.show { display: block; }
 
@@ -64,6 +69,13 @@ const CSS = /* css */ `
 .ammo .pips { display: flex; gap: 3px; justify-content: flex-end; margin-top: 6px; }
 .ammo .pips i { width: 5px; height: 14px; background: var(--ui-amber); border-radius: 1px 1px 0 0; opacity: .9; }
 .ammo .pips i.spent { background: rgba(255,255,255,.12); }
+.ammo .slots { display: flex; gap: 4px; justify-content: flex-end; margin-bottom: 8px; }
+.ammo .slots i { font-style: normal; font-size: 10px; letter-spacing: 1px; padding: 2px 6px; border: 1px solid rgba(255,255,255,.1);
+  color: rgba(232,226,214,.25); }
+.ammo .slots i span { margin-left: 5px; }
+.ammo .slots i.owned { color: var(--ui-dim); border-color: rgba(255,255,255,.25); }
+.ammo .slots i.on { color: var(--ui-fg); border-color: var(--ui-amber); background: rgba(226,176,74,.12); }
+.ammo .wname { font-size: 11px; letter-spacing: 4px; color: var(--ui-dim); margin-bottom: 2px; }
 .ammo .status { font-size: 12px; letter-spacing: 3px; margin-top: 6px; height: 14px; color: var(--ui-amber); }
 
 /* ---- noise meter + awareness ---- */
@@ -78,6 +90,16 @@ const CSS = /* css */ `
 .aware .lbl { font-size: 11px; letter-spacing: 5px; margin-top: 2px; }
 .aware.hunted { color: var(--ui-red); animation: pulse 0.8s ease-in-out infinite; }
 .aware.sus { color: var(--ui-amber); }
+
+/* ---- boss ---- */
+.boss { position: absolute; left: 50%; top: 84px; transform: translateX(-50%); width: min(520px, 70vw); text-align: center;
+  opacity: 0; transition: opacity .6s; }
+.boss.show { opacity: 1; }
+.boss .name { font-family: var(--font-display); font-size: 15px; letter-spacing: 8px; color: #f0c8c0; margin-bottom: 6px; }
+.boss .bar { position: relative; height: 8px; background: rgba(255,255,255,.08); border: 1px solid rgba(216,67,47,.5); overflow: hidden; }
+.boss .bar b { position: absolute; left: 0; top: 0; bottom: 0; transition: width .2s; }
+.boss .bar b.lag { background: rgba(255,255,255,.35); transition: width 1s ease .3s; }
+.boss .bar b.fill { background: linear-gradient(90deg, #6a1410, var(--ui-red)); }
 
 /* ---- objective / toasts / prompts ---- */
 .objective { position: absolute; left: 28px; top: 24px; max-width: 360px; }
@@ -118,6 +140,8 @@ const CSS = /* css */ `
 .subtitle.aida .line { font-style: italic; color: rgba(232,226,214,.85); }
 .subtitle.unknown .who { color: var(--ui-red); }
 .subtitle.unknown .line { color: #f0c8c0; letter-spacing: 1px; }
+.subtitle.echo .who { color: #d88ab0; }
+.subtitle.echo .line { color: #e8d0dc; font-style: italic; }
 /* ---- screens (menus) ---- */
 .screen { position: absolute; inset: 0; z-index: 10; display: none; flex-direction: column; align-items: center; justify-content: safe center;
   overflow-y: auto; padding: 24px 16px; box-sizing: border-box;

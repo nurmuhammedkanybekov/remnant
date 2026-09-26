@@ -15,7 +15,7 @@ import { Viewmodel } from "../weapons/viewmodel";
 import { LEVELS } from "../world/levels";
 import type { CheckpointState } from "./checkpoint";
 import { LevelSession, type SessionServices } from "./levelSession";
-import { carryOver, startingLoadout, type Loadout } from "./loadout";
+import { carryOver, cloneLoadout, startingLoadout, type Loadout } from "./loadout";
 import { MenuBackdrop } from "./menuBackdrop";
 import { addStats, freshStats, type RunStats } from "./stats";
 
@@ -225,7 +225,12 @@ export class Game {
 
   private startCampaign(difficulty: DifficultyId, levelIndex: number): void {
     const def = DIFFICULTIES[difficulty];
-    this.run = { difficulty: def, levelIndex, loadout: startingLoadout(def), stats: freshStats(), checkpoint: null };
+    const loadout = startingLoadout(
+      def,
+      LEVELS.map((l) => l.id),
+      levelIndex
+    );
+    this.run = { difficulty: def, levelIndex, loadout, stats: freshStats(), checkpoint: null };
     this.startLevel();
   }
 
@@ -235,7 +240,7 @@ export class Game {
     this.run = {
       difficulty: DIFFICULTIES[saved.difficulty],
       levelIndex: saved.levelIndex,
-      loadout: { ...saved.loadout },
+      loadout: cloneLoadout(saved.loadout),
       stats: { ...saved.stats },
       checkpoint: saved.checkpoint ? structuredClone(saved.checkpoint) : null,
     };

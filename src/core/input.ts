@@ -1,7 +1,8 @@
 /**
  * Raw device state: which keys and mouse buttons are held, what was pressed
  * this frame, and accumulated mouse movement. Mouse buttons are reported as
- * the codes `Mouse0`–`Mouse4` so they can be bound like keys.
+ * the codes `Mouse0`–`Mouse4` so they can be bound like keys, and the scroll
+ * wheel as `WheelUp`/`WheelDown` presses (never "held").
  *
  * Gameplay code should not read this directly — see `buildCommand`.
  */
@@ -23,6 +24,14 @@ export class Input {
     domElement.addEventListener("mousedown", (e) => this.press(`Mouse${e.button}`));
     window.addEventListener("mouseup", (e) => this.down.delete(`Mouse${e.button}`));
     domElement.addEventListener("contextmenu", (e) => e.preventDefault());
+    domElement.addEventListener(
+      "wheel",
+      (e) => {
+        if (e.deltaY !== 0) this.pressed.add(e.deltaY < 0 ? "WheelUp" : "WheelDown");
+        if (this.locked) e.preventDefault();
+      },
+      { passive: false }
+    );
 
     // Losing focus (alt-tab) would otherwise leave keys "stuck" down.
     window.addEventListener("blur", () => this.down.clear());

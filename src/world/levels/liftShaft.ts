@@ -1,7 +1,7 @@
 import { aida, objective, radio, unknown } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
-/** Level 10 — the top of the lift shaft. Walk out, or bring the mountain down. */
+/** Level 10 — the top of the lift shaft. One more push past what's left, then walk out, or bring the mountain down. */
 export const LIFT_SHAFT: LevelDef = {
   id: "lift-shaft",
   name: "Surface",
@@ -26,7 +26,7 @@ export const LIFT_SHAFT: LevelDef = {
     "#.C..E.C....#......Z...#",
     "#.....L.....#..........#",
     "######D######....L..X..#",
-    "#......E.....#.........#",
+    "#.T....V.....#.........#",
     "#.M....A.....D.H.......#",
     "#......L.....#.........#",
     "########################",

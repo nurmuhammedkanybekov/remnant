@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import type { EnemyKind } from "../content/enemies";
+import { RemnantBoss } from "./boss";
 import { Enemy, NO_MODIFIERS, type EnemyModifiers, type Perception } from "./enemy";
 import { hasLineOfSight, type LevelGrid } from "../world/grid";
 import type { EnemySpawn } from "../world/levelParser";
@@ -12,18 +14,44 @@ export interface EnemyHit {
 
 export class EnemyManager {
   readonly enemies: Enemy[] = [];
+  /** Called for every enemy, including ones spawned mid-level, so the session can wire up its callbacks. */
+  onSpawned: ((enemy: Enemy) => void) | null = null;
 
   constructor(
-    scene: THREE.Scene,
+    private readonly scene: THREE.Scene,
     private readonly level: LevelGrid,
     spawns: EnemySpawn[],
-    modifiers: EnemyModifiers = NO_MODIFIERS
+    private readonly modifiers: EnemyModifiers = NO_MODIFIERS
   ) {
-    for (const s of spawns) this.enemies.push(new Enemy(scene, s.pos, s.kind, modifiers));
+    for (const s of spawns) this.add(s.kind, s.pos);
+  }
+
+  private add(kind: EnemyKind, pos: THREE.Vector2): Enemy {
+    const e =
+      kind === "remnant" ? new RemnantBoss(this.scene, pos, kind, this.modifiers) : new Enemy(this.scene, pos, kind, this.modifiers);
+    this.enemies.push(e);
+    return e;
+  }
+
+  /** Adds an enemy mid-level (the boss's summons). Appended, so checkpoint indices of the originals never shift. */
+  spawn(kind: EnemyKind, pos: THREE.Vector2): Enemy {
+    const e = this.add(kind, pos);
+    this.onSpawned?.(e);
+    return e;
+  }
+
+  /** Wires every enemy that exists so far. */
+  wireAll(): void {
+    for (const e of this.enemies) this.onSpawned?.(e);
+  }
+
+  get boss(): RemnantBoss | null {
+    return (this.enemies.find((e) => e instanceof RemnantBoss) as RemnantBoss | undefined) ?? null;
   }
 
   update(dt: number, perception: Perception): void {
-    for (const e of this.enemies) e.update(dt, this.level, perception, this.enemies);
+    // Copy: an update can spawn more enemies.
+    for (const e of [...this.enemies]) e.update(dt, this.level, perception, this.enemies);
   }
 
   /** Loud noise (gunfire). Walls cut the radius to 60%. */
@@ -41,6 +69,10 @@ export class EnemyManager {
     const tmp = new THREE.Vector3();
     for (const enemy of this.enemies) {
       if (enemy.isDead) continue;
+      // Cheap reject before building hit volumes.
+      const c = enemy.root.position;
+      const reach = enemy.stats.radius + 2.5;
+      if (ray.distanceSqToPoint(tmp.set(c.x, 1.2, c.z)) > reach * reach) continue;
       const { head, body } = enemy.hitVolumes();
       const test = (s: THREE.Sphere, headshot: boolean) => {
         if (!ray.intersectSphere(s, tmp)) return;
@@ -64,7 +96,7 @@ export class EnemyManager {
     let t = 0;
     for (const e of this.enemies) {
       if (e.isDead) continue;
-      if (e.isHunting) return 1;
+      if (e.isHunting || e.state === "drop") return 1;
       t = Math.max(t, e.state === "investigate" || e.state === "search" ? 0.6 : e.suspicion * 0.6);
     }
     return t;

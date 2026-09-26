@@ -213,6 +213,19 @@ export class Effects {
     }
   }
 
+  /** A glob of acid bursting. */
+  acidSplash(point: THREE.Vector3): void {
+    for (let i = 0; i < 14; i++) {
+      const v = new THREE.Vector3((Math.random() - 0.5) * 3, 0.5 + Math.random() * 2.5, (Math.random() - 0.5) * 3);
+      const g = 0.6 + Math.random() * 0.4;
+      this.sparks.emit(point, v, 0.3 + Math.random() * 0.4, 0.06 + Math.random() * 0.05, new THREE.Color(0.45 * g, g, 0.15 * g), 8);
+    }
+    for (let i = 0; i < 8; i++) {
+      const v = new THREE.Vector3((Math.random() - 0.5) * 0.6, 0.3 + Math.random() * 0.6, (Math.random() - 0.5) * 0.6);
+      this.blood.emit(point, v, 0.8 + Math.random() * 0.6, 0.15 + Math.random() * 0.1, new THREE.Color(0.25, 0.35, 0.1), -0.4);
+    }
+  }
+
   update(dt: number, camera: THREE.Camera, flashlightLevel: number, time: number): void {
     this.sparks.update(dt);
     this.blood.update(dt);

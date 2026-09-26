@@ -6,7 +6,7 @@ const LEVELS = 3;
 const campaign = {
   difficulty: "normal" as const,
   levelIndex: 1,
-  loadout: { health: 80, battery: 50, mag: 8, reserve: 16 },
+  loadout: { health: 80, battery: 50, medkits: 1, weapons: { pistol: { mag: 8, reserve: 16 } }, current: "pistol" as const },
   stats: { ...freshStats(), kills: 3 },
   checkpoint: null,
 };
@@ -31,12 +31,18 @@ describe("parseSave", () => {
     const s = parseSave(
       {
         version: SAVE_VERSION,
-        campaign: { ...campaign, loadout: { health: 500, battery: -3, mag: 2.7, reserve: "lots" } },
+        campaign: { ...campaign, loadout: { health: 500, battery: -3, medkits: 1, weapons: { pistol: { mag: 2.7, reserve: "lots" } } } },
         progress: { unlockedLevel: 99, completed: ["normal", "normal", "godmode"], bestTimes: { a: -1, b: 30 } },
       },
       LEVELS
     );
-    expect(s.campaign!.loadout).toEqual({ health: 100, battery: 0, mag: 2, reserve: 0 });
+    expect(s.campaign!.loadout).toEqual({
+      health: 100,
+      battery: 0,
+      medkits: 1,
+      weapons: { pistol: { mag: 2, reserve: 0 } },
+      current: "pistol",
+    });
     expect(s.progress.unlockedLevel).toBe(LEVELS - 1);
     expect(s.progress.completed).toEqual(["normal"]);
     expect(s.progress.bestTimes).toEqual({ b: 30 });
@@ -45,7 +51,7 @@ describe("parseSave", () => {
   it("migrates a v1 save: levels shifted by one, ids renamed", () => {
     const v1 = {
       version: 1,
-      campaign: { ...campaign, levelIndex: 1, checkpoint: undefined },
+      campaign: { ...campaign, loadout: { health: 80, battery: 50, mag: 8, reserve: 16 }, levelIndex: 1, checkpoint: undefined },
       progress: { unlockedLevel: 1, completed: [], bestTimes: { "sublevel-3": 90, "sublevel-2": 120 } },
     };
     const s = parseSave(v1, 10);
@@ -53,6 +59,30 @@ describe("parseSave", () => {
     expect(s.campaign!.checkpoint).toBeNull();
     expect(s.progress.unlockedLevel).toBe(2);
     expect(s.progress.bestTimes).toEqual({ "maintenance-wing": 90, "cold-storage": 120 });
+    expect(s.campaign!.loadout.weapons.pistol).toEqual({ mag: 8, reserve: 16 });
+  });
+
+  it("migrates a v2 save: the pistol loadout moves into weapons, the mid-level checkpoint is dropped", () => {
+    const v2 = {
+      version: 2,
+      campaign: {
+        ...campaign,
+        loadout: { health: 70, battery: 40, mag: 5, reserve: 20 },
+        checkpoint: { x: 1, z: 2, yaw: 0, loadout: { health: 70, battery: 40, mag: 5, reserve: 20 }, objective: "Go." },
+      },
+      progress: { unlockedLevel: 4, completed: [], bestTimes: {}, endings: [] },
+    };
+    const s = parseSave(v2, 10);
+    expect(s.version).toBe(SAVE_VERSION);
+    expect(s.campaign!.loadout).toEqual({
+      health: 70,
+      battery: 40,
+      medkits: 0,
+      weapons: { pistol: { mag: 5, reserve: 20 } },
+      current: "pistol",
+    });
+    expect(s.campaign!.checkpoint).toBeNull();
+    expect(s.progress.unlockedLevel).toBe(4);
   });
 
   it("keeps a valid mid-level checkpoint and drops a broken one", () => {

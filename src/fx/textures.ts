@@ -346,6 +346,72 @@ export function paperTexture(): THREE.CanvasTexture {
   });
 }
 
+/**
+ * Emissive map for creatures: branching veins of the Remnant under the skin.
+ * The background is a very dark grey rather than black so a hit flash still
+ * tints the whole body, while the veins carry the glow.
+ */
+export function veinTexture(): THREE.CanvasTexture {
+  return canvasTexture(256, 256, 11, (ctx, w, h, rand) => {
+    ctx.fillStyle = "#141414";
+    ctx.fillRect(0, 0, w, h);
+    ctx.lineCap = "round";
+    const branch = (x: number, y: number, angle: number, width: number, depth: number) => {
+      let px = x;
+      let py = y;
+      const steps = 6 + Math.floor(rand() * 8);
+      for (let i = 0; i < steps; i++) {
+        angle += (rand() - 0.5) * 0.9;
+        const nx = px + Math.cos(angle) * 9;
+        const ny = py + Math.sin(angle) * 9;
+        ctx.strokeStyle = `rgba(255,255,255,${0.3 + width / 5})`;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(nx, ny);
+        ctx.stroke();
+        // Draw wrapped copies so the texture tiles without seams.
+        for (const [ox, oy] of [
+          [w, 0],
+          [-w, 0],
+          [0, h],
+          [0, -h],
+        ]) {
+          ctx.beginPath();
+          ctx.moveTo(px + ox, py + oy);
+          ctx.lineTo(nx + ox, ny + oy);
+          ctx.stroke();
+        }
+        px = nx;
+        py = ny;
+        if (depth > 0 && rand() < 0.25) branch(px, py, angle + (rand() < 0.5 ? 0.8 : -0.8), width * 0.6, depth - 1);
+      }
+    };
+    for (let i = 0; i < 6; i++) branch(rand() * w, rand() * h, rand() * Math.PI * 2, 1.4 + rand() * 1.4, 3);
+    // Soft glow nodes where veins gather.
+    for (let i = 0; i < 4; i++) {
+      const x = rand() * w;
+      const y = rand() * h;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 6 + rand() * 8);
+      g.addColorStop(0, "rgba(255,255,255,0.6)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 20, y - 20, 40, 40);
+    }
+  });
+}
+
+/** Mottled, slick skin for the creatures (multiplied with each creature's tint). */
+export function fleshTexture(): THREE.CanvasTexture {
+  return canvasTexture(256, 256, 12, (ctx, w, h, rand) => {
+    ctx.fillStyle = "#b8aaa0";
+    ctx.fillRect(0, 0, w, h);
+    blotches(ctx, w, h, rand, 40, "rgba(90,60,55,0.35)", 30);
+    blotches(ctx, w, h, rand, 30, "rgba(230,220,210,0.25)", 18);
+    noise(ctx, w, h, rand, 40, 1);
+  });
+}
+
 let cache: ReturnType<typeof buildAll> | null = null;
 function buildAll() {
   return {
@@ -360,6 +426,8 @@ function buildAll() {
     bulletHole: bulletHoleTexture(),
     medkit: medkitTexture(),
     paper: paperTexture(),
+    veins: veinTexture(),
+    flesh: fleshTexture(),
   };
 }
 
