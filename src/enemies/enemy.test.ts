@@ -193,6 +193,16 @@ describe("the Remnant", () => {
     const before = boss.health;
     boss.takeDamage(100, cellCenter(6, 2), "head"); // core closed
     expect(before - boss.health).toBeCloseTo(100 * armor);
+    expect(boss.isArmoured("head")).toBe(true);
+    expect(boss.isArmoured("body")).toBe(true);
+  });
+
+  it("opens its core while it attacks", () => {
+    const boss = spawn("remnant", 3) as RemnantBoss;
+    // Standing within tendril reach: it wakes, winds up a slam, and the core opens.
+    for (let i = 0; i < 300 && boss.isArmoured("head"); i++) boss.update(1 / 30, level, perceive(4), [boss]);
+    expect(boss.isArmoured("head")).toBe(false);
+    expect(boss.isArmoured("body")).toBe(true);
   });
 
   it("summons help from phase 2", () => {
