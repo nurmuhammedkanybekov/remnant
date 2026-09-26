@@ -90,10 +90,23 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [ ] Cloud save sync; local saves keep working offline
 - [ ] Per-level best times
 
-## Phase 6 — Two-player co-op (optional)
+## Phase 6 — Two-player co-op ✅
 
-- [ ] Host-authoritative simulation: host runs the world, guest sends
-      `PlayerCommand`s and receives snapshots
-- [ ] WebRTC peer-to-peer with room codes (free public signaling)
-- [ ] Second player avatar, revive mechanic, shared objectives
-- [ ] Graceful fallback when a peer-to-peer connection can't be made
+- [x] Host-authoritative world: the host runs creatures, doors, generators,
+      the boss and the level's end and streams them; the guest's creatures
+      are puppets. Each player simulates their own movement (no input lag)
+      and sends it 20×/s — a deliberate change from "guest sends commands",
+      which would make the guest's own movement lag.
+- [x] WebRTC peer-to-peer with five-character room codes (free public
+      PeerJS signaling, or a self-hosted server via `?signal=`)
+- [x] Creatures hunt whichever player is closest; either torch holds a
+      Watcher
+- [x] Second player figure with a real headlamp, spatial gunshots and
+      footsteps, partner health on the HUD
+- [x] Down-and-revive (45 s bleed-out, hold Use to revive), team wipe
+      restarts both from the checkpoint
+- [x] Shared objectives: keycard, generators, intercoms, triggers,
+      checkpoints, leaving each sublevel together
+- [x] Graceful failure: clear messages for a wrong code, a full room,
+      blocked connections, version mismatch; the host plays on alone if
+      the guest leaves

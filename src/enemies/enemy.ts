@@ -46,6 +46,12 @@ const BEAM_REACH = 20;
 /** Behind = more than this far round from where it's facing. */
 const BEHIND_ANGLE = THREE.MathUtils.degToRad(105);
 const MELEE_WINDUP_MAX = 0.45;
+/** With two players, it only switches to the other one if they're this much closer. */
+const TARGET_STICK = 3;
+/** A puppet further than this from where the host says it is jumps there instead of gliding. */
+const PUPPET_SNAP = 3;
+
+const STATES: EnemyState[] = ["lurk", "drop", "patrol", "investigate", "chase", "attack", "search", "dead"];
 
 export interface Perception {
   playerPos: THREE.Vector2;
@@ -71,6 +77,15 @@ export class Enemy {
   suspicion = 0;
   /** A Watcher held in the flashlight beam. */
   frozen = false;
+  /** Index of the player (in the perceptions it was given) it's paying attention to. */
+  target = 0;
+  /**
+   * Co-op guest: the host's copy does the thinking; this one follows its
+   * snapshots (`applyNet`) and only animates.
+   */
+  puppet = false;
+  /** Latest snapshot from the host, for a puppet. */
+  protected net: number[] | null = null;
 
   onAttackHit: ((damage: number, from: THREE.Vector2) => void) | null = null;
   onAlert: ((enemy: Enemy) => void) | null = null;
@@ -287,7 +302,28 @@ export class Enemy {
     return d < BEAM_REACH && p.look.angleTo(chest) < BEAM_HALF_ANGLE + Math.atan2(0.4, d);
   }
 
-  update(dt: number, level: LevelGrid, p: Perception, others: Enemy[]): void {
+  /**
+   * Chooses which player to pay attention to: the closest one standing, but
+   * it doesn't flip back and forth — it sticks with its current one unless
+   * the other is clearly closer.
+   */
+  protected pickTarget(ps: Perception | Perception[]): Perception {
+    if (!Array.isArray(ps)) {
+      this.target = 0;
+      return ps;
+    }
+    const me = this.position2D;
+    const d = ps.map((q) => (q.playerDead ? Infinity : me.distanceTo(q.playerPos)));
+    let best = d.indexOf(Math.min(...d));
+    const current = this.target < ps.length ? this.target : 0;
+    if (d[best] === Infinity) best = current;
+    else if (best !== current && d[current] < d[best] + TARGET_STICK) best = current;
+    this.target = best;
+    return ps[best];
+  }
+
+  /** `ps` is one perception per player (a single one in solo play). */
+  update(dt: number, level: LevelGrid, ps: Perception | Perception[], others: Enemy[]): void {
     this.time += dt;
     this.hitFlash = Math.max(0, this.hitFlash - dt * 6);
     this.stagger = Math.max(0, this.stagger - dt * 2.5);
@@ -297,6 +333,7 @@ export class Enemy {
       return;
     }
 
+    const p = this.pickTarget(ps);
     const me = this.position2D;
     const toPlayer = p.playerPos.clone().sub(me);
     const dist = toPlayer.length();
@@ -304,7 +341,11 @@ export class Enemy {
     const angleTo = Math.atan2(toPlayer.x, toPlayer.y);
     const s = this.stats;
 
-    this.frozen = s.light === "freezes" && this.state !== "drop" && this.inBeam(p, los);
+    // Anyone's beam holds a Watcher.
+    this.frozen =
+      s.light === "freezes" &&
+      this.state !== "drop" &&
+      (Array.isArray(ps) ? ps : [ps]).some((q) => this.inBeam(q, q === p ? los : !q.playerDead && hasLineOfSight(level, me, q.playerPos)));
 
     // --- Sight (blind creatures skip it; "ignores" means the beam doesn't give you away) ---
     const hunting = this.isHunting;
@@ -492,7 +533,8 @@ export class Enemy {
       this.vocalTimer = (hunting ? 2 : 5) + Math.random() * 6;
       // Mimics are silent except when they mean to be heard; frozen things can't make a sound.
       const silent = (this.stats.behaviour === "lurker" && this.state === "lurk") || this.frozen;
-      if (!silent) this.onVocal?.(this, "idle");
+      // A puppet's voice comes from the host.
+      if (!silent && !this.puppet) this.onVocal?.(this, "idle");
     }
     this.root.rotation.y = this.facing;
     this.walkPhase += dt * this.speedNow * this.stats.stride;
@@ -599,6 +641,88 @@ export class Enemy {
     }
     const k = Math.min(1, t / 0.7);
     this.body.die(1 - Math.pow(1 - k, 3));
+  }
+
+  // ------------------------------------------------------------------ co-op
+
+  /**
+   * This creature's state for the guest, flattened:
+   * [x, z, facing, state, speed, attack, attackK, stagger, frozen, hitFlash, suspicion, health].
+   * `attack` is 0 (none), 1/2 melee wind-up/recover, 3/4 ranged wind-up/recover.
+   */
+  netState(): number[] {
+    const r = (v: number) => Math.round(v * 100) / 100;
+    const attack = this.attackPhase ? (this.attackKind === "ranged" ? 3 : 1) + (this.attackPhase === "recover" ? 1 : 0) : 0;
+    const k = this.attackPhase ? 1 - Math.max(0, this.attackTimer) / this.attackDuration : 0;
+    return [
+      r(this.root.position.x),
+      r(this.root.position.z),
+      r(this.facing),
+      STATES.indexOf(this.state),
+      r(this.speedNow),
+      this.state === "attack" ? attack : 0,
+      r(k),
+      r(this.stagger),
+      this.frozen ? 1 : 0,
+      r(this.hitFlash),
+      r(this.suspicion),
+      Math.round(this.health),
+    ];
+  }
+
+  /** Puppet: take the host's latest state. */
+  applyNet(a: number[]): void {
+    this.net = a;
+    const state = STATES[a[3]] ?? "patrol";
+    if (state === "dead" && !this.isDead) {
+      this.diedOnCeiling = this.onCeiling || this.state === "drop";
+      this.deathT = 0;
+    }
+    if (state === "drop" && this.state !== "drop") this.dropT = 0;
+    this.state = state;
+    this.health = a[11];
+    this.hitFlash = Math.max(this.hitFlash, a[9]);
+  }
+
+  /** Puppet: glide toward the host's copy and animate like it. */
+  updatePuppet(dt: number): void {
+    this.time += dt;
+    this.hitFlash = Math.max(0, this.hitFlash - dt * 6);
+    if (this.isDead) {
+      this.animateDeath(dt);
+      return;
+    }
+    const a = this.net;
+    if (a) {
+      const k = 1 - Math.exp(-12 * dt);
+      const p = this.root.position;
+      if (Math.hypot(a[0] - p.x, a[1] - p.z) > PUPPET_SNAP) p.set(a[0], p.y, a[1]);
+      else {
+        p.x += (a[0] - p.x) * k;
+        p.z += (a[1] - p.z) * k;
+      }
+      this.facing += wrapAngle(a[2] - this.facing) * k;
+      this.speedNow = a[4];
+      const attack = a[5];
+      this.attackPhase = attack === 0 ? null : attack % 2 === 1 ? "windup" : "recover";
+      this.attackKind = attack >= 3 ? "ranged" : "melee";
+      this.attackDuration = 1;
+      this.attackTimer = 1 - a[6];
+      this.stagger = a[7];
+      this.frozen = a[8] === 1;
+      this.suspicion = a[10];
+    }
+    if (this.onCeiling) this.hangFromCeiling(1);
+    else if (this.state === "drop") {
+      this.dropT += dt;
+      this.hangFromCeiling(1 - Math.min(1, this.dropT / DROP_TIME));
+    } else if (this.stats.behaviour === "ceiling") this.hangFromCeiling(0);
+    this.finishFrame(dt, this.isHunting);
+  }
+
+  /** Guest: the creature flinches from a hit right away, before the host confirms it. */
+  flash(amount = 1): void {
+    this.hitFlash = Math.max(this.hitFlash, amount);
   }
 
   dispose(): void {

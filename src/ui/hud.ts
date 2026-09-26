@@ -84,6 +84,7 @@ export class Hud {
         <div class="vrow battery" data-k="batRow">${ICON.torch}<div class="vbar"><b class="fill" data-k="bat"></b></div><div class="vnum" data-k="batNum"></div></div>
         <div class="medkits" data-k="med"><b>✚</b><span data-k="medNum"></span><kbd data-k="medKey"></kbd></div>
         <div class="keycard" data-k="key">▣ KEYCARD</div>
+        <div class="partner" data-k="partner"><span>PARTNER</span><div class="pbar"><b data-k="partnerHp"></b></div><span data-k="partnerTxt"></span></div>
       </div>
       <div class="boss" data-k="boss"><div class="name" data-k="bossName"></div><div class="bar"><b class="lag" data-k="bossLag"></b><b class="fill" data-k="bossHp"></b></div></div>
       <div class="noise"><div class="bars" data-k="noiseBars"></div><div class="lbl">NOISE</div></div>
@@ -108,6 +109,17 @@ export class Hud {
       this.el.dmg.appendChild(d);
       this.dmgArcs.push(d);
     }
+  }
+
+  /** Co-op: the other player's health and state, or null to hide it. */
+  partner(info: { hp: number; down: boolean; bleed: number } | null): void {
+    const el = this.el.partner;
+    el.classList.toggle("show", info !== null);
+    if (!info) return;
+    el.classList.toggle("down", info.down);
+    this.el.partnerHp.style.width = `${Math.round(info.hp * 100)}%`;
+    const txt = info.down ? `DOWN ${info.bleed}s` : "";
+    if (this.el.partnerTxt.textContent !== txt) this.el.partnerTxt.textContent = txt;
   }
 
   setVisible(v: boolean): void {

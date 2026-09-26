@@ -27,7 +27,7 @@ npm run dev      # http://localhost:5173
 npm run build    # tsc -b && vite build -> dist/
 ```
 
-Append `?debug` to the URL to expose `window.game` (see §12).
+Append `?debug` to the URL to expose `window.game` (see §13).
 
 ---
 
@@ -41,6 +41,7 @@ src/
 │   ├── levelSession.ts        One level of gameplay: player, enemies, weapon, pickups, rules
 │   ├── menuBackdrop.ts        The live 3D scene behind the main menu
 │   ├── save.ts                Versioned save data: campaign checkpoint, unlocks, best times
+│   ├── remotePlayer.ts        Co-op: the other player's figure, headlamp and footsteps
 │   ├── loadout.ts             What carries between levels
 │   └── stats.ts               Run statistics
 ├── content/                   Game data — balancing is a data change, not a code change
@@ -78,6 +79,10 @@ src/
 │   ├── bodies.ts              Per-type rigs: humanoid variants, rat, the Remnant's mass
 │   ├── projectiles.ts         Lobbed acid
 │   └── enemyManager.ts        Spawning (incl. mid-level), noise, hit tests, threat
+├── net/                       Co-op networking
+│   ├── signaling.ts           WebSocket client for a PeerJS-protocol matchmaking server
+│   ├── link.ts                WebRTC connection: reliable + fast data channels, timeouts
+│   └── protocol.ts            Room codes and every message the two games exchange
 ├── items/pickup.ts            Pickup meshes and animation
 ├── fx/                        Procedural canvas textures, particles
 ├── audio/soundManager.ts      Synth SFX, stereo panning, wall muffling, reverb, ambience
@@ -624,19 +629,87 @@ adjusts sliders and options, A selects, B goes back. Whichever device was
 touched last decides the prompts: `[E] OPEN DOOR` becomes `[A] OPEN DOOR`.
 With a pad in use the game doesn't need pointer lock.
 
-## 12. Debug hooks (`?debug`)
+## 12. Co-op (`net/`, `game/remotePlayer.ts`)
+
+Two players, online, through the whole campaign. Main menu → **Co-op** →
+**Host a Game** (pick a sublevel you've reached and a difficulty) shows a
+five-character room code; the partner picks **Join a Game** and types it.
+
+**Connecting.** Browsers talk directly over WebRTC data channels. To find
+each other they use a signaling server — by default the free public PeerJS
+server (`wss://0.peerjs.com/peerjs`), used only as a mailbox for the
+connection offer, answer and ICE candidates; nothing about the game goes
+through it, and the connection is closed once the players are linked. The
+host registers as `remnant-v<protocol>-<code>`, so different versions never
+meet. `?signal=wss://your-server/peerjs` points the game at a self-hosted
+PeerJS server instead. STUN comes from Google's public servers; there's no
+TURN relay (not free), so the rare networks that block direct connections
+between browsers get a clear message after 20 s. Room codes use 31
+characters with no look-alikes (no 0/O, 1/I/L).
+
+Two channels: **reliable** (ordered; every event) and **fast** (unordered,
+no retransmits; the state streams, where a late packet is worthless). A
+ping every second and 8 s of silence detect a partner who vanished.
+
+**Who decides what.** The host's game is the authority on the world:
+
+| Thing                          | How it's shared                                                                                                                                                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Each player's own movement     | Simulated locally, sent 20×/s (`ps`: position, look, gait, torch, weapon, health, down). Never waits on the network.                                                                                                                                                |
+| Creatures                      | The host's AI runs with one perception per player (`Enemy.pickTarget`: closest standing player, sticky within 3 m). Snapshots 15×/s (`es`, 12 numbers per creature, +4 for the boss). The guest's creatures are **puppets** that glide to the snapshot and animate. |
+| Creature voices, spit, summons | Events from the host. Acid globs are spawned on both sides; each copy can only hurt the local player.                                                                                                                                                               |
+| Guest's shots and melee        | The guest raycasts its puppets and sends `hit` / `takedown` / `shove`; the host applies them and reports `killed` (the kill counts for the guest). The creature flinches on the guest immediately.                                                                  |
+| Noise                          | Noise the world makes (doors, generators, alarms) is made on the host. Noise the guest makes (gunfire, melee) is sent to the host's creatures; the guest's footsteps reach them through its `ps` gait.                                                              |
+| Doors, generators, intercoms   | The guest sends `use`; the host does it and broadcasts `used`. A locked door is answered locally.                                                                                                                                                                   |
+| Pickups                        | Whoever walks over one gets it; it vanishes for both. The **keycard is shared**. Boss-arena restocks are timed by the host.                                                                                                                                         |
+| Triggers, checkpoints          | Whoever reaches one fires it for both; each player keeps their own checkpoint snapshot.                                                                                                                                                                             |
+| The exit                       | Both players must be within 4.5 m of it; the host ends the level for both.                                                                                                                                                                                          |
+
+**Down, not dead.** In co-op, reaching 0 health puts you **down**: camera on
+the floor, look only, 45 s bleed-out. The partner holds Use within 2 m for
+3 s to revive you at 35 health. Creatures ignore downed players. Both down,
+a bleed-out, or being down when the partner leaves is a **wipe**: the level
+is lost for both, and the host chooses Retry (from the checkpoint) for
+both.
+
+**Flow.** The host drives it: start, next level, retry. The guest's result
+and death screens wait for the host. Co-op runs never touch the solo save.
+The pause menu doesn't pause the world. If the guest leaves, the host
+carries on alone; if the host leaves, the guest returns to the menu (the
+world was the host's). Level cards are skipped in co-op.
+
+**The partner** is a figure in a coverall, hi-vis vest and hard hat, built
+from primitives like the creatures: legs swing with speed, crouch, lie down
+when downed. Their headlamp is a real `SpotLight` (so co-op sessions have
+two more lights than solo — added when the level starts, so shaders never
+recompile mid-level), plus a muzzle-flash light. A faint marker above them
+shows through walls, red and pulsing while they're down. Their gunshots and
+footsteps are spatial (`playGunshotAt`, `playFootstepAt`).
+
+**Testing.** Unit tests cover target choice, the Watcher and either torch,
+puppets copying a creature to its death, the boss's shared phase, and room
+codes. An end-to-end check runs two real browsers against a local PeerJS
+server (`?signal=ws://127.0.0.1:9000/peerjs`), clicking through the actual
+menus, and verifies: intercom and door use by the guest, pickups, the
+guest's shots killing the host's creature, down and revive, wipe and
+retry, leaving together, moving to the next level, and a partner leaving
+(`tools/coop/run.mjs`; usage in its header).
+
+---
+
+## 13. Debug hooks (`?debug`)
 
 With `?debug`, pointer lock isn't required and `window.game` exposes:
 `debugStart(levelIndex, difficulty?)`, `debugSimulate(seconds, heldCodes[])`,
 `debugFire()`, `debugLook(yaw, pitch)`, `debugTeleport(x, z)`,
-`debugEnemies()`, `debugState()`, `debugMusicLevel()`. `debugSimulate` also
+`debugEnemies()`, `debugState()`, `debugMusicLevel()`, `debugLeave()`. `debugSimulate` also
 takes gamepad buttons to hold. `debugSimulate` steps the game at a fixed
 30 Hz without rendering, holding the given key codes (e.g. `["KeyW",
 "ShiftLeft"]`), which is handy for testing AI headlessly.
 
 ---
 
-## 13. Testing
+## 14. Testing
 
 `npm test` runs the Vitest suite; `npm run check` adds the typecheck and
 formatting check, and CI runs all of it on every push. Deploys are blocked if
@@ -660,7 +733,7 @@ ammo for a weapon the player can't have yet.
 
 ---
 
-## 14. Known limitations / next steps
+## 15. Known limitations / next steps
 
 See [`ROADMAP.md`](ROADMAP.md) for the full plan.
 
@@ -673,6 +746,12 @@ See [`ROADMAP.md`](ROADMAP.md) for the full plan.
    readable in the dark, but a proper model pipeline (see the roadmap's
    asset rule) would be the next step up.
 5. **No touch input.**
-6. **Performance** hasn't been profiled on real low-end GPUs; the Low
+6. **Co-op has no relay server**, so it can't connect across the few
+   networks that block direct browser-to-browser connections, and it
+   depends on the free public PeerJS signaling server being up (or a
+   self-hosted one via `?signal=`). Joining needs a keyboard to type the
+   code. There's no host migration: if the host leaves, the guest's game
+   ends.
+7. **Performance** hasn't been profiled on real low-end GPUs; the Low
    preset is the lever if it's needed.
-7. **The gamepad layout isn't rebindable** (the keyboard is).
+8. **The gamepad layout isn't rebindable** (the keyboard is).

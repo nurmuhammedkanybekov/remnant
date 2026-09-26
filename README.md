@@ -190,6 +190,22 @@ Nine kinds of creature, each built to break a habit the last one taught you:
 - Title screen, a main menu that shows how far up the shaft you've climbed,
   and a title card for every level.
 
+### Two-player co-op
+
+- **Play the campaign with a friend, online.** One player hosts and picks
+  the sublevel and difficulty; the other types in a five-character room
+  code. No accounts, no install, no server to run.
+- **The creatures hunt you both.** They go after whoever is closest, hear
+  both of you, and either player's flashlight holds a Watcher.
+- **Nobody dies alone.** At zero health you go down instead, with 45
+  seconds for your partner to reach you and hold Use to get you back up. If
+  you're both down, the level restarts for both from the last checkpoint.
+- **Shared progress:** one keycard opens the doors for both, generators,
+  intercoms, story triggers and checkpoints happen for both, and you leave
+  each sublevel together.
+- Your partner is a figure in a hard hat whose headlamp really lights the
+  corridor, with their shots, footsteps and health on your HUD.
+
 ---
 
 ## Controls
@@ -269,8 +285,14 @@ flowchart LR
   every attempt and thrown away afterwards, so no state leaks between levels
   or retries.
 - **`PlayerCommand`** is the only way player intent reaches the simulation.
-  The keyboard, the headless test harness and (planned) a co-op partner over
-  the network all produce commands.
+  The keyboard, the gamepad and the headless test harness all produce
+  commands.
+- **Co-op** is host-authoritative for the world: the host's game runs the
+  creatures, doors, generators, the boss and the level's end, and streams
+  them to the guest, whose creatures are puppets. Each player moves their
+  own character (so movement never lags) and sends where they are 20 times
+  a second; everything else is an event. Browsers connect directly with
+  WebRTC data channels, found through a free public signaling server.
 - **`content/`** holds the game data. Adding an enemy type means adding a
   definition, and its map glyph works in levels immediately.
 
@@ -283,6 +305,7 @@ src/
 ├── player/     commands, movement, flashlight, health
 ├── enemies/    AI state machine, creature bodies, boss, projectiles, enemy manager
 ├── weapons/    weapon logic, first-person viewmodel
+├── net/        co-op: signaling, WebRTC link, message protocol
 ├── items/      pickups
 ├── fx/         procedural textures, particles
 ├── audio/      synthesized sound engine and adaptive music
@@ -351,9 +374,11 @@ The Vitest suite covers the level parser and validator, collision,
 raycasts, pathfinding, player movement, weapons (pellets, shell-by-shell
 loading), creature AI (blindness, light-freezing, ceiling drops, spitting,
 lures, takedowns and the boss's phases, run headlessly with stand-in
-bodies), acid hit tests, loadouts, key bindings, input commands, settings
+bodies), co-op creature targeting and host-to-guest snapshots, room codes,
+acid hit tests, loadouts, key bindings, input commands, settings
 and save migration. **Every shipped level is checked to be
-completable.** CI runs the typecheck, formatting check and tests on every
+completable.** Co-op has an end-to-end check that drives two real browsers
+through the menus and a dozen scenarios (`tools/coop/run.mjs`). CI runs the typecheck, formatting check and tests on every
 push and pull request, and a failing check blocks deployment.
 
 ---
@@ -370,7 +395,7 @@ keeps growing.
 | 3. New creatures, melee, more weapons           | ✅ Done  |
 | 4. Adaptive music, interface redesign, gamepad  | ✅ Done  |
 | 5. Cloud saves                                  | Optional |
-| 6. Two-player online co-op                      | Optional |
+| 6. Two-player online co-op                      | ✅ Done  |
 
 Details in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

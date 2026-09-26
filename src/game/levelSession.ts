@@ -8,18 +8,20 @@ import { ACTIONS, type Action } from "../core/actions";
 import type { Engine } from "../core/engine";
 import type { QualityPreset } from "../core/quality";
 import { RemnantBoss } from "../enemies/boss";
-import type { Enemy, Perception } from "../enemies/enemy";
+import type { Enemy, Perception, VocalKind } from "../enemies/enemy";
 import { EnemyManager } from "../enemies/enemyManager";
 import { Projectiles } from "../enemies/projectiles";
 import { Effects } from "../fx/particles";
 import { Pickup } from "../items/pickup";
-import type { PlayerCommand } from "../player/command";
+import { r2, type PlayerState, type SessionMsg } from "../net/protocol";
+import type { Role } from "../net/link";
+import { emptyCommand, type PlayerCommand } from "../player/command";
 import { MAX_BATTERY } from "../player/flashlight";
 import { DRY, NOISE_RADIUS, PlayerController, WATER } from "../player/playerController";
 import type { Hud } from "../ui/hud";
 import { Weapon } from "../weapons/weapon";
 import type { Viewmodel } from "../weapons/viewmodel";
-import { hasLineOfSight, isSolid, raycastWorld, worldToCell } from "../world/grid";
+import { circleHitsWall, hasLineOfSight, isSolid, raycastWorld, worldToCell } from "../world/grid";
 import { CheckpointMarker, DetonatorConsole, Door, Generator, Intercom, type Interactable } from "../world/interactables";
 import { LampSystem } from "../world/lamps";
 import { buildLevel, type LevelData } from "../world/levelBuilder";
@@ -29,6 +31,7 @@ import type { CheckpointState } from "./checkpoint";
 import type { Loadout, WeaponAmmo } from "./loadout";
 import { RadioChannel } from "./radio";
 import type { ScriptAction } from "./script";
+import { RemotePlayer } from "./remotePlayer";
 import { freshStats, type RunStats } from "./stats";
 
 const EXIT_RADIUS = 1.6;
@@ -51,6 +54,24 @@ const MELEE_FACING = Math.cos(THREE.MathUtils.degToRad(50));
 const RESTOCK_RADIUS = 40;
 const RESTOCK_TIME = 25;
 const AMMO_LABEL: Record<WeaponId, string> = { pistol: "ROUNDS", rivet: "RIVETS", shotgun: "SHELLS" };
+/** Co-op: player states go out this often, creature snapshots (host) this often. */
+const STATE_INTERVAL = 1 / 20;
+const SNAPSHOT_INTERVAL = 1 / 15;
+/** Co-op: seconds you can stay down before you bleed out, how close and how long a revive takes, and what you get back. */
+const BLEED_TIME = 45;
+const REVIVE_RANGE = 2;
+const REVIVE_TIME = 3;
+const REVIVE_HEALTH = 35;
+/** Co-op: both players have to be this close to the exit to leave. */
+const EXIT_TOGETHER = 4.5;
+
+/** How a session talks to the other player in co-op. `Game` owns the actual connection. */
+export interface CoopLink {
+  readonly role: Role;
+  /** Still connected to the other player. */
+  readonly connected: boolean;
+  send(msg: SessionMsg, fast?: boolean): void;
+}
 
 /** The systems a session renders and plays sound through; owned by `Game`, shared across levels. */
 export interface SessionServices {
@@ -123,12 +144,25 @@ export class LevelSession {
   private time = 0;
   private finished = false;
 
+  // --- co-op
+  /** The other player's figure (co-op only). */
+  private readonly remote: RemotePlayer | null = null;
+  /** Down and waiting for the partner, instead of dead. */
+  private downed = false;
+  private bleed = 0;
+  private reviveProgress = 0;
+  private stateTimer = 0;
+  private snapshotTimer = 0;
+  private partnerGoneShown = false;
+
   constructor(
     private readonly services: SessionServices,
     readonly def: LevelDef,
     readonly difficulty: DifficultyDef,
     loadout: Loadout,
-    restore: CheckpointState | null = null
+    restore: CheckpointState | null = null,
+    /** The link to the other player, in co-op. */
+    private readonly coop: CoopLink | null = null
   ) {
     const { engine, sound, hud, viewmodel } = services;
     const { scene, camera } = engine;
@@ -145,7 +179,12 @@ export class LevelSession {
 
     // A checkpoint carries the loadout from the moment it was reached.
     const start = restore?.loadout ?? loadout;
-    this.player = new PlayerController(camera, this.level, sp.playerStart, def.spawnYaw);
+    this.player = new PlayerController(
+      camera,
+      this.level,
+      this.startPoint(sp.playerStart, def.spawnYaw, coop?.role === "guest"),
+      def.spawnYaw
+    );
     this.player.motionScale = services.motionScale();
     this.player.health.current = start.health;
     this.player.flashlight.battery = start.battery;
@@ -182,7 +221,8 @@ export class LevelSession {
       door.isUnlocked = () => this.hasKeycard;
       door.onOpen = () => {
         sound.playDoor(this.spatial(door.pos), door.security);
-        this.enemies.emitNoise(door.pos, DOOR_NOISE);
+        this.worldNoise(door.pos, DOOR_NOISE);
+        this.broadcastUse(door);
       };
       door.onLocked = () => {
         sound.playLocked();
@@ -192,7 +232,10 @@ export class LevelSession {
     });
     this.generators = sp.generators.map((g) => {
       const gen = new Generator(scene, g);
-      gen.onStart = () => this.handleGeneratorStarted(gen);
+      gen.onStart = () => {
+        this.handleGeneratorStarted(gen);
+        this.broadcastUse(gen);
+      };
       return gen;
     });
     this.intercoms = sp.intercoms.map((s, i) => {
@@ -200,6 +243,7 @@ export class LevelSession {
       ic.onUse = () => {
         sound.playIntercom(this.spatial(ic.pos));
         this.run(def.intercoms?.[i] ?? []);
+        this.broadcastUse(ic);
       };
       return ic;
     });
@@ -219,6 +263,11 @@ export class LevelSession {
     }
     this.currentWeapon = this.weapons.has(start.current) ? start.current : "pistol";
 
+    if (coop) {
+      this.remote = new RemotePlayer(scene);
+      this.remote.onFootstep = (gait, wet, at) => sound.playFootstepAt(gait, wet, this.spatial(at));
+    }
+
     this.muzzleLight = new THREE.PointLight(0xffb060, 0, 12, 1.6);
     this.muzzleLight.position.set(0.2, -0.1, -0.6);
     camera.add(this.muzzleLight);
@@ -232,6 +281,18 @@ export class LevelSession {
     if (restore) this.restore(restore);
     else this.run(def.events?.start ?? []);
     this.refreshObjective();
+  }
+
+  /** The guest starts a step beside the host (to the right, left or behind — whichever is clear). */
+  private startPoint(start: THREE.Vector2, yaw: number, guest: boolean): THREE.Vector2 {
+    if (!guest) return start;
+    const right = new THREE.Vector2(Math.cos(yaw), -Math.sin(yaw));
+    const back = new THREE.Vector2(Math.sin(yaw), Math.cos(yaw));
+    for (const dir of [right, right.clone().negate(), back]) {
+      const p = start.clone().addScaledVector(dir, 1.2);
+      if (!circleHitsWall(this.level, p.x, p.y, 0.45)) return p;
+    }
+    return start;
   }
 
   /** 0..1 danger for the music: 1 while anything hunts you (or the Remnant is awake). */
@@ -284,15 +345,20 @@ export class LevelSession {
     const cell = worldToCell(this.player.position.x, this.player.position.z);
     const cellI = cell.row * this.level.cols + cell.col;
     this.player.terrain = this.waterCells.has(cellI) ? WATER : DRY;
-    this.player.update(dt, cmd);
+    // Down: you can look around, and that's all.
+    this.player.update(dt, this.downed ? { ...emptyCommand(), turn: cmd.turn, tilt: cmd.tilt } : cmd);
+    if (this.downed) engine.camera.position.y = 0.4;
     this.keepOutOfBoss();
     this.checkTriggers();
 
-    this.enemies.update(dt, this.perception(false));
+    this.enemies.update(dt, this.perceptions(false));
     this.projectiles.update(dt, this.player.position, this.player.position.y, this.player.health.isDead);
-    this.updateCombat(dt, cmd);
-    this.updatePickups(dt);
-    this.updateInteraction(dt, cmd.interact);
+    if (!this.downed) {
+      this.updateCombat(dt, cmd);
+      this.updatePickups(dt);
+      this.updateInteraction(dt, cmd.interact);
+    }
+    this.updateCoop(dt, cmd);
     this.updateGenerators(dt);
     this.radio.update(dt);
     this.lamps.update(dt, this.player.position, this.time);
@@ -328,7 +394,8 @@ export class LevelSession {
     const cam = engine.camera;
     cam.position.y = THREE.MathUtils.lerp(cam.position.y, 0.35, 1 - Math.exp(-dt * 3));
     cam.rotation.z = THREE.MathUtils.lerp(cam.rotation.z, 0.9, 1 - Math.exp(-dt * 2));
-    this.enemies.update(dt, this.perception(true));
+    this.enemies.update(dt, this.perceptions(true));
+    this.updateCoop(dt, emptyCommand());
     this.projectiles.update(dt, this.player.position, this.player.position.y, true);
     this.lamps.update(dt, this.player.position, this.time);
     this.effects.update(dt, cam, this.player.flashlight.level, this.time);
@@ -336,7 +403,24 @@ export class LevelSession {
     engine.setPostFx(this.damageFx, 1, this.time);
   }
 
-  /** What the creatures can sense this frame. */
+  /** What the creatures can sense this frame: one entry per player (the host senses both). */
+  private perceptions(dead: boolean): Perception[] {
+    const list = [this.perception(dead)];
+    const r = this.remote;
+    if (this.coop?.role === "host" && this.partnerHere && r?.state) {
+      const s = r.state;
+      list.push({
+        playerPos: r.position2D,
+        playerNoise: s.down ? 0 : NOISE_RADIUS[s.gait] * (s.wet ? WATER.noise : 1),
+        torchOn: !s.down && s.torch > 0.3,
+        playerDead: s.down || s.hp <= 0,
+        eye: r.eyePosition,
+        look: r.lookDirection,
+      });
+    }
+    return list;
+  }
+
   private perception(dead: boolean): Perception {
     const cam = this.services.engine.camera;
     const torch = this.player.flashlight;
@@ -364,19 +448,27 @@ export class LevelSession {
   }
 
   private wireEnemy(e: Enemy): void {
-    const { sound } = this.services;
+    // The guest's creatures are puppets of the host's: they don't think, so none of this fires for them.
+    if (this.coop?.role === "guest") e.puppet = true;
+    const heavy = e.stats.behaviour === "boss";
     e.onAttackHit = (dmg, from) => {
+      if (e.target === 1 && this.remote) {
+        this.coop?.send({ t: "hurt", dmg, from: [r2(from.x), r2(from.y)], heavy });
+        return;
+      }
       this.player.health.takeDamage(dmg, from);
-      if (e.stats.behaviour === "boss") this.player.addTrauma(0.6);
+      if (heavy) this.player.addTrauma(0.6);
     };
-    e.onAlert = (en) => sound.playEnemy("alert", en.stats.voicePitch, this.spatial(en.position2D));
-    e.onVocal = (en, kind) => {
-      sound.playEnemy(kind, en.stats.voicePitch, this.spatial(en.position2D));
-      if (kind === "slam" && en.position2D.distanceTo(this.player.position2D) < 14) this.player.addTrauma(0.35);
-    };
+    e.onAlert = (en) => this.enemyVocal(en, "alert");
+    e.onVocal = (en, kind) => this.enemyVocal(en, kind);
     e.onRanged = (en, from, target) => {
       const r = en.stats.ranged;
-      if (r) this.projectiles.spawn(from, target, r.speed, r.damage * this.difficulty.enemyDamage);
+      if (!r) return;
+      const dmg = r.damage * this.difficulty.enemyDamage;
+      this.projectiles.spawn(from, target, r.speed, dmg);
+      // The guest gets its own copy of the glob: it can only hurt the guest there, and only the host here.
+      const v = (p: THREE.Vector3) => [r2(p.x), r2(p.y), r2(p.z)];
+      this.coop?.send({ t: "proj", from: v(from), to: v(target), speed: r.speed, dmg });
     };
     e.onLure = (en) => this.handleLure(en);
     if (e instanceof RemnantBoss) {
@@ -385,22 +477,30 @@ export class LevelSession {
     }
   }
 
+  /** A creature makes a sound; the host passes it on so the guest hears it too. */
+  private enemyVocal(en: Enemy, kind: "alert" | VocalKind): void {
+    this.services.sound.playEnemy(kind, en.stats.voicePitch, this.spatial(en.position2D));
+    if (kind === "slam" && en.position2D.distanceTo(this.player.position2D) < 14) this.player.addTrauma(0.35);
+    if (this.coop?.role === "host") this.coop.send({ t: "vocal", i: this.enemies.enemies.indexOf(en), k: kind });
+  }
+
   /** A Mimic makes a sound to draw you in: your own footsteps, a pickup, or the Operator's voice. */
-  private handleLure(e: Enemy): void {
+  private handleLure(e: Enemy, r = Math.random()): void {
+    if (this.coop?.role === "host") this.coop.send({ t: "lure", i: this.enemies.enemies.indexOf(e), r });
     const pos = e.position2D;
     if (pos.distanceTo(this.player.position2D) > 26) return;
     const sp = this.spatial(pos);
-    const r = Math.random();
     if (r < 0.45 && this.radio.sayFrom({ speaker: "echo", text: MIMIC_LINES[Math.floor(Math.random() * MIMIC_LINES.length)] }, sp)) return;
     this.services.sound.playLure(r < 0.75 ? "footsteps" : "pickup", sp);
   }
 
   private handleBossPhase(phase: number): void {
     const b = this.boss!;
+    if (this.coop?.role === "host") this.coop.send({ t: "bossPhase", phase });
     this.player.addTrauma(0.7);
     this.services.hud.toast(`THE REMNANT — PHASE ${phase}`, "var(--ui-red)");
     // The scream reaches every creature on the level.
-    this.enemies.emitNoise(b.position2D, 60);
+    this.worldNoise(b.position2D, 60);
     this.run((phase === 2 ? this.def.events?.bossPhase2 : this.def.events?.bossPhase3) ?? []);
   }
 
@@ -425,6 +525,7 @@ export class LevelSession {
     const e = this.enemies.spawn(kind, p);
     e.alertTo(this.player.position2D);
     this.brood.add(e);
+    this.coop?.send({ t: "spawn", kind, x: r2(p.x), z: r2(p.y) });
   }
 
   // ------------------------------------------------------------------ scripting
@@ -451,7 +552,7 @@ export class LevelSession {
           this.saveCheckpoint();
           break;
         case "alarm":
-          this.enemies.emitNoise(this.player.position2D, a.radius);
+          this.worldNoise(this.player.position2D, a.radius);
           sound.playLocked();
           break;
       }
@@ -466,15 +567,27 @@ export class LevelSession {
     const { col, row } = worldToCell(this.player.position.x, this.player.position.z);
     const i = row * this.level.cols + col;
     const key = this.triggerCells.get(i);
-    if (key && !this.firedTriggers.has(key)) {
-      this.firedTriggers.add(key);
-      this.run(this.def.triggers?.[key] ?? []);
-    }
-    for (const m of this.markers) {
-      if (m.reached || m.spawn.cell.col !== col || m.spawn.cell.row !== row) continue;
-      m.reached = true;
-      this.saveCheckpoint();
-    }
+    if (key && this.fireTrigger(key)) this.coop?.send({ t: "trigger", key });
+    this.markers.forEach((m, mi) => {
+      if (m.spawn.cell.col !== col || m.spawn.cell.row !== row) return;
+      if (this.reachMarker(mi)) this.coop?.send({ t: "marker", i: mi });
+    });
+  }
+
+  /** Script triggers fire once, for both players, whoever walks in. Returns false if it already had. */
+  private fireTrigger(key: string): boolean {
+    if (this.firedTriggers.has(key)) return false;
+    this.firedTriggers.add(key);
+    this.run(this.def.triggers?.[key] ?? []);
+    return true;
+  }
+
+  private reachMarker(i: number): boolean {
+    const m = this.markers[i];
+    if (!m || m.reached) return false;
+    m.reached = true;
+    this.saveCheckpoint();
+    return true;
   }
 
   private saveCheckpoint(): void {
@@ -549,15 +662,26 @@ export class LevelSession {
   private updateInteraction(dt: number, pressed: boolean): void {
     for (const it of this.interactables) it.update(dt, this.time);
     for (const m of this.markers) m.update(this.time);
+    // Reviving a downed partner takes the use key (see updateCoop).
+    if (this.canRevive) return;
     const target = this.focusedInteractable();
     this.services.hud.interactPrompt(target ? this.services.keyFor("interact") : null, target?.prompt ?? null);
-    if (target && pressed) target.interact();
+    if (!target || !pressed) return;
+    // The guest asks the host, who runs the world — except to hear that a door is locked.
+    const lockedDoor = target instanceof Door && target.security && !this.hasKeycard;
+    if (this.coop?.role === "guest" && !lockedDoor) this.coop.send({ t: "use", i: this.interactables.indexOf(target) });
+    else target.interact();
+  }
+
+  /** Host: tell the guest something was used (it happens there too). */
+  private broadcastUse(it: Interactable): void {
+    if (this.coop?.role === "host") this.coop.send({ t: "used", i: this.interactables.indexOf(it) });
   }
 
   private handleGeneratorStarted(gen: Generator): void {
     const { sound, hud } = this.services;
     sound.playGeneratorStart(this.spatial(gen.pos));
-    this.enemies.emitNoise(gen.pos, GENERATOR_START_NOISE);
+    this.worldNoise(gen.pos, GENERATOR_START_NOISE);
     const running = this.generators.filter((g) => g.running).length;
     if (this.powerOn) {
       hud.toast("POWER RESTORED", "var(--ui-green)");
@@ -577,7 +701,7 @@ export class LevelSession {
     for (const g of this.generators) {
       if (!g.running) continue;
       this.services.sound.playGeneratorHum(this.spatial(g.pos));
-      this.enemies.emitNoise(g.pos, GENERATOR_HUM_NOISE);
+      this.worldNoise(g.pos, GENERATOR_HUM_NOISE);
     }
   }
 
@@ -682,13 +806,16 @@ export class LevelSession {
     this.player.addTrauma(0.04 + cfg.recoil * 2.5);
     // The rivet gun has no muzzle blast to light the room.
     if (this.currentWeapon !== "rivet") this.muzzleTime = MUZZLE_FLASH_TIME;
-    this.enemies.emitNoise(this.player.position2D, cfg.noiseRadius);
+    this.playerNoise(this.player.position2D, cfg.noiseRadius);
 
     let anyHit = false;
     let anyHead = false;
     let anyKill = false;
     let allArmoured = true;
     let impactSound = false;
+    const walls: number[][] = [];
+    const blood: number[][] = [];
+    const v3 = (a: THREE.Vector3, b: THREE.Vector3) => [a.x, a.y, a.z, b.x, b.y, b.z].map(r2);
     for (const dir of shot.dirs) {
       const wall = raycastWorld(this.level, shot.origin, dir, cfg.range);
       const hit = this.enemies.raycast(new THREE.Ray(shot.origin, dir), wall ? wall.distance : cfg.range);
@@ -698,15 +825,18 @@ export class LevelSession {
         if (!(hit.enemy instanceof RemnantBoss && hit.enemy.isArmoured(part))) allArmoured = false;
         const killed = this.damageEnemy(hit.enemy, dmg, part);
         this.effects.bloodBurst(hit.point, dir.clone(), (killed ? 28 : 14) / Math.sqrt(cfg.pellets));
+        blood.push(v3(hit.point, dir));
         anyHit = true;
         anyHead ||= hit.headshot;
         anyKill ||= killed;
       } else if (wall) {
         this.effects.impact(wall.point, wall.normal);
+        walls.push(v3(wall.point, wall.normal));
         if (!impactSound) sound.playImpact(this.spatial(new THREE.Vector2(wall.point.x, wall.point.z)));
         impactSound = true;
       }
     }
+    this.coop?.send({ t: "shot", w: this.currentWeapon, walls: walls.slice(0, 4), blood: blood.slice(0, 4) });
     if (anyHit) {
       this.stats.hits++;
       if (anyHead && !allArmoured) this.stats.headshots++;
@@ -723,19 +853,36 @@ export class LevelSession {
     }
   }
 
-  /** All player damage to creatures goes through here. Returns true on a kill. */
+  /**
+   * All player damage to creatures goes through here. Returns true on a kill.
+   * The guest's creatures are only copies: the guest tells the host, which
+   * reports the kill back (`killed`).
+   */
   private damageEnemy(enemy: Enemy, amount: number, part: "head" | "body"): boolean {
+    if (this.coop?.role === "guest") {
+      const me = this.player.position2D;
+      this.coop.send({ t: "hit", i: this.enemies.enemies.indexOf(enemy), dmg: amount, part, x: r2(me.x), z: r2(me.y) });
+      enemy.flash();
+      return false;
+    }
     const killed = enemy.takeDamage(amount, this.player.position2D, part);
     if (killed) this.onEnemyKilled(enemy);
     return killed;
   }
 
-  private onEnemyKilled(enemy: Enemy): void {
-    this.stats.kills++;
+  /** Host: a creature died. `byPartner` if the guest landed the blow (it counts in their stats). */
+  private onEnemyKilled(enemy: Enemy, byPartner = false): void {
+    if (byPartner) this.coop?.send({ t: "killed", i: this.enemies.enemies.indexOf(enemy) });
+    else this.stats.kills++;
     if (enemy !== this.boss) return;
+    for (const e of this.brood) e.takeDamage(e.health + 1, enemy.position2D);
+    this.coop?.send({ t: "bossDead" });
+    this.bossDefeated();
+  }
+
+  private bossDefeated(): void {
     this.services.hud.toast("THE REMNANT IS DEAD", "var(--ui-red)");
     this.player.addTrauma(0.8);
-    for (const e of this.brood) e.takeDamage(e.health + 1, enemy.position2D);
     this.run(this.def.events?.bossDefeated ?? []);
   }
 
@@ -772,22 +919,26 @@ export class LevelSession {
     }
     const chest = new THREE.Vector3(target.root.position.x, 1.1 * target.stats.scale, target.root.position.z);
     if (target.canBeTakenDown(me)) {
-      target.takedown();
       this.stats.takedowns++;
-      this.onEnemyKilled(target);
+      if (this.coop?.role === "guest") this.coop.send({ t: "takedown", i: this.enemies.enemies.indexOf(target), x: r2(me.x), z: r2(me.y) });
+      else {
+        target.takedown();
+        this.onEnemyKilled(target);
+      }
       sound.playTakedown();
       this.effects.bloodBurst(chest, new THREE.Vector3(fwd.x, 0.2, fwd.y), 10);
       hud.hitMarker(true, true);
-      this.enemies.emitNoise(me, TAKEDOWN_NOISE);
+      this.playerNoise(me, TAKEDOWN_NOISE);
       return;
     }
     sound.playMelee(true);
     this.player.addTrauma(0.15);
     const killed = this.damageEnemy(target, MELEE_DAMAGE, "body");
-    if (!killed) target.shove(fwd, 0.8, this.level);
+    if (this.coop?.role === "guest") this.coop.send({ t: "shove", i: this.enemies.enemies.indexOf(target), dx: r2(fwd.x), dz: r2(fwd.y) });
+    else if (!killed) target.shove(fwd, 0.8, this.level);
     this.effects.bloodBurst(chest, new THREE.Vector3(fwd.x, 0.2, fwd.y), 8);
     hud.hitMarker(false, killed);
-    this.enemies.emitNoise(me, MELEE_NOISE);
+    this.playerNoise(me, MELEE_NOISE);
   }
 
   private updatePickups(dt: number): void {
@@ -797,7 +948,9 @@ export class LevelSession {
       this.restock[i][1] -= dt;
       if (this.boss?.isDead) this.restock.splice(i, 1);
       else if (this.restock[i][1] <= 0) {
-        this.restock[i][0].restore();
+        const p = this.restock[i][0];
+        p.restore();
+        this.coop?.send({ t: "restock", i: this.pickups.indexOf(p) });
         this.restock.splice(i, 1);
       }
     }
@@ -823,16 +976,14 @@ export class LevelSession {
         }
         const got = w.addReserveAmmo(amount(w.config.ammoPickup));
         hud.toast(`+${got} ${AMMO_LABEL[item.ammoFor]}`);
-        const b = this.boss;
-        if (b && b.awake && !b.isDead && b.position2D.distanceTo(new THREE.Vector2(px, pz)) < RESTOCK_RADIUS)
-          this.restock.push([p, RESTOCK_TIME]);
-        p.collect();
+        this.maybeRestock(p);
+        this.collect(p);
         sound.playPickup(p.type);
         continue;
       }
       if (item.weapon) {
         this.pickUpWeapon(item.weapon, amount(WEAPONS[item.weapon].ammoPickup * 2));
-        p.collect();
+        this.collect(p);
         sound.playPickup(p.type);
         continue;
       }
@@ -860,20 +1011,39 @@ export class LevelSession {
           hud.toast("+ BATTERY", "var(--ui-blue)");
           break;
         case "keycard":
-          this.hasKeycard = true;
-          hud.toast("KEYCARD ACQUIRED", "var(--ui-green)");
-          if (this.def.events?.keycard) this.run(this.def.events.keycard);
-          else if (this.keycardLocksExit) {
-            this.objective = "Reach the exit.";
-            this.refreshObjective();
-          }
+          this.gotKeycard("KEYCARD ACQUIRED");
           break;
         case "note":
           if (p.noteText) hud.showNote(p.noteText);
           break;
       }
-      p.collect();
+      this.collect(p);
       sound.playPickup(p.type);
+    }
+  }
+
+  /** Takes a pickup out of the world — for both players. */
+  private collect(p: Pickup): void {
+    p.collect();
+    this.coop?.send({ t: "pickup", i: this.pickups.indexOf(p) });
+  }
+
+  /** Ammo taken in the boss arena while the fight is on comes back later (the host keeps the clock). */
+  private maybeRestock(p: Pickup): void {
+    if (this.coop?.role === "guest") return;
+    const b = this.boss;
+    if (b && b.awake && !b.isDead && p.distanceTo(b.position2D.x, b.position2D.y) < RESTOCK_RADIUS) this.restock.push([p, RESTOCK_TIME]);
+  }
+
+  /** The keycard is shared: whoever finds it opens the doors for both. */
+  private gotKeycard(toast: string): void {
+    if (this.hasKeycard) return;
+    this.hasKeycard = true;
+    this.services.hud.toast(toast, "var(--ui-green)");
+    if (this.def.events?.keycard) this.run(this.def.events.keycard);
+    else if (this.keycardLocksExit) {
+      this.objective = "Reach the exit.";
+      this.refreshObjective();
     }
   }
 
@@ -916,12 +1086,20 @@ export class LevelSession {
       this.throttledPrompt(reason);
       return;
     }
+    // Co-op: nobody leaves alone. The host decides when you both have.
+    if (this.partnerHere) {
+      const r = this.remote!;
+      if (r.down) return this.throttledPrompt("YOUR PARTNER IS DOWN");
+      if (r.position2D.distanceTo(exit) > EXIT_TOGETHER) return this.throttledPrompt("WAITING FOR YOUR PARTNER");
+    }
+    if (this.coop?.role === "guest" && this.coop.connected) return;
     this.finish(this.def.finale ? "leave" : null);
   }
 
   private finish(ending: EndingId | null): void {
     if (this.finished) return;
     this.finished = true;
+    if (this.coop?.role === "host") this.coop.send({ t: "finish", ending });
     this.radio.clear();
     if (ending === "seal") this.services.sound.playDetonation();
     else this.services.sound.playLevelComplete();
@@ -938,11 +1116,274 @@ export class LevelSession {
 
   private handleDeath(): void {
     if (this.finished) return;
+    // Co-op: you go down, and your partner has a while to get you back up.
+    if (this.partnerHere && !this.remote!.down) return this.goDown();
+    this.coop?.send({ t: "wipe" });
+    this.die();
+  }
+
+  /** The level is lost. */
+  private die(): void {
+    if (this.finished) return;
+    this.downed = false;
     this.finished = true;
     this.radio.clear();
     this.services.hud.boss(null);
     this.services.sound.playDeath();
     this.onDeath?.();
+  }
+
+  // ------------------------------------------------------------------ co-op
+
+  /** The other player is connected and in the level. */
+  private get partnerHere(): boolean {
+    return !!this.coop?.connected && !!this.remote?.visible;
+  }
+
+  /** Standing over a downed partner: holding the use key gets them up. */
+  private get canRevive(): boolean {
+    const r = this.remote;
+    return !this.downed && this.partnerHere && !!r?.down && r.position2D.distanceTo(this.player.position2D) < REVIVE_RANGE;
+  }
+
+  /** Noise the world makes (doors, generators, alarms, the boss): the host's creatures hear it. */
+  private worldNoise(pos: THREE.Vector2, radius: number): void {
+    if (this.coop?.role !== "guest") this.enemies.emitNoise(pos, radius);
+  }
+
+  /** Noise the player makes (shots, melee): a guest's goes over to the host's creatures. */
+  private playerNoise(pos: THREE.Vector2, radius: number): void {
+    if (this.coop?.role === "guest") this.coop.send({ t: "noise", x: r2(pos.x), z: r2(pos.y), r: radius });
+    else this.enemies.emitNoise(pos, radius);
+  }
+
+  private sendState(): void {
+    const p = this.player;
+    const torch = p.flashlight;
+    const state: PlayerState = {
+      t: "ps",
+      x: r2(p.position.x),
+      y: r2(p.position.y),
+      z: r2(p.position.z),
+      yaw: r2(p.facing),
+      pitch: r2(p.lookPitch),
+      gait: p.gait,
+      wet: p.terrain.wet,
+      torch: torch.on ? r2(torch.level) : 0,
+      weapon: this.currentWeapon,
+      hp: r2(p.health.fraction),
+      down: this.downed || p.health.isDead,
+      bleed: Math.ceil(this.bleed),
+    };
+    this.coop?.send(state, true);
+  }
+
+  private goDown(): void {
+    const { hud, sound, viewmodel } = this.services;
+    this.downed = true;
+    this.bleed = BLEED_TIME;
+    this.healTimer = 0;
+    this.weapon.cancelReload();
+    viewmodel.setVisible(false);
+    hud.interactPrompt(null, null);
+    sound.playDeath();
+    hud.toast("YOU'RE DOWN", "var(--ui-red)");
+    this.sendState();
+  }
+
+  private revived(): void {
+    if (!this.downed || this.finished) return;
+    this.downed = false;
+    this.player.health.current = REVIVE_HEALTH;
+    this.services.viewmodel.setVisible(true);
+    this.services.sound.playHeal();
+    this.services.hud.toast("BACK ON YOUR FEET", "var(--ui-green)");
+    this.sendState();
+  }
+
+  private updateCoop(dt: number, cmd: PlayerCommand): void {
+    const coop = this.coop;
+    const r = this.remote;
+    if (!coop || !r) return;
+    const { hud, sound } = this.services;
+    if (!coop.connected) {
+      if (r.visible) r.hide();
+      if (!this.partnerGoneShown && !this.finished) hud.toast("YOUR PARTNER IS GONE", "var(--ui-red)");
+      this.partnerGoneShown = true;
+      // Nobody left to get you up.
+      if (this.downed) this.die();
+      return;
+    }
+    r.update(dt, this.time);
+    this.stateTimer -= dt;
+    if (this.stateTimer <= 0) {
+      this.stateTimer = STATE_INTERVAL;
+      this.sendState();
+    }
+    if (coop.role === "host") {
+      this.snapshotTimer -= dt;
+      if (this.snapshotTimer <= 0) {
+        this.snapshotTimer = SNAPSHOT_INTERVAL;
+        coop.send({ t: "es", e: this.enemies.enemies.map((e) => e.netState()) }, true);
+      }
+    }
+    if (this.finished) return;
+
+    if (this.downed) {
+      this.bleed -= dt;
+      hud.prompt(`YOU'RE DOWN — ${Math.max(0, Math.ceil(this.bleed))}s — YOUR PARTNER CAN GET YOU UP`, 0.25);
+      if (this.bleed <= 0 || r.down) {
+        coop.send({ t: "wipe" });
+        this.die();
+      }
+      return;
+    }
+    if (!this.canRevive) {
+      this.reviveProgress = 0;
+      if (r.down) hud.prompt(`YOUR PARTNER IS DOWN — ${r.state?.bleed ?? 0}s TO REACH THEM`, 0.25);
+      return;
+    }
+    hud.interactPrompt(
+      this.services.keyFor("interact"),
+      this.reviveProgress > 0 ? `REVIVING… ${Math.round(this.reviveProgress * 100)}%` : "HOLD TO REVIVE YOUR PARTNER"
+    );
+    if (!cmd.interactHeld) {
+      this.reviveProgress = 0;
+      return;
+    }
+    this.reviveProgress += dt / REVIVE_TIME;
+    if (this.reviveProgress >= 1) {
+      this.reviveProgress = 0;
+      coop.send({ t: "revive" });
+      hud.toast("PARTNER REVIVED", "var(--ui-green)");
+      sound.playHeal();
+    }
+  }
+
+  /** The other player fired: their gun, their muzzle flash, where their bullets landed. */
+  private partnerShot(m: Extract<SessionMsg, { t: "shot" }>): void {
+    const r = this.remote;
+    if (!r) return;
+    r.fired();
+    this.services.sound.playGunshotAt(m.w, this.spatial(r.position2D));
+    for (const [x, y, z, nx, ny, nz] of m.walls) this.effects.impact(new THREE.Vector3(x, y, z), new THREE.Vector3(nx, ny, nz));
+    for (const [x, y, z, dx, dy, dz] of m.blood) this.effects.bloodBurst(new THREE.Vector3(x, y, z), new THREE.Vector3(dx, dy, dz), 12);
+  }
+
+  /** A message from the other player (see `net/protocol.ts`). */
+  receive(m: SessionMsg): void {
+    const enemy = (i: number): Enemy | undefined => this.enemies.enemies[i];
+    const host = this.coop?.role === "host";
+    switch (m.t) {
+      case "ps":
+        this.remote?.apply(m);
+        break;
+      case "es":
+        if (!host) m.e.forEach((a, i) => enemy(i)?.applyNet(a));
+        break;
+      case "vocal": {
+        const e = enemy(m.i);
+        if (e && !host) this.enemyVocal(e, m.k as VocalKind);
+        break;
+      }
+      case "spawn":
+        if (!host) this.enemies.spawn(m.kind, new THREE.Vector2(m.x, m.z));
+        break;
+      case "proj":
+        this.projectiles.spawn(
+          new THREE.Vector3(m.from[0], m.from[1], m.from[2]),
+          new THREE.Vector3(m.to[0], m.to[1], m.to[2]),
+          m.speed,
+          m.dmg
+        );
+        break;
+      case "lure": {
+        const e = enemy(m.i);
+        if (e && !host) this.handleLure(e, m.r);
+        break;
+      }
+      case "hurt":
+        this.player.health.takeDamage(m.dmg, new THREE.Vector2(m.from[0], m.from[1]));
+        if (m.heavy) this.player.addTrauma(0.6);
+        break;
+      case "killed":
+        this.stats.kills++;
+        this.services.hud.hitMarker(false, true);
+        break;
+      case "bossPhase":
+        if (this.boss && !host) this.handleBossPhase(m.phase);
+        break;
+      case "bossDead":
+        if (!host) this.bossDefeated();
+        break;
+      case "shot":
+        this.partnerShot(m);
+        break;
+      case "noise":
+        if (host) this.enemies.emitNoise(new THREE.Vector2(m.x, m.z), m.r);
+        break;
+      case "hit": {
+        const e = enemy(m.i);
+        if (!host || !e || e.isDead) break;
+        if (e.takeDamage(m.dmg, new THREE.Vector2(m.x, m.z), m.part)) this.onEnemyKilled(e, true);
+        break;
+      }
+      case "takedown": {
+        const e = enemy(m.i);
+        if (!host || !e || e.isDead) break;
+        const from = new THREE.Vector2(m.x, m.z);
+        if (e.canBeTakenDown(from)) {
+          e.takedown();
+          this.onEnemyKilled(e, true);
+        } else if (e.takeDamage(MELEE_DAMAGE, from)) this.onEnemyKilled(e, true);
+        break;
+      }
+      case "shove":
+        if (host) enemy(m.i)?.shove(new THREE.Vector2(m.dx, m.dz), 0.8, this.level);
+        break;
+      case "use": {
+        const it = this.interactables[m.i];
+        if (!host || !it || (it instanceof Door && it.security && !this.hasKeycard)) break;
+        it.interact();
+        break;
+      }
+      case "used": {
+        const it = this.interactables[m.i];
+        if (host || !it) break;
+        if (!(it instanceof Door)) it.interact();
+        else if (!it.isOpen) {
+          it.open();
+          it.onOpen?.(it);
+        }
+        break;
+      }
+      case "pickup": {
+        const p = this.pickups[m.i];
+        if (!p || p.collected) break;
+        p.collect();
+        if (p.type === "keycard") this.gotKeycard("YOUR PARTNER FOUND THE KEYCARD");
+        else if (ITEMS[p.type].ammoFor) this.maybeRestock(p);
+        break;
+      }
+      case "restock":
+        this.pickups[m.i]?.restore();
+        break;
+      case "trigger":
+        this.fireTrigger(m.key);
+        break;
+      case "marker":
+        this.reachMarker(m.i);
+        break;
+      case "revive":
+        this.revived();
+        break;
+      case "wipe":
+        this.die();
+        break;
+      case "finish":
+        this.finish(m.ending);
+        break;
+    }
   }
 
   // ------------------------------------------------------------------ helpers
@@ -974,6 +1415,8 @@ export class LevelSession {
       spreadPx: (Math.tan(spread) / halfFov) * (window.innerHeight / 2),
       hasKeycard: this.hasKeycard,
     });
+    const r = this.partnerHere ? this.remote?.state : null;
+    hud.partner(r ? { hp: r.hp, down: r.down, bleed: r.bleed } : null);
   }
 
   private updateBossBar(): void {

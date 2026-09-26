@@ -332,6 +332,42 @@ export class Screens {
     );
   }
 
+  // ------------------------------------------------------------------ co-op
+
+  /** A co-op screen: title, a line of status, optionally the room code in big letters. */
+  lobby(title: string, tag: string, text: string, items: MenuItem[], code?: string): void {
+    this.render(
+      `<h2>${esc(title)}</h2><div class="tag">${esc(tag)}</div>${
+        code ? `<div class="room-code" aria-label="Room code">${[...code].map((c) => `<b>${esc(c)}</b>`).join("")}</div>` : ""
+      }<div class="sub">${esc(text)}</div>`,
+      items,
+      true
+    );
+  }
+
+  /** Type in a partner's room code. */
+  joinForm(onJoin: (code: string) => void, back: () => void, error = "", value = ""): void {
+    this.render(
+      `<h2>JOIN A GAME</h2><div class="tag">ENTER THE CODE YOUR PARTNER SEES</div>
+       <input class="code-input" maxlength="7" autocomplete="off" spellcheck="false" placeholder="•••••" value="${esc(value)}">
+       <div class="sub err">${esc(error)}</div>`,
+      [
+        { label: "Join", primary: true, action: () => onJoin(input.value) },
+        { label: "Back", action: back },
+      ],
+      true
+    );
+    const input = this.root.querySelector<HTMLInputElement>(".code-input")!;
+    input.addEventListener("input", () => (input.value = input.value.toUpperCase()));
+    // Keys typed here are for the code, not the game.
+    input.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") onJoin(input.value);
+      if (e.key === "Escape") back();
+    });
+    input.focus();
+  }
+
   private statsHtml(s: RunStats): string {
     return `<div class="stats">
       <span>TIME</span><span>${formatTime(s.time)}</span>
