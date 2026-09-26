@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { Engine } from "../core/engine";
+import type { QualityPreset } from "../core/quality";
 import { LampSystem } from "../world/lamps";
 import { buildLevel } from "../world/levelBuilder";
 import type { LevelDef } from "../world/levelDef";
@@ -15,12 +16,13 @@ export class MenuBackdrop {
 
   constructor(
     private readonly engine: Engine,
-    def: LevelDef
+    def: LevelDef,
+    quality: QualityPreset
   ) {
     engine.resetWorld();
-    const level = buildLevel(engine.scene, parseLevel(def));
-    this.lamps = new LampSystem(engine.scene, level.spawns.lamps, level.lampFixtures);
-    this.effects = new Effects(engine.scene);
+    const level = buildLevel(engine.scene, parseLevel(def), quality.bumpMaps);
+    this.lamps = new LampSystem(engine.scene, level.spawns.lamps, level.lampFixtures, quality.lampLights);
+    this.effects = new Effects(engine.scene, quality.dustMotes);
 
     const s = level.spawns.playerStart;
     const cam = engine.camera;

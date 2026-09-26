@@ -51,3 +51,14 @@ export const MIMIC_LINES = [
   "It's safe in here. Come and see.",
   "Keep going, Aida. Nearly there. This way.",
 ];
+
+/** Radio fragments that scroll along the bottom of the main menu. */
+export const TRANSMISSIONS = [
+  "…is anyone on ten? Anyone at all? Pick up the intercom…",
+  "…stay off the main corridors. They follow the noise…",
+  "…the lift needs all three generators. Come up to me, Aida…",
+  "…this is Voss. If you're reading this, don't answer the radio…",
+  "…forty-one on the manifest. Forty-one voices on the channel…",
+  "…Zenit control, do you copy. Zenit control. Zenit…",
+  "…we only want to see the sky…",
+];

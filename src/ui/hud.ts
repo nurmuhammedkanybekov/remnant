@@ -41,6 +41,10 @@ export interface HudState {
   healing: boolean;
   /** The weapon slot in hand (1-based). */
   slot: number;
+  /** Label of the reload key, for the low-ammo hint. */
+  reloadKey: string;
+  /** False while you can't shoot (sprinting, switching, healing): the crosshair fades. */
+  canFire: boolean;
 }
 
 export class Hud {
@@ -130,9 +134,16 @@ export class Hud {
     this.last.slot = undefined;
   }
 
-  /** The heal key's label, shown next to the medkit count. */
+  /** The heal key's label, shown next to the medkit count. Cheap to call every frame. */
   setHealKey(key: string): void {
-    this.el.medKey.textContent = key;
+    if (this.el.medKey.textContent !== key) this.el.medKey.textContent = key;
+  }
+
+  /** HUD size and subtitle size (accessibility settings). */
+  applyDisplay(hudScale: number, subtitleSize: "small" | "medium" | "large"): void {
+    this.root.style.setProperty("--hud-scale", String(hudScale));
+    this.root.classList.toggle("sub-small", subtitleSize === "small");
+    this.root.classList.toggle("sub-large", subtitleSize === "large");
   }
 
   /** The boss health bar. Pass null to hide it. */
@@ -168,7 +179,14 @@ export class Hud {
       this.el.batRow.classList.toggle("low", s.battery < 0.2);
       this.el.batRow.classList.toggle("off", !s.torchOn);
     }
-    if (L.mag !== s.mag || L.reserve !== s.reserve || L.reloading !== s.reloading || L.healing !== s.healing || L.weapon !== s.weapon) {
+    if (
+      L.mag !== s.mag ||
+      L.reserve !== s.reserve ||
+      L.reloading !== s.reloading ||
+      L.healing !== s.healing ||
+      L.weapon !== s.weapon ||
+      L.reloadKey !== s.reloadKey
+    ) {
       this.el.mag.textContent = `${s.mag}`;
       this.el.mag.classList.toggle("empty", s.mag === 0);
       this.el.res.textContent = `/ ${s.reserve}`;
@@ -182,7 +200,7 @@ export class Hud {
           : s.mag === 0 && s.reserve === 0
             ? "NO AMMO"
             : s.mag <= 2 && s.reserve > 0
-              ? "[R] RELOAD"
+              ? `[${s.reloadKey}] RELOAD`
               : "";
     }
     if (L.noise !== s.noise) {
@@ -207,6 +225,7 @@ export class Hud {
       r.style.left = `${g}px`;
     }
     if (L.hasKeycard !== s.hasKeycard) this.el.key.classList.toggle("show", s.hasKeycard);
+    if (L.canFire !== s.canFire) this.el.xhair.style.opacity = s.canFire ? "1" : "0.15";
     if (L.weapon !== s.weapon) this.el.wname.textContent = s.weapon.toUpperCase();
     if (L.slot !== s.slot)
       this.el.slots.querySelectorAll<HTMLElement>("i").forEach((i) => i.classList.toggle("on", Number(i.dataset.slot) === s.slot));

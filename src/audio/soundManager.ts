@@ -7,6 +7,14 @@ import type { VocalKind } from "../enemies/enemy";
  *   voice → [lowpass if behind a wall] → panner → dry bus ─┐
  *                                               └→ reverb ─┴→ master → out
  */
+/** What the music engine needs from the sound engine. */
+export interface MusicOutput {
+  ctx: AudioContext;
+  /** The music bus: goes to the master (and a little to the reverb). */
+  out: AudioNode;
+  noise: AudioBuffer;
+}
+
 export interface Spatial {
   /** -1 (left) .. 1 (right) */
   pan: number;
@@ -23,6 +31,10 @@ export class SoundManager {
   private dry!: GainNode;
   private reverbIn!: GainNode;
   private noiseBuf!: AudioBuffer;
+  private musicBus!: GainNode;
+  private musicVolume = 0.7;
+  /** Called once the audio context exists (the music hooks in here). */
+  onReady: ((music: MusicOutput) => void) | null = null;
   private heartbeatTimer = 0;
   private ambientTimer = 4;
   private volume = 0.8;
@@ -62,7 +74,20 @@ export class SoundManager {
     const d = this.noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
+    this.musicBus = ctx.createGain();
+    this.musicBus.gain.value = this.musicVolume;
+    this.musicBus.connect(this.master);
+    const musicSend = ctx.createGain();
+    musicSend.gain.value = 0.5;
+    this.musicBus.connect(musicSend).connect(this.reverbIn);
+
     this.startAmbient();
+    this.onReady?.({ ctx, out: this.musicBus, noise: this.noiseBuf });
+  }
+
+  setMusicVolume(v: number): void {
+    this.musicVolume = v;
+    if (this.ctx) this.musicBus.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1);
   }
 
   setVolume(v: number): void {

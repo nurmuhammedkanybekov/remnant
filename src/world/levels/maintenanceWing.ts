@@ -6,6 +6,7 @@ export const MAINTENANCE_WING: LevelDef = {
   id: "maintenance-wing",
   name: "Sublevel 9",
   subtitle: "Maintenance Wing",
+  tagline: "Stay off the main corridors.",
   objective: "Find the stairwell.",
   spawnYaw: -Math.PI / 2, // start corridor runs toward +X
   map: [

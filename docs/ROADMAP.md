@@ -63,15 +63,19 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
       rigs (humanoid variants, rats, the Remnant's mass)
 - [x] Save format v3 (multi-weapon loadouts), with migration of v2 saves
 
-## Phase 4 — Sound, music, interface
+## Phase 4 — Sound, music, interface ✅
 
-- [ ] Adaptive music: calm / tension / chase layers driven by threat level
-- [ ] Main theme for the menu
-- [ ] Redesigned main menu, level transition cards, loading screen
-- [ ] HUD pass, subtitles, accessibility options (colour-blind safe HUD,
-      reduced camera shake, subtitle size)
-- [ ] Gamepad support
-- [ ] Graphics quality presets
+- [x] Adaptive music: calm / tension / chase layers driven by threat level,
+      one synthesized piece on a shared clock
+- [x] Main theme for the menu and result screens
+- [x] Redesigned main menu (depth gauge, intercepted radio), level
+      transition cards, loading screen and title screen
+- [x] HUD pass (weapon-aware key hints, crosshair fades when you can't
+      fire), subtitle size, HUD size, colour-blind friendly HUD, reduced
+      camera shake
+- [x] Gamepad support: play, pause and every menu, with prompts that switch
+      to pad buttons
+- [x] Graphics quality presets (Low / Medium / High)
 
 ## Phase 5 — Accounts and cloud saves (optional)
 

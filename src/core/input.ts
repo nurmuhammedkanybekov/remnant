@@ -12,6 +12,12 @@ export class Input {
   mouseDeltaX = 0;
   mouseDeltaY = 0;
   locked = false;
+  /** True when the last thing the player touched was a gamepad. */
+  usingPad = false;
+  private padButtons: boolean[] = [];
+  private padPrev: boolean[] = [];
+  private padAxes: number[] = [0, 0, 0, 0];
+  private simulatedPad: boolean[] | null = null;
 
   constructor(private readonly domElement: HTMLElement) {
     window.addEventListener("keydown", (e) => {
@@ -40,6 +46,7 @@ export class Input {
       if (!this.locked) return;
       this.mouseDeltaX += e.movementX;
       this.mouseDeltaY += e.movementY;
+      if (Math.abs(e.movementX) + Math.abs(e.movementY) > 2) this.usingPad = false;
     });
     document.addEventListener("pointerlockchange", () => {
       this.locked = document.pointerLockElement === domElement;
@@ -49,6 +56,47 @@ export class Input {
   private press(code: string): void {
     if (!this.down.has(code)) this.pressed.add(code);
     this.down.add(code);
+    this.usingPad = false;
+  }
+
+  /** Reads the first connected gamepad. Call once per frame, before anything reads input. */
+  pollGamepad(): void {
+    this.padPrev = this.padButtons;
+    const pads = typeof navigator !== "undefined" && navigator.getGamepads ? navigator.getGamepads() : [];
+    const pad = [...pads].find((p): p is Gamepad => !!p && p.connected);
+    if (!pad && !this.simulatedPad) {
+      this.padButtons = [];
+      this.padAxes = [0, 0, 0, 0];
+      return;
+    }
+    this.padButtons = this.simulatedPad ?? pad!.buttons.map((b) => b.pressed || b.value > 0.5);
+    this.padAxes = pad ? [0, 1, 2, 3].map((i) => pad.axes[i] ?? 0) : [0, 0, 0, 0];
+    const active = this.padButtons.some(Boolean) || this.padAxes.some((a) => Math.abs(a) > 0.35);
+    if (active) this.usingPad = true;
+  }
+
+  padDown(button: number): boolean {
+    return this.padButtons[button] === true;
+  }
+
+  padPressed(button: number): boolean {
+    return this.padButtons[button] === true && this.padPrev[button] !== true;
+  }
+
+  /** 0 left X, 1 left Y, 2 right X, 3 right Y — raw, -1..1. */
+  padAxis(i: number): number {
+    return this.padAxes[i] ?? 0;
+  }
+
+  /** Simulate gamepad buttons (debug/test harness only). Pass null to release the fake pad. */
+  simulatePad(buttons: number[] | null): void {
+    if (buttons === null) {
+      this.simulatedPad = null;
+      return;
+    }
+    const b: boolean[] = [];
+    for (const i of buttons) b[i] = true;
+    this.simulatedPad = b;
   }
 
   requestLock(): void {

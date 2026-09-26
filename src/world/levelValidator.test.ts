@@ -4,7 +4,9 @@ import { parseLevel } from "./levelParser";
 import { validateLevel } from "./levelValidator";
 
 const check = (map: string[], extra: Partial<LevelDef> = {}) =>
-  validateLevel(parseLevel({ id: "t", name: "", subtitle: "", objective: "", map, notes: {}, spawnYaw: 0, ...extra } satisfies LevelDef));
+  validateLevel(
+    parseLevel({ id: "t", name: "", subtitle: "", tagline: "", objective: "", map, notes: {}, spawnYaw: 0, ...extra } satisfies LevelDef)
+  );
 
 describe("validateLevel", () => {
   it("accepts a sound level", () => {

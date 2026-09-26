@@ -6,6 +6,7 @@ export const INFIRMARY: LevelDef = {
   id: "infirmary",
   name: "Sublevel 10",
   subtitle: "Infirmary",
+  tagline: "You wake up on the lowest floor of a mountain. The radio is already talking.",
   objective: "Answer the intercom.",
   spawnYaw: -Math.PI / 2,
   theme: { wallTint: 0xd4e2de, floorTint: 0xc8d4d2, lampColor: 0xdff0ff, fog: 0x050808 },

@@ -18,14 +18,14 @@ export interface LevelData extends ParsedLevel {
   exitLight: THREE.PointLight;
 }
 
-/** Builds a parsed level's geometry, props, lamps and exit into `scene`. */
-export function buildLevel(scene: THREE.Scene, level: ParsedLevel): LevelData {
-  const lampFixtures = buildGeometry(scene, level);
+/** Builds a parsed level's geometry, props, lamps and exit into `scene`. `bumpMaps` is a quality option. */
+export function buildLevel(scene: THREE.Scene, level: ParsedLevel, bumpMaps = true): LevelData {
+  const lampFixtures = buildGeometry(scene, level, bumpMaps);
   const exit = buildExit(scene, level, level.exitCell);
   return { ...level, lampFixtures, exitSignMat: exit.signMat, exitLight: exit.light };
 }
 
-function buildGeometry(scene: THREE.Scene, level: ParsedLevel): LampFixture[] {
+function buildGeometry(scene: THREE.Scene, level: ParsedLevel, bumpMaps: boolean): LampFixture[] {
   const tex = textures();
   const theme = resolveTheme(level.def.theme);
   const { walls, crates, barrels } = level.props;
@@ -35,7 +35,7 @@ function buildGeometry(scene: THREE.Scene, level: ParsedLevel): LampFixture[] {
   const wallMat = new THREE.MeshStandardMaterial({
     color: theme.wallTint,
     map: tex.wall,
-    bumpMap: tex.wall,
+    bumpMap: bumpMaps ? tex.wall : null,
     bumpScale: 1.2,
     roughness: 0.92,
     metalness: 0.05,
@@ -61,7 +61,7 @@ function buildGeometry(scene: THREE.Scene, level: ParsedLevel): LampFixture[] {
   const floorMat = new THREE.MeshStandardMaterial({
     color: theme.floorTint,
     map: floorTex,
-    bumpMap: floorTex,
+    bumpMap: bumpMaps ? floorTex : null,
     bumpScale: 0.8,
     roughness: 0.75,
     metalness: 0.15,

@@ -1,5 +1,7 @@
 import { ACTIONS, ACTION_LABELS, RESERVED_CODES, keyLabel, rebind, type Action, type Bindings } from "../core/actions";
-import type { Settings } from "../core/settings";
+import { PAD_LAYOUT } from "../core/gamepad";
+import { QUALITY, QUALITY_ORDER } from "../core/quality";
+import { SUBTITLE_SIZES, type Settings } from "../core/settings";
 import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyId } from "../content/difficulty";
 import type { Ending } from "../content/story";
 import { accuracy, type RunStats } from "../game/stats";
@@ -13,6 +15,29 @@ export interface MenuItem {
   detail?: string;
   disabled?: boolean;
 }
+
+/** One sublevel on the main menu's depth gauge and the level cards. */
+export interface DepthEntry {
+  name: string;
+  subtitle: string;
+  reached: boolean;
+}
+
+export interface LevelCard {
+  /** 0-based position in the campaign. */
+  index: number;
+  name: string;
+  subtitle: string;
+  tagline: string;
+  objective: string;
+  /** The whole campaign, bottom to top, for the depth gauge. */
+  depth: DepthEntry[];
+  /** "Click or press any key" / "Press A". */
+  prompt: string;
+}
+
+/** Labels that make a button the screen's "back" action (the gamepad's B). */
+const BACK_LABELS = new Set(["Back", "Cancel", "Resume", "Main Menu"]);
 
 export interface ChapterEntry {
   name: string;
@@ -30,6 +55,10 @@ export function formatTime(s: number): string {
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
+
+type NumericKey = "sensitivity" | "padSensitivity" | "fov" | "volume" | "musicVolume" | "hudScale";
+type ToggleKey = "invertY" | "reducedShake" | "colorBlind";
+type CycleKey = "quality" | "subtitleSize";
 
 /** Full-screen menus. Each method replaces whatever screen is showing. */
 export class Screens {
@@ -49,6 +78,56 @@ export class Screens {
     });
   }
 
+  /** Screens that take "any button" (the title) set this for the gamepad. */
+  private onAnyButton: (() => void) | null = null;
+
+  // ------------------------------------------------------------------ gamepad navigation
+
+  private focusables(): HTMLElement[] {
+    return [...this.root.querySelectorAll<HTMLElement>("button:not(:disabled), input")].filter((el) => el.offsetParent !== null);
+  }
+
+  /** Move focus up (-1) or down (1) through the screen's buttons and controls. */
+  navigate(dir: 1 | -1): void {
+    const list = this.focusables();
+    if (list.length === 0) return;
+    const i = list.indexOf(document.activeElement as HTMLElement);
+    const next = list[i < 0 ? 0 : (i + dir + list.length) % list.length];
+    next.focus();
+    next.scrollIntoView({ block: "nearest" });
+    this.onUiSound?.();
+  }
+
+  /** Left/right on a slider or a cycling option. */
+  adjust(dir: 1 | -1): void {
+    const el = document.activeElement as HTMLElement | null;
+    if (el instanceof HTMLInputElement && el.type === "range") {
+      if (dir > 0) el.stepUp();
+      else el.stepDown();
+      el.dispatchEvent(new Event("input"));
+    } else if (el instanceof HTMLButtonElement && el.classList.contains("cycle")) {
+      el.click();
+    }
+  }
+
+  /** The gamepad's A: press whatever is focused (or the primary button). */
+  activate(): void {
+    if (this.onAnyButton) {
+      const f = this.onAnyButton;
+      this.onAnyButton = null;
+      f();
+      return;
+    }
+    const el = document.activeElement as HTMLElement | null;
+    if (el && this.root.contains(el)) el.click();
+    else this.root.querySelector<HTMLButtonElement>("button.primary:not(:disabled)")?.click();
+  }
+
+  /** The gamepad's B: the screen's Back / Cancel / Resume, if it has one. */
+  back(): void {
+    this.root.querySelector<HTMLButtonElement>("button[data-back]")?.click();
+  }
+
   get visible(): boolean {
     return this.root.classList.contains("show");
   }
@@ -56,18 +135,21 @@ export class Screens {
   hide(): void {
     this.teardown?.();
     this.teardown = null;
+    this.onAnyButton = null;
     this.root.classList.remove("show");
   }
 
-  private render(html: string, items: MenuItem[], opaque = false, row = false): void {
+  private render(html: string, items: MenuItem[], opaque = false, row = false, variant = ""): void {
     this.teardown?.();
     this.teardown = null;
+    this.onAnyButton = null;
+    this.root.className = `screen${variant ? ` ${variant}` : ""}`;
     this.root.innerHTML = `${html}<div class="menu${row ? " row" : ""}">${items
       .map(
         (it, i) =>
-          `<button data-i="${i}" class="${it.primary ? "primary" : ""}" ${it.disabled ? "disabled" : ""}>${esc(it.label)}${
-            it.detail ? `<small>${esc(it.detail)}</small>` : ""
-          }</button>`
+          `<button data-i="${i}" class="${it.primary ? "primary" : ""}" ${it.disabled ? "disabled" : ""} ${
+            BACK_LABELS.has(it.label) ? "data-back" : ""
+          }>${esc(it.label)}${it.detail ? `<small>${esc(it.detail)}</small>` : ""}</button>`
       )
       .join("")}</div>`;
     this.root.querySelectorAll<HTMLButtonElement>("button[data-i]").forEach((b) => {
@@ -83,12 +165,89 @@ export class Screens {
 
   // ------------------------------------------------------------------ main flow
 
-  main(items: MenuItem[], version: string): void {
-    this.render(`<h1>REMNANT</h1><div class="tag">OBJECT 9 · TIAN SHAN · SUBLEVEL 10</div>`, items);
+  /** The first screen: loading is done, waiting for a key (browsers only allow audio after one). */
+  title(prompt: string, onStart: () => void): void {
+    this.render(
+      `<h1>REMNANT</h1><div class="tag">OBJECT 9 · TIAN SHAN</div><div class="press">${esc(prompt)}</div>`,
+      [],
+      true,
+      false,
+      "title"
+    );
+    const go = (e: Event) => {
+      e.preventDefault();
+      onStart();
+    };
+    const opts = { capture: true, once: true } as const;
+    window.addEventListener("keydown", go, opts);
+    window.addEventListener("mousedown", go, opts);
+    this.teardown = () => {
+      window.removeEventListener("keydown", go, opts);
+      window.removeEventListener("mousedown", go, opts);
+    };
+    this.onAnyButton = onStart;
+  }
+
+  /**
+   * The main menu: title and options on the left, the shaft on the right —
+   * every sublevel from the bottom to the surface, lit up as far as you've
+   * climbed — and radio fragments ticking along the bottom.
+   */
+  main(items: MenuItem[], version: string, depth: DepthEntry[], transmission: string): void {
+    this.render(
+      `<div class="brand"><h1>REMNANT</h1><div class="tag">OBJECT 9 · TIAN SHAN · 2.4 KM DOWN</div></div>`,
+      items,
+      false,
+      false,
+      "main-menu"
+    );
     this.root.insertAdjacentHTML(
       "beforeend",
-      `<div class="hint">HEADPHONES RECOMMENDED · THEY HUNT BY SOUND</div><div class="version">v${esc(version)}</div>`
+      `${this.gaugeHtml(depth, -1)}
+       <div class="transmission"><span class="dot"></span><span class="who">INTERCEPTED</span><span class="txt">${esc(transmission)}</span></div>
+       <div class="version">v${esc(version)}</div>`
     );
+  }
+
+  /** The card between the menu and a level: where you are in the shaft, and what you're doing there. */
+  levelCard(card: LevelCard, onBegin: () => void): void {
+    this.render(
+      `<div class="card-body">
+         <div class="depth-no">${(card.name.match(/\d+/)?.[0] ?? "0").padStart(2, "0")}</div>
+         <div class="card-text">
+           <div class="card-name">${esc(card.name.toUpperCase())}</div>
+           <div class="card-sub">${esc(card.subtitle.toUpperCase())}</div>
+           <div class="card-tagline">“${esc(card.tagline)}”</div>
+           <div class="card-obj"><span>OBJECTIVE</span>${esc(card.objective)}</div>
+         </div>
+       </div>
+       <div class="press">${esc(card.prompt)}</div>`,
+      [{ label: "Begin", primary: true, action: onBegin }],
+      true,
+      false,
+      "level-card"
+    );
+    this.root.insertAdjacentHTML("beforeend", this.gaugeHtml(card.depth, card.index));
+    // Any key starts the level (the click on "Begin" is the mouse's way in).
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === "Escape") return;
+      e.preventDefault();
+      onBegin();
+    };
+    window.addEventListener("keydown", onKey, true);
+    this.teardown = () => window.removeEventListener("keydown", onKey, true);
+  }
+
+  /** Vertical shaft: surface at the top, Sublevel 10 at the bottom. */
+  private gaugeHtml(depth: DepthEntry[], current: number): string {
+    const rows = depth
+      .map((d, i) => {
+        const cls = i === current ? "cur" : d.reached ? "reached" : "";
+        return `<li class="${cls}"><i></i><b>${esc(d.name.toUpperCase())}</b><span>${d.reached || i === current ? esc(d.subtitle) : "—"}</span></li>`;
+      })
+      .reverse()
+      .join("");
+    return `<ol class="gauge">${rows}</ol>`;
   }
 
   difficulty(onPick: (id: DifficultyId) => void, back: () => void, completed: readonly DifficultyId[]): void {
@@ -187,32 +346,72 @@ export class Screens {
   // ------------------------------------------------------------------ options
 
   settings(settings: Settings, onChange: (s: Settings) => void, back: () => void): void {
+    const slider = (label: string, key: NumericKey, min: number, max: number, step: number) =>
+      `<label>${label} <input type="range" min="${min}" max="${max}" step="${step}" data-s="${key}"><output></output></label>`;
+    const toggle = (label: string, key: ToggleKey) => `<label>${label} <input type="checkbox" data-s="${key}"></label>`;
+    const cycle = (label: string, key: CycleKey) => `<label>${label} <button class="cycle" data-c="${key}"></button></label>`;
     this.render(
-      `<h2>SETTINGS</h2><div class="tag">&nbsp;</div>
+      `<h2>SETTINGS</h2>
        <div class="panel">
-         <label>MOUSE SENSITIVITY <input type="range" min="0.2" max="3" step="0.05" data-s="sensitivity"><output></output></label>
-         <label>FIELD OF VIEW <input type="range" min="60" max="100" step="1" data-s="fov"><output></output></label>
-         <label>VOLUME <input type="range" min="0" max="1" step="0.05" data-s="volume"><output></output></label>
-         <label>INVERT MOUSE Y <input type="checkbox" data-s="invertY"></label>
-       </div>`,
-      [{ label: "Back", action: back, primary: true }]
+         <section>
+           <div class="group">CONTROLS</div>
+           ${slider("MOUSE SENSITIVITY", "sensitivity", 0.2, 3, 0.05)}
+           ${slider("GAMEPAD LOOK SPEED", "padSensitivity", 0.2, 3, 0.05)}
+           ${toggle("INVERT LOOK Y", "invertY")}
+           <div class="group">AUDIO</div>
+           ${slider("VOLUME", "volume", 0, 1, 0.05)}
+           ${slider("MUSIC", "musicVolume", 0, 1, 0.05)}
+         </section>
+         <section>
+           <div class="group">DISPLAY</div>
+           ${cycle("GRAPHICS QUALITY", "quality")}
+           ${slider("FIELD OF VIEW", "fov", 60, 100, 1)}
+           ${slider("HUD SIZE", "hudScale", 0.8, 1.4, 0.05)}
+           <div class="group">ACCESSIBILITY</div>
+           ${cycle("SUBTITLE SIZE", "subtitleSize")}
+           ${toggle("REDUCED CAMERA SHAKE", "reducedShake")}
+           ${toggle("COLOUR-BLIND FRIENDLY HUD", "colorBlind")}
+         </section>
+       </div>
+       <div class="note-line">Graphics quality fully applies from the next level you load.</div>`,
+      [{ label: "Back", action: back, primary: true }],
+      false,
+      false,
+      "settings"
     );
-    type NumericKey = "sensitivity" | "fov" | "volume";
-    const fmt = (k: NumericKey, v: number) => (k === "volume" ? `${Math.round(v * 100)}%` : k === "fov" ? `${v}°` : `${v.toFixed(2)}×`);
+    const fmt = (k: NumericKey, v: number) =>
+      k === "volume" || k === "musicVolume" || k === "hudScale" ? `${Math.round(v * 100)}%` : k === "fov" ? `${v}°` : `${v.toFixed(2)}×`;
     this.root.querySelectorAll<HTMLInputElement>("input[data-s]").forEach((input) => {
-      const key = input.dataset.s as NumericKey | "invertY";
+      const key = input.dataset.s as NumericKey | ToggleKey;
       const out = input.nextElementSibling as HTMLOutputElement | null;
-      if (key === "invertY") input.checked = settings.invertY;
+      if (input.type === "checkbox") input.checked = settings[key as ToggleKey];
       else {
-        input.value = String(settings[key]);
-        if (out) out.textContent = fmt(key, settings[key]);
+        input.value = String(settings[key as NumericKey]);
+        if (out) out.textContent = fmt(key as NumericKey, settings[key as NumericKey]);
       }
       input.addEventListener("input", () => {
-        if (key === "invertY") settings.invertY = input.checked;
+        if (input.type === "checkbox") settings[key as ToggleKey] = input.checked;
         else {
-          settings[key] = Number(input.value);
-          if (out) out.textContent = fmt(key, settings[key]);
+          settings[key as NumericKey] = Number(input.value);
+          if (out) out.textContent = fmt(key as NumericKey, settings[key as NumericKey]);
         }
+        onChange(settings);
+      });
+    });
+    const cycles: Record<CycleKey, { values: string[]; label: (v: string) => string }> = {
+      quality: { values: QUALITY_ORDER, label: (v) => QUALITY[v as keyof typeof QUALITY].name },
+      subtitleSize: { values: SUBTITLE_SIZES, label: (v) => v[0].toUpperCase() + v.slice(1) },
+    };
+    this.root.querySelectorAll<HTMLButtonElement>("button.cycle").forEach((btn) => {
+      const key = btn.dataset.c as CycleKey;
+      const c = cycles[key];
+      const show = () => (btn.textContent = `‹ ${c.label(settings[key])} ›`);
+      show();
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const i = c.values.indexOf(settings[key]);
+        (settings as unknown as Record<CycleKey, string>)[key] = c.values[(i + 1) % c.values.length];
+        show();
         onChange(settings);
       });
     });
@@ -231,6 +430,8 @@ export class Screens {
          <div class="binds">${ACTIONS.map((a) => `<span>${ACTION_LABELS[a]}</span>${slotHtml(a, 0)}${slotHtml(a, 1)}`).join(
            ""
          )}<span>Look</span><kbd>Mouse</kbd><kbd>—</kbd><span>Pause</span><kbd>Esc</kbd><kbd>—</kbd></div>
+         <div class="group">GAMEPAD</div>
+         <div class="keys">${PAD_LAYOUT.map(([what, keys]) => `<span>${esc(what)}</span><kbd>${esc(keys)}</kbd>`).join("")}</div>
          <div class="tips">
            Everything makes noise, and gunshots carry through walls. Your flashlight lets them see you from much
            further. Break line of sight and stay quiet — they give up eventually. Headshots do extra damage.

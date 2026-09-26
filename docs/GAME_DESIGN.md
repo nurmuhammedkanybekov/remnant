@@ -50,7 +50,9 @@ src/
 │   └── difficulty.ts          Difficulty modes
 ├── core/
 │   ├── engine.ts              Renderer, tone mapping, post-processing, world + viewmodel scenes
-│   ├── input.ts               Raw keyboard / mouse / pointer-lock state
+│   ├── input.ts               Raw keyboard / mouse / wheel / gamepad / pointer-lock state
+│   ├── gamepad.ts             The gamepad layout and stick response
+│   ├── quality.ts             Graphics quality presets
 │   ├── actions.ts             Named actions, default bindings, rebinding rules
 │   ├── settings.ts            Settings (incl. bindings) with validation
 │   ├── storage.ts             localStorage JSON that never throws
@@ -79,6 +81,7 @@ src/
 ├── items/pickup.ts            Pickup meshes and animation
 ├── fx/                        Procedural canvas textures, particles
 ├── audio/soundManager.ts      Synth SFX, stereo panning, wall muffling, reverb, ambience
+├── audio/music.ts             Adaptive music: layers, intensity, the theme
 └── ui/                        HUD, menus, styles
 ```
 
@@ -110,7 +113,7 @@ Game (shell) ──creates──► LevelSession.step(dt, command)
 ## 3. Game flow
 
 ```
-menu ──New Game / Chapters──► difficulty ──► playing ──exit──► levelComplete ──Continue──► playing (next level)
+title ──any key──► menu ──New Game / Chapters──► difficulty ──► card ──► playing ──exit──► levelComplete ──Continue──► card (next level)
   ▲  └─Continue (saved run)─────────────────────┘ │ ▲                         (last level) ► victory ──► menu
   │                                           Esc │ │ Resume
   │                                               ▼ │
@@ -119,7 +122,17 @@ playing ──health 0──► dead ──Retry──► playing (same level, s
                           └─(Ironman)──► run over, save deleted ──► menu
 ```
 
-- The main menu renders a slowly turning view of the Maintenance Wing behind it.
+- A **loading screen** is plain HTML, so it shows before any script runs;
+  if WebGL can't start it says so instead of leaving a black page. Then a
+  **title screen** waits for a key or button (browsers only allow audio
+  after one) and the theme starts.
+- The **main menu** renders a slowly turning view of the Maintenance Wing
+  behind it, with a depth gauge of the shaft (every sublevel, lit up as far
+  as you've climbed) and an intercepted radio fragment along the bottom.
+- Entering a level from a menu or the results screen shows its **title
+  card**: the sublevel number, name, a one-line tagline, the objective and
+  where it sits in the shaft. Any key, click or A starts it. Retrying after
+  a death skips the card.
 - A new game from the first level opens with the **prologue**; the last
   level ends with one of **two endings** (`content/story.ts`).
 - **Saving** (`game/save.ts`): the run is saved whenever a level starts,
@@ -511,7 +524,27 @@ compressor.
   band-passed "syllables" for the length of the subtitle), door motors,
   generator start-up and thrum, splashing footsteps, intercom chime,
   checkpoint tone and the detonation.
-- Pause ducks the mix. Master volume is a setting.
+- Pause ducks the mix. Master and music volume are settings.
+
+### Adaptive music (`audio/music.ts`)
+
+One piece in D minor (i – VI – iv – V, 72 bpm, four-bar loop), every note
+scheduled ahead on the audio clock so all layers stay in time however they
+are mixed:
+
+| Layer   | What it is                                             | Heard when                     |
+| ------- | ------------------------------------------------------ | ------------------------------ |
+| Pad     | Slow detuned chords with a sub                         | Always, thinning under a chase |
+| Bells   | Sparse music-box notes from the chord                  | Calm exploration               |
+| Tension | Low pulse on the eighths, a trembling semitone cluster | Something is suspicious        |
+| Chase   | Kick, snare, hats, a filtered 16th bass, chord stabs   | Something is hunting you       |
+| Melody  | The main theme, with a soft echo                       | Menu, results and endings      |
+
+The session's **threat** (the HUD eye: ~0.6 when a creature is suspicious or
+searching, 1 when hunted or the Remnant is awake) drives an intensity that
+rises fast (1.6/s), falls slowly (0.12/s), and holds at full for 5 s after a
+chase ends so the music doesn't flap. Tension fades in over 0.2–0.55,
+the chase over 0.8–0.97. Death cuts the music; a new level starts calm.
 
 ---
 
@@ -526,8 +559,8 @@ compressor.
   (top centre) while it's awake; pickup toasts; context prompts; interact
   prompt with the bound key; radio subtitles with the speaker's name; note
   card; level-name intro. DOM updates only when values change.
-- **Screens**: main menu (Continue / New Game / Chapters / Settings /
-  Controls), prologue, ending, difficulty select, chapter select with best times, confirm
+- **Screens**: loading, title, main menu (Continue / New Game / Chapters /
+  Settings / Controls, depth gauge, intercepted radio), level title cards, prologue, ending, difficulty select, chapter select with best times, confirm
   dialog, pause, settings (sensitivity, FOV, volume, invert Y — saved),
   controls with **rebinding** (click a slot, press a key or mouse button;
   Backspace clears; a key moved to a new action is removed from its old one),
@@ -536,12 +569,42 @@ compressor.
 
 ---
 
+### Settings
+
+Mouse sensitivity, gamepad look speed, invert look Y, volume, music volume,
+**graphics quality**, field of view, **HUD size** (80–140%), **subtitle
+size** (small / medium / large), **reduced camera shake** (camera shake and
+head bob at 20%) and a **colour-blind friendly HUD** (red/green signals
+become orange/blue). All validated field by field on load.
+
+| Quality | Pixel ratio cap | Lamp lights | Bump maps | Dust motes | Grain & aberration |
+| ------- | --------------- | ----------- | --------- | ---------- | ------------------ |
+| Low     | 0.75            | 3           | no        | 80         | no                 |
+| Medium  | 1               | 4           | yes       | 160        | yes                |
+| High    | 1.5             | 6           | yes       | 260        | yes                |
+
+Resolution and film effects apply at once; lights, bump maps and dust from
+the next level loaded.
+
+### Gamepad
+
+Standard-mapping pads (Xbox, PlayStation, most others) through the Gamepad
+API, polled every frame. Left stick moves, right stick looks (dead zone
+0.18, squared response for precision, vertical at 65% speed), plus RT fire,
+LT/L3 sprint, B crouch, RB/R3 melee, A interact, X reload, LB flashlight,
+Y or D-pad →/← switch weapon, D-pad ↓ sidearm, D-pad ↑ medkit, Menu pause.
+In menus the D-pad or stick moves focus (with key repeat), left/right
+adjusts sliders and options, A selects, B goes back. Whichever device was
+touched last decides the prompts: `[E] OPEN DOOR` becomes `[A] OPEN DOOR`.
+With a pad in use the game doesn't need pointer lock.
+
 ## 12. Debug hooks (`?debug`)
 
 With `?debug`, pointer lock isn't required and `window.game` exposes:
 `debugStart(levelIndex, difficulty?)`, `debugSimulate(seconds, heldCodes[])`,
 `debugFire()`, `debugLook(yaw, pitch)`, `debugTeleport(x, z)`,
-`debugEnemies()`, `debugState()`. `debugSimulate` steps the game at a fixed
+`debugEnemies()`, `debugState()`, `debugMusicLevel()`. `debugSimulate` also
+takes gamepad buttons to hold. `debugSimulate` steps the game at a fixed
 30 Hz without rendering, holding the given key codes (e.g. `["KeyW",
 "ShiftLeft"]`), which is handy for testing AI headlessly.
 
@@ -556,7 +619,8 @@ any of it fails.
 The tests run in Node without a GPU. That's possible because the logic that
 matters is separated from rendering: the level parser, grid queries,
 pathfinding, weapons, player movement (driven by commands), bindings,
-settings, loadouts and save migration are all pure or near-pure. Creature AI
+settings, loadouts, save migration, gamepad commands and the music's
+intensity and layer mix are all pure or near-pure. Creature AI
 is tested by giving `Enemy` a stand-in body (the real rigs need a canvas for
 their textures): blindness, hearing, light-freezing, ceiling drops, spitting,
 lures, takedown rules and the boss's armour, phases and summons.
@@ -582,7 +646,7 @@ See [`ROADMAP.md`](ROADMAP.md) for the full plan.
 4. **Creatures are primitives.** Per-type rigs and glowing veins make them
    readable in the dark, but a proper model pipeline (see the roadmap's
    asset rule) would be the next step up.
-5. **No gamepad or touch input.**
-6. **Performance** hasn't been profiled on low-end GPUs. If needed: lower
-   the lamp pool from 6, drop the pixel-ratio cap (1.5), or remove the
-   bump maps.
+5. **No touch input.**
+6. **Performance** hasn't been profiled on real low-end GPUs; the Low
+   preset is the lever if it's needed.
+7. **The gamepad layout isn't rebindable** (the keyboard is).

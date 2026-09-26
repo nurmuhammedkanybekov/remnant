@@ -6,6 +6,7 @@ export const ARMORY: LevelDef = {
   id: "armory",
   name: "Sublevel 3",
   subtitle: "Armory",
+  tagline: "Don't trust the radio.",
   objective: "Find the armory keycard.",
   spawnYaw: 0,
   theme: { fog: 0x060606, wallTint: 0xc8c4bc, floorTint: 0xb8b4ac, lampColor: 0xfff0d8 },

@@ -4,7 +4,7 @@ import type { LevelDef } from "./levelDef";
 import { LevelParseError, parseLevel } from "./levelParser";
 
 function def(map: string[], notes: Record<string, string> = {}): LevelDef {
-  return { id: "test", name: "Test", subtitle: "", objective: "", map, notes, spawnYaw: 0 };
+  return { id: "test", name: "Test", subtitle: "", tagline: "", objective: "", map, notes, spawnYaw: 0 };
 }
 
 describe("parseLevel", () => {

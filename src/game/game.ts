@@ -1,7 +1,10 @@
+import { MusicDirector } from "../audio/music";
 import { SoundManager } from "../audio/soundManager";
 import { DIFFICULTIES, type DifficultyDef, type DifficultyId } from "../content/difficulty";
 import { cloneBindings, DEFAULT_BINDINGS, keyLabel, type Action } from "../core/actions";
-import { ENDINGS, PROLOGUE, type EndingId } from "../content/story";
+import { ENDINGS, PROLOGUE, TRANSMISSIONS, type EndingId } from "../content/story";
+import { PAD, padLabel } from "../core/gamepad";
+import { QUALITY } from "../core/quality";
 import { Clock } from "../core/clock";
 import { Engine } from "../core/engine";
 import { Input } from "../core/input";
@@ -19,10 +22,17 @@ import { carryOver, cloneLoadout, startingLoadout, type Loadout } from "./loadou
 import { MenuBackdrop } from "./menuBackdrop";
 import { addStats, freshStats, type RunStats } from "./stats";
 
-type GameState = "menu" | "playing" | "paused" | "dead" | "levelComplete" | "victory";
+type GameState = "title" | "menu" | "card" | "playing" | "paused" | "dead" | "levelComplete" | "victory";
 
 /** Radians of look per pixel of mouse movement at sensitivity 1. */
 const BASE_LOOK_SPEED = 0.0022;
+/** Radians per second at full right-stick tilt, at gamepad look speed 1. */
+const BASE_PAD_LOOK_SPEED = 2.8;
+/** Gamepad menu navigation: first repeat after holding, then this often. */
+const NAV_DELAY = 0.4;
+const NAV_REPEAT = 0.14;
+/** "Reduced camera shake" keeps this much of the shake and bob. */
+const REDUCED_MOTION = 0.2;
 const DEATH_SCREEN_DELAY_MS = 1400;
 
 /** The campaign run in progress. Mirrors what is checkpointed to the save. */
@@ -47,6 +57,8 @@ export class Game {
   private readonly input: Input;
   private readonly clock = new Clock();
   private readonly sound = new SoundManager();
+  private readonly music = new MusicDirector();
+  private readonly container: HTMLElement;
   private readonly hud: Hud;
   private readonly screens: Screens;
   private readonly viewmodel: Viewmodel;
@@ -55,7 +67,9 @@ export class Game {
   private readonly save = new SaveStore(LEVELS.length);
   private readonly debug = new URLSearchParams(location.search).has("debug");
 
-  private state: GameState = "menu";
+  private state: GameState = "title";
+  private navHeld = 0;
+  private navTimer = 0;
   private run: Run | null = null;
   private session: LevelSession | null = null;
   private backdrop: MenuBackdrop | null = null;
@@ -63,8 +77,10 @@ export class Game {
   private scriptedFire = false;
 
   constructor(container: HTMLElement) {
+    this.container = container;
     this.engine = new Engine(container);
     this.engine.setFov(this.settings.fov);
+    this.engine.setQuality(QUALITY[this.settings.quality]);
     this.input = new Input(this.engine.domElement);
     this.hud = new Hud(container);
     this.screens = new Screens(container);
@@ -76,15 +92,21 @@ export class Game {
       hud: this.hud,
       viewmodel: this.viewmodel,
       keyFor: (action: Action) => {
+        if (this.input.usingPad) return padLabel(action);
         const [primary, alternate] = this.settings.bindings[action];
         return keyLabel(primary ?? alternate);
       },
+      quality: () => QUALITY[this.settings.quality],
+      motionScale: () => (this.settings.reducedShake ? REDUCED_MOTION : 1),
     };
     this.hud.setVisible(false);
     this.sound.setVolume(this.settings.volume);
+    this.sound.setMusicVolume(this.settings.musicVolume);
+    this.sound.onReady = (out) => this.music.attach(out);
+    this.applyDisplaySettings();
 
     document.addEventListener("pointerlockchange", () => {
-      if (!this.input.locked && this.state === "playing" && !this.debug) this.pause();
+      if (!this.input.locked && this.state === "playing" && !this.debug && !this.input.usingPad) this.pause();
     });
     // Clicking the game view after losing pointer lock resumes control.
     this.engine.domElement.addEventListener("click", () => {
@@ -93,22 +115,43 @@ export class Game {
 
     if (this.debug) (window as unknown as { game: Game }).game = this;
 
-    this.showMainMenu();
+    // The world behind the title and menus.
+    this.backdrop = new MenuBackdrop(this.engine, LEVELS[1], QUALITY[this.settings.quality]);
+    document.getElementById("boot")?.remove();
+    this.showTitle();
     requestAnimationFrame(this.loop);
+  }
+
+  /** Settings that change how the HUD and camera behave. */
+  private applyDisplaySettings(): void {
+    this.hud.applyDisplay(this.settings.hudScale, this.settings.subtitleSize);
+    this.container.classList.toggle("cb", this.settings.colorBlind);
+    this.session?.applySettings();
   }
 
   // ------------------------------------------------------------------ menus
 
+  /** Loading is done; wait for a key, which is also what lets the browser start audio. */
+  private showTitle(): void {
+    this.state = "title";
+    this.screens.title(this.input.usingPad ? "PRESS A" : "PRESS ANY KEY", () => {
+      this.sound.init();
+      this.music.setMode("menu");
+      this.showMainMenu();
+    });
+  }
+
   private showMainMenu(): void {
     this.state = "menu";
-    this.session = null;
-    this.run = null;
+    this.music.setMode("menu");
     this.hud.setVisible(false);
     this.hud.hideTransient();
     this.viewmodel.setVisible(false);
     this.sound.setPaused(false);
     // The maintenance wing's long lamp-lit corridor makes the best establishing shot.
-    this.backdrop = new MenuBackdrop(this.engine, LEVELS[1]);
+    if (this.session || !this.backdrop) this.backdrop = new MenuBackdrop(this.engine, LEVELS[1], QUALITY[this.settings.quality]);
+    this.session = null;
+    this.run = null;
 
     const saved = this.save.campaign;
     const items: MenuItem[] = [];
@@ -127,7 +170,13 @@ export class Game {
       { label: "Settings", action: () => this.showSettings(() => this.showMainMenu()) },
       { label: "Controls", action: () => this.showControls(() => this.showMainMenu()) }
     );
-    this.screens.main(items, __APP_VERSION__);
+    const reached = this.save.progress.unlockedLevel;
+    this.screens.main(
+      items,
+      __APP_VERSION__,
+      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, reached: i <= reached })),
+      TRANSMISSIONS[Math.floor(Math.random() * TRANSMISSIONS.length)]
+    );
   }
 
   /** Starting a new run replaces the saved one — ask first. */
@@ -171,7 +220,10 @@ export class Game {
       (s) => {
         saveSettings(s);
         this.engine.setFov(s.fov);
+        this.engine.setQuality(QUALITY[s.quality]);
         this.sound.setVolume(s.volume);
+        this.sound.setMusicVolume(s.musicVolume);
+        this.applyDisplaySettings();
       },
       back
     );
@@ -216,7 +268,7 @@ export class Game {
   private resume(): void {
     this.screens.hide();
     this.sound.setPaused(false);
-    this.input.requestLock();
+    if (!this.input.usingPad) this.input.requestLock();
     this.clock.tick(); // don't let the pause count as a giant frame
     this.state = "playing";
   }
@@ -231,7 +283,7 @@ export class Game {
       levelIndex
     );
     this.run = { difficulty: def, levelIndex, loadout, stats: freshStats(), checkpoint: null };
-    this.startLevel();
+    this.startLevel(true);
   }
 
   private continueCampaign(): void {
@@ -244,7 +296,7 @@ export class Game {
       stats: { ...saved.stats },
       checkpoint: saved.checkpoint ? structuredClone(saved.checkpoint) : null,
     };
-    this.startLevel();
+    this.startLevel(true);
   }
 
   private restartLevelFresh(): void {
@@ -265,8 +317,12 @@ export class Game {
     });
   }
 
-  /** (Re)starts the run's current level — from its mid-level checkpoint if there is one. */
-  private startLevel(): void {
+  /**
+   * (Re)starts the run's current level — from its mid-level checkpoint if
+   * there is one. Coming in from a menu shows the level's title card first;
+   * a retry drops straight back in.
+   */
+  private startLevel(card = false): void {
     const run = this.run;
     if (!run) return;
     this.sound.init();
@@ -283,10 +339,37 @@ export class Game {
       this.persistRun();
     };
     this.session = session;
+    this.music.setMode("game");
 
+    if (card && !this.debug) {
+      this.state = "card";
+      const def = LEVELS[run.levelIndex];
+      this.screens.levelCard(
+        {
+          index: run.levelIndex,
+          name: def.name,
+          subtitle: def.subtitle,
+          tagline: def.tagline,
+          objective: run.checkpoint?.objective ?? def.objective,
+          depth: LEVELS.map((d, i) => ({ name: d.name, subtitle: d.subtitle, reached: i <= run.levelIndex })),
+          prompt: this.input.usingPad ? "PRESS A" : "CLICK OR PRESS ANY KEY",
+        },
+        () => this.beginLevel(false)
+      );
+      return;
+    }
+    this.beginLevel(true);
+  }
+
+  /** Into the level: HUD on, mouse captured, clock running. */
+  private beginLevel(intro: boolean): void {
+    const session = this.session;
+    if (!session) return;
+    this.screens.hide();
     this.hud.setVisible(true);
+    if (intro) this.hud.intro(session.def.name, session.def.subtitle);
     this.sound.setPaused(false);
-    if (!this.debug) this.input.requestLock();
+    if (!this.debug && !this.input.usingPad) this.input.requestLock();
     this.clock.tick();
     this.state = "playing";
   }
@@ -300,6 +383,7 @@ export class Game {
   private onDeath(): void {
     const run = this.run!;
     this.state = "dead";
+    this.music.setMode("silent");
     this.leaveGameplay();
     const runOver = run.difficulty.permadeath;
     if (runOver) this.save.clearCampaign();
@@ -328,6 +412,7 @@ export class Game {
     this.hud.setVisible(false);
     addStats(run.stats, session.stats);
     const newBest = this.save.recordLevelTime(session.def.id, session.stats.time);
+    this.music.setMode("menu");
 
     if (run.levelIndex >= LEVELS.length - 1) {
       this.state = "victory";
@@ -346,7 +431,7 @@ export class Game {
     // Save now, so quitting from the results screen resumes at the next level.
     this.persistRun();
     this.screens.levelComplete(session.def.name, session.def.subtitle, session.stats, newBest, [
-      { label: "Continue", primary: true, action: () => this.startLevel() },
+      { label: "Continue", primary: true, action: () => this.startLevel(true) },
       { label: "Quit to Menu", action: () => this.showMainMenu() },
     ]);
   }
@@ -354,18 +439,29 @@ export class Game {
   // ------------------------------------------------------------------ loop
 
   private readonly loop = (): void => {
-    this.step(this.clock.tick());
+    const dt = this.clock.tick();
+    this.input.pollGamepad();
+    this.handlePadMenus(dt);
+    this.step(dt);
+    this.music.update(dt, this.state === "playing" ? (this.session?.threat ?? 0) : 0);
     this.input.endFrame();
     this.engine.render();
     requestAnimationFrame(this.loop);
   };
 
-  private readCommand(): PlayerCommand {
-    const active = this.input.locked || this.debug;
+  private readCommand(dt: number): PlayerCommand {
+    const active = this.input.locked || this.debug || this.input.usingPad;
     const cmd = buildCommand(
       this.input,
       this.settings.bindings,
-      active ? { radiansPerPixel: BASE_LOOK_SPEED * this.settings.sensitivity, invertY: this.settings.invertY } : null
+      active
+        ? {
+            radiansPerPixel: BASE_LOOK_SPEED * this.settings.sensitivity,
+            padRadiansPerSecond: BASE_PAD_LOOK_SPEED * this.settings.padSensitivity,
+            invertY: this.settings.invertY,
+          }
+        : null,
+      dt
     );
     // The click that re-captures the mouse must not also fire the gun.
     if (!active) cmd.fire = false;
@@ -374,16 +470,56 @@ export class Game {
     return cmd;
   }
 
+  /** Gamepad: Menu pauses and resumes; in menus the d-pad or stick moves, A picks, B goes back. */
+  private handlePadMenus(dt: number): void {
+    const i = this.input;
+    if (this.state === "playing") {
+      if (i.padPressed(PAD.START)) this.pause();
+      return;
+    }
+    if (this.state === "paused" && i.padPressed(PAD.START)) {
+      this.resume();
+      return;
+    }
+    const y = i.padAxis(1);
+    const x = i.padAxis(0);
+    const vertical = i.padDown(PAD.UP) || y < -0.5 ? -1 : i.padDown(PAD.DOWN) || y > 0.5 ? 1 : 0;
+    const horizontal = i.padDown(PAD.LEFT) || x < -0.5 ? -1 : i.padDown(PAD.RIGHT) || x > 0.5 ? 1 : 0;
+    const dir = vertical !== 0 ? vertical * 2 : horizontal;
+    if (dir === 0) {
+      this.navHeld = 0;
+    } else if (dir !== this.navHeld) {
+      this.navHeld = dir;
+      this.navTimer = NAV_DELAY;
+      this.padNavigate(dir);
+    } else {
+      this.navTimer -= dt;
+      if (this.navTimer <= 0) {
+        this.navTimer = NAV_REPEAT;
+        this.padNavigate(dir);
+      }
+    }
+    if (i.padPressed(PAD.A)) this.screens.activate();
+    else if (i.padPressed(PAD.B)) this.screens.back();
+  }
+
+  /** ±2 = up/down, ±1 = left/right. */
+  private padNavigate(dir: number): void {
+    if (Math.abs(dir) === 2) this.screens.navigate(dir > 0 ? 1 : -1);
+    else this.screens.adjust(dir > 0 ? 1 : -1);
+  }
+
   private step(dt: number): void {
     switch (this.state) {
+      case "title":
       case "menu":
         this.backdrop?.update(dt);
         this.sound.updateAmbient(dt);
         break;
       case "playing":
         // Pointer lock can be refused (e.g. resuming too quickly after Esc) — tell the player to click.
-        if (!this.input.locked && !this.debug) this.hud.prompt("CLICK TO RESUME", 0.25);
-        this.session?.step(dt, this.readCommand());
+        if (!this.input.locked && !this.debug && !this.input.usingPad) this.hud.prompt("CLICK TO RESUME", 0.25);
+        this.session?.step(dt, this.readCommand(dt));
         break;
       case "dead":
         this.session?.stepDead(dt);
@@ -409,14 +545,25 @@ export class Game {
   debugEnemies(): Enemy[] {
     return this.session?.enemies.enemies ?? [];
   }
-  /** Advance the simulation at a fixed 30 Hz without rendering, holding the given key codes. */
-  debugSimulate(seconds: number, codes: string[] = []): void {
+  /** Advance the simulation at a fixed 30 Hz without rendering, holding the given key codes (and gamepad buttons). */
+  debugSimulate(seconds: number, codes: string[] = [], padButtons: number[] | null = null): void {
     for (const c of codes) this.input.simulateDown(c, true);
+    if (padButtons) this.input.simulatePad(padButtons);
     for (let t = 0; t < seconds; t += 1 / 30) {
+      this.input.pollGamepad();
+      this.handlePadMenus(1 / 30);
       this.step(1 / 30);
+      this.music.update(1 / 30, this.state === "playing" ? (this.session?.threat ?? 0) : 0);
       this.input.endFrame();
     }
     for (const c of codes) this.input.simulateDown(c, false);
+    if (padButtons) {
+      this.input.simulatePad(null);
+      this.input.pollGamepad();
+    }
+  }
+  debugMusicLevel(): number {
+    return this.music.level;
   }
   debugFire(): void {
     this.scriptedFire = true;

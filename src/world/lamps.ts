@@ -3,7 +3,7 @@ import { WALL_HEIGHT } from "./grid";
 import type { LampFixture } from "./levelBuilder";
 import type { LampSpawn } from "./levelParser";
 
-const POOL_SIZE = 6;
+const DEFAULT_POOL_SIZE = 6;
 const MAX_LIGHT_DIST = 26;
 
 type Mode = "steady" | "flicker" | "dying" | "pulse";
@@ -29,7 +29,7 @@ export class LampSystem {
   private readonly lamps: Lamp[];
   private readonly pool: THREE.PointLight[] = [];
 
-  constructor(scene: THREE.Scene, spawns: LampSpawn[], fixtures: LampFixture[] = []) {
+  constructor(scene: THREE.Scene, spawns: LampSpawn[], fixtures: LampFixture[] = [], poolSize = DEFAULT_POOL_SIZE) {
     this.lamps = spawns.map((spawn, i) => ({
       spawn,
       fixture: fixtures[i],
@@ -39,7 +39,7 @@ export class LampSystem {
       phase: Math.random() * Math.PI * 2,
       baseColor: new THREE.Color(spawn.color),
     }));
-    for (let i = 0; i < POOL_SIZE; i++) {
+    for (let i = 0; i < poolSize; i++) {
       const l = new THREE.PointLight(0xffffff, 0, 11, 1.6);
       l.position.set(0, -100, 0);
       scene.add(l);

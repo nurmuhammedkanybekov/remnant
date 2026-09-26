@@ -6,6 +6,7 @@ import { HEAL_TIME, ITEMS, MAX_MEDKITS } from "../content/items";
 import { WEAPON_ORDER, WEAPONS, type WeaponId } from "../content/weapons";
 import { ACTIONS, type Action } from "../core/actions";
 import type { Engine } from "../core/engine";
+import type { QualityPreset } from "../core/quality";
 import { RemnantBoss } from "../enemies/boss";
 import type { Enemy, Perception } from "../enemies/enemy";
 import { EnemyManager } from "../enemies/enemyManager";
@@ -54,8 +55,12 @@ export interface SessionServices {
   sound: SoundManager;
   hud: Hud;
   viewmodel: Viewmodel;
-  /** Current key label for an action, for prompts and hints ("E", "Left Mouse"). */
+  /** Current key label for an action, for prompts and hints ("E", "Left Mouse", or "A" on a gamepad). */
   keyFor: (action: Action) => string;
+  /** Graphics quality, read when the level is built. */
+  quality: () => QualityPreset;
+  /** 1 normally; lower with "reduced camera shake". */
+  motionScale: () => number;
 }
 
 /**
@@ -123,17 +128,19 @@ export class LevelSession {
     const { scene, camera } = engine;
     engine.resetWorld();
 
-    this.level = buildLevel(scene, parseLevel(def));
+    const quality = services.quality();
+    this.level = buildLevel(scene, parseLevel(def), quality.bumpMaps);
     const sp = this.level.spawns;
     const cellIndex = (c: { col: number; row: number }) => c.row * this.level.cols + c.col;
-    this.lamps = new LampSystem(scene, sp.lamps, this.level.lampFixtures);
-    this.effects = new Effects(scene);
+    this.lamps = new LampSystem(scene, sp.lamps, this.level.lampFixtures, quality.lampLights);
+    this.effects = new Effects(scene, quality.dustMotes);
     this.radio = new RadioChannel(hud, sound);
     this.objective = def.objective;
 
     // A checkpoint carries the loadout from the moment it was reached.
     const start = restore?.loadout ?? loadout;
     this.player = new PlayerController(camera, this.level, sp.playerStart, def.spawnYaw);
+    this.player.motionScale = services.motionScale();
     this.player.health.current = start.health;
     this.player.flashlight.battery = start.battery;
     this.medkits = start.medkits;
@@ -213,13 +220,23 @@ export class LevelSession {
     hud.setMagSize(this.weapon.config.magSize);
     hud.setHealKey(services.keyFor("heal"));
     this.refreshWeaponStrip();
-    hud.intro(def.name, def.subtitle);
     viewmodel.equip(this.currentWeapon, true);
     viewmodel.setVisible(true);
 
     if (restore) this.restore(restore);
     else this.run(def.events?.start ?? []);
     this.refreshObjective();
+  }
+
+  /** 0..1 danger for the music: 1 while anything hunts you (or the Remnant is awake). */
+  get threat(): number {
+    if (this.boss?.awake && !this.boss.isDead) return 1;
+    return this.player.health.isDead ? 0 : this.enemies.threat;
+  }
+
+  /** Re-reads settings that can change mid-level. */
+  applySettings(): void {
+    this.player.motionScale = this.services.motionScale();
   }
 
   /** The weapon in hand. */
@@ -844,7 +861,8 @@ export class LevelSession {
     this.refreshWeaponStrip();
     this.switchTo(id);
     hud.toast(`${def.name.toUpperCase()} ACQUIRED`, "var(--ui-green)");
-    const key = this.keyLabel(`weapon${def.slot}`) ?? String(def.slot);
+    const slotKey = this.keyLabel(`weapon${def.slot}`);
+    const key = slotKey && slotKey !== "—" ? slotKey : this.services.keyFor("nextWeapon");
     const tip = id === "rivet" ? "Almost silent, but weak — " : id === "shotgun" ? "Devastating up close, and very loud — " : "";
     hud.prompt(`${tip}press ${key} to select it`.toUpperCase(), 5);
   }
@@ -902,6 +920,7 @@ export class LevelSession {
 
   private updateHud(): void {
     const { engine, hud } = this.services;
+    hud.setHealKey(this.services.keyFor("heal"));
     const noiseBars = Math.min(5, Math.round((this.player.noiseRadius / NOISE_RADIUS.sprint) * 5));
     const spread = this.weapon.currentSpread(this.player.moveFactor);
     const halfFov = Math.tan(THREE.MathUtils.degToRad(engine.camera.fov / 2));
@@ -919,6 +938,8 @@ export class LevelSession {
       slot: this.weapon.config.slot,
       medkits: this.medkits,
       healing: this.healTimer > 0,
+      reloadKey: this.services.keyFor("reload"),
+      canFire: !this.busy && !this.player.isSprinting,
       noise: this.weapon.bloom > 0.6 ? 5 : noiseBars,
       threat: this.enemies.threat,
       spreadPx: (Math.tan(spread) / halfFov) * (window.innerHeight / 2),

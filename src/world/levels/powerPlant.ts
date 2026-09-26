@@ -6,6 +6,7 @@ export const POWER_PLANT: LevelDef = {
   id: "power-plant",
   name: "Sublevel 4",
   subtitle: "Power Plant",
+  tagline: "Three generators. Every one of them is a dinner bell.",
   objective: "Start the generators",
   spawnYaw: -Math.PI / 2,
   theme: { fog: 0x080604, wallTint: 0xe6d6bc, floorTint: 0xd0c0a8, lampColor: 0xffb870, skyLight: 0x6a5a48, groundLight: 0x201408 },

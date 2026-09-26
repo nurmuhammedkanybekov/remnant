@@ -144,6 +144,10 @@ Nine kinds of creature, each built to break a habit the last one taught you:
   through walls and convolution reverb.
 - Ambient drone with distant drips and metal groans, and a heartbeat at low
   health.
+- **Adaptive music**, synthesized too: one piece in layers (a slow pad,
+  music-box notes, a tense pulse and clashing strings, then drums and a
+  driving bass) that fade in and out with how much danger you're in. The
+  menu plays the main theme over the same chords.
 
 ### Campaign
 
@@ -164,8 +168,14 @@ Nine kinds of creature, each built to break a habit the last one taught you:
   (one life for the whole run).
 - **Saves:** continue where you left off, replay any level you've reached
   from Chapters, and beat your best time per level.
-- **Fully rebindable controls**, including mouse buttons.
-- Settings for sensitivity, field of view, volume and invert-Y.
+- **Fully rebindable controls**, including mouse buttons and the wheel.
+- **Gamepad support** for playing and for every menu.
+- **Graphics quality presets** (Low / Medium / High).
+- **Accessibility:** subtitle size, HUD size, a colour-blind friendly HUD
+  and reduced camera shake, plus sensitivity, field of view, music and
+  master volume and invert-Y.
+- Title screen, a main menu that shows how far up the shaft you've climbed,
+  and a title card for every level.
 
 ---
 
@@ -182,11 +192,15 @@ Every action can be rebound in **Controls**. Defaults:
 | Melee / takedown | V / Right click   |
 | Use medkit       | H                 |
 | Switch weapon    | 1 2 3 / Q / wheel |
-| Sprint (loud)    | Shift             |
-| Crouch (quiet)   | C / Ctrl          |
-| Flashlight       | F                 |
-| Interact         | E                 |
-| Pause            | Esc               |
+
+On a gamepad: left stick to move, right stick to look, RT fire, LT sprint,
+B crouch, RB melee, A interact, X reload, LB flashlight, Y switch weapon,
+D-pad ↑ medkit, Menu to pause.
+| Sprint (loud) | Shift |
+| Crouch (quiet) | C / Ctrl |
+| Flashlight | F |
+| Interact | E |
+| Pause | Esc |
 
 **Goal:** climb from Sublevel 10 to the surface. Find keycards, restore
 power, and listen to the radio, but don't believe everything it says.
@@ -258,7 +272,7 @@ src/
 ├── weapons/    weapon logic, first-person viewmodel
 ├── items/      pickups
 ├── fx/         procedural textures, particles
-├── audio/      synthesized sound engine
+├── audio/      synthesized sound engine and adaptive music
 └── ui/         HUD, menus, styles
 ```
 
@@ -341,7 +355,7 @@ keeps growing.
 | 1. Foundations                                  | ✅ Done  |
 | 2. Campaign: 10 levels, radio dialogue, endings | ✅ Done  |
 | 3. New creatures, melee, more weapons           | ✅ Done  |
-| 4. Adaptive music, interface redesign, gamepad  | ⏳ Next  |
+| 4. Adaptive music, interface redesign, gamepad  | ✅ Done  |
 | 5. Cloud saves                                  | Optional |
 | 6. Two-player online co-op                      | Optional |
 

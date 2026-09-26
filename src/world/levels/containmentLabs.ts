@@ -6,6 +6,7 @@ export const CONTAINMENT_LABS: LevelDef = {
   id: "containment-labs",
   name: "Sublevel 6",
   subtitle: "Containment Labs",
+  tagline: "Sample R-7 is to be kept in darkness.",
   objective: "Find a keycard for the security door.",
   spawnYaw: Math.PI,
   theme: { fog: 0x06070a, wallTint: 0xdde2ea, floorTint: 0xd0d6de, lampColor: 0xe8f4ff, skyLight: 0x606a78 },

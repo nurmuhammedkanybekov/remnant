@@ -197,6 +197,81 @@ const CSS = /* css */ `
 .tips { margin-top: 16px; font-size: 12px; line-height: 1.6; color: var(--ui-dim); }
 .hint { position: absolute; bottom: 26px; left: 0; right: 0; font-size: 11px; letter-spacing: 3px; color: rgba(232,226,214,.35); }
 
+/* ---- title ---- */
+.screen.title h1 { font-size: clamp(64px, 13vw, 150px); }
+.screen .press { margin-top: 34px; font-size: 13px; letter-spacing: 6px; color: var(--ui-dim); animation: pulse 1.8s ease-in-out infinite; }
+
+/* ---- main menu ---- */
+.screen.main-menu { align-items: flex-start; padding-left: clamp(24px, 8vw, 120px); text-align: left;
+  background: linear-gradient(90deg, rgba(0,0,0,.88) 0%, rgba(0,0,0,.55) 45%, rgba(0,0,0,.15) 75%, rgba(0,0,0,.6) 100%); }
+.main-menu .brand h1 { margin-left: 0; font-size: clamp(56px, 9vw, 112px); }
+.main-menu .brand .tag { margin-bottom: 36px; }
+.main-menu .menu { min-width: 300px; }
+.main-menu .menu button { text-align: left; padding-left: 26px; }
+.main-menu .menu button:hover::before, .main-menu .menu button:focus-visible::before { left: 4px; }
+.gauge { position: absolute; right: clamp(20px, 5vw, 70px); top: 50%; transform: translateY(-50%); list-style: none; margin: 0;
+  padding: 0 0 0 18px; border-left: 1px solid var(--ui-faint); font-size: 11px; letter-spacing: 2px; text-align: left; }
+.gauge li { position: relative; display: grid; grid-template-columns: 110px 130px; gap: 8px; padding: 5px 0; color: rgba(232,226,214,.28); }
+.gauge li i { position: absolute; left: -23px; top: 8px; width: 9px; height: 9px; border-radius: 50%; background: #111;
+  border: 1px solid rgba(255,255,255,.2); }
+.gauge li span { color: rgba(232,226,214,.22); letter-spacing: 1px; }
+.gauge li.reached { color: var(--ui-dim); }
+.gauge li.reached span { color: rgba(232,226,214,.4); }
+.gauge li.reached i { background: var(--ui-amber); border-color: var(--ui-amber); box-shadow: 0 0 8px rgba(226,176,74,.6); }
+.gauge li.cur { color: var(--ui-fg); }
+.gauge li.cur span { color: var(--ui-amber); }
+.gauge li.cur i { background: var(--ui-red); border-color: var(--ui-red); box-shadow: 0 0 12px var(--ui-red); animation: pulse 1.2s infinite; }
+.transmission { position: absolute; left: clamp(24px, 8vw, 120px); bottom: 26px; right: 220px; font-size: 12px; letter-spacing: 1px;
+  color: rgba(232,226,214,.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.transmission .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ui-red); margin-right: 10px;
+  animation: blink 1s steps(2) infinite; }
+.transmission .who { letter-spacing: 4px; margin-right: 14px; color: var(--ui-amber); }
+.transmission .txt { font-style: italic; }
+@media (max-width: 820px) { .gauge { display: none; } }
+
+/* ---- level card ---- */
+.screen.level-card { align-items: flex-start; padding-left: clamp(24px, 8vw, 120px); padding-right: 330px;
+  background: radial-gradient(ellipse at 30% 50%, rgba(18,14,12,.94), #000 75%); }
+@media (max-width: 820px) { .screen.level-card { padding-right: 24px; } }
+.level-card .card-body { display: flex; align-items: center; gap: 34px; text-align: left; max-width: 820px; }
+.level-card .depth-no { font-family: var(--font-display); font-weight: 300; font-size: clamp(90px, 16vw, 190px); line-height: .85;
+  color: rgba(216,67,47,.85); text-shadow: 0 0 40px rgba(216,67,47,.35); }
+.level-card .card-name { font-family: var(--font-display); font-size: clamp(26px, 3.6vw, 48px); letter-spacing: .2em; }
+.level-card .card-sub { font-size: 14px; letter-spacing: 8px; color: var(--ui-dim); margin-top: 4px; }
+.level-card .card-tagline { font-family: var(--font-type); font-size: 17px; color: rgba(232,226,214,.8); margin: 26px 0 18px; max-width: 520px; line-height: 1.5; }
+.level-card .card-obj { font-size: 13px; letter-spacing: 1px; color: var(--ui-fg); }
+.level-card .card-obj span { color: var(--ui-amber); letter-spacing: 4px; margin-right: 12px; }
+.level-card .menu { position: absolute; left: clamp(24px, 8vw, 120px); bottom: 70px; min-width: 0; }
+.level-card .menu button { padding-left: 0; }
+.level-card .press { position: absolute; left: clamp(24px, 8vw, 120px); bottom: 36px; margin: 0; }
+.card-body { animation: cardin 1.1s ease both; }
+@keyframes cardin { from { opacity: 0; transform: translateY(10px); letter-spacing: 0; } to { opacity: 1; transform: none; } }
+
+/* ---- settings ---- */
+.screen.settings h2 { margin-bottom: 22px; }
+.settings .panel { display: grid; grid-template-columns: 1fr 1fr; gap: 0 56px; width: min(960px, 92vw); margin-bottom: 14px; }
+.settings .note-line { font-size: 11px; letter-spacing: 1px; color: var(--ui-dim); margin-bottom: 22px; }
+@media (max-width: 860px) { .settings .panel { grid-template-columns: 1fr; } }
+.panel .group { font-size: 11px; letter-spacing: 5px; color: var(--ui-amber); padding: 18px 0 4px; }
+.panel .group:first-child { padding-top: 0; }
+.panel button.cycle { font-family: var(--font-mono); font-size: 13px; letter-spacing: 1px; color: var(--ui-fg); background: none;
+  border: 1px solid rgba(255,255,255,.25); padding: 3px 10px; cursor: pointer; min-width: 120px; }
+.panel button.cycle:hover, .panel button.cycle:focus-visible { border-color: var(--ui-red); outline: none; }
+.panel input:focus-visible { outline: 1px solid var(--ui-red); outline-offset: 3px; }
+.panel .keys { margin-top: 6px; }
+
+/* ---- accessibility ---- */
+.hud { --hud-scale: 1; }
+.hud .vitals, .hud .ammo, .hud .objective, .hud .noise, .hud .aware, .hud .boss, .hud .toasts { zoom: var(--hud-scale); }
+.hud.sub-small .subtitle .line { font-size: 14px; }
+.hud.sub-large .subtitle .line { font-size: 23px; }
+.hud.sub-large .subtitle .who { font-size: 12px; }
+.hud.sub-large .subtitle { width: min(960px, 92vw); bottom: 150px; }
+/* Colour-blind friendly: the signals that were red vs green become orange vs blue. */
+.cb { --ui-red: #ff7b1c; --ui-green: #3ea8ff; --ui-amber: #ffd23f; }
+.cb .vrow.health .vbar > b.fill { background: linear-gradient(90deg, #a04a00, var(--ui-red)); }
+.cb .hitmark.head::before, .cb .hitmark.head::after { background: linear-gradient(var(--ui-green) 0 32%, transparent 32% 68%, var(--ui-green) 68%); }
+
 @keyframes blink { 50% { opacity: .25; } }
 @keyframes pulse { 50% { opacity: .55; } }
 @keyframes fadein { from { opacity: 0; } }
