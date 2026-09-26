@@ -11,6 +11,7 @@ import { Input } from "../core/input";
 import { SaveStore } from "./save";
 import { loadSettings, saveSettings, type Settings } from "../core/settings";
 import type { Enemy } from "../enemies/enemy";
+import { hasRelay } from "../net/ice";
 import { CLOSE_REASONS, PeerLink } from "../net/link";
 import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg } from "../net/protocol";
 import { DEFAULT_SIGNAL_URL } from "../net/signaling";
@@ -550,7 +551,8 @@ export class Game {
     this.screens.lobby(
       "CO-OP",
       "TWO PLAYERS · ONLINE",
-      "One of you hosts and picks the sublevel; the other joins with the host's room code.\nYou leave each sublevel together — and when one of you goes down, the other has 45 seconds to get them back up.",
+      "One of you hosts and picks the sublevel; the other joins with the host's room code.\nYou leave each sublevel together — and when one of you goes down, the other has 45 seconds to get them back up.\n" +
+        (hasRelay() ? "Relay: on — works even on strict networks." : "Relay: off — strict school or office networks may not connect."),
       [
         { label: "Host a Game", primary: true, action: () => this.showCoopChapters() },
         { label: "Join a Game", action: () => this.showJoin() },

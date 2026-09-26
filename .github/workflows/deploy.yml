@@ -33,12 +33,12 @@ jobs:
         env:
           # Optional: the free co-op relay for networks that block direct
           # connections. Set these under Settings → Secrets and variables →
-          # Actions → Variables (see "Co-op relay" in the README). Empty = no relay.
-          VITE_METERED_APP: ${{ vars.METERED_APP }}
-          VITE_METERED_API_KEY: ${{ vars.METERED_API_KEY }}
-          VITE_TURN_URLS: ${{ vars.TURN_URLS }}
-          VITE_TURN_USERNAME: ${{ vars.TURN_USERNAME }}
-          VITE_TURN_CREDENTIAL: ${{ vars.TURN_CREDENTIAL }}
+          # Actions, as Variables or Secrets (see the README). Empty = no relay.
+          VITE_METERED_APP: ${{ vars.METERED_APP || secrets.METERED_APP }}
+          VITE_METERED_API_KEY: ${{ vars.METERED_API_KEY || secrets.METERED_API_KEY }}
+          VITE_TURN_URLS: ${{ vars.TURN_URLS || secrets.TURN_URLS }}
+          VITE_TURN_USERNAME: ${{ vars.TURN_USERNAME || secrets.TURN_USERNAME }}
+          VITE_TURN_CREDENTIAL: ${{ vars.TURN_CREDENTIAL || secrets.TURN_CREDENTIAL }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

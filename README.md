@@ -148,7 +148,9 @@ that's hundreds of hours of play.
    Actions → Variables → New repository variable**. Add:
    - `METERED_APP` = your app domain, e.g. `remnant.metered.live`
    - `METERED_API_KEY` = the API key
+     (Saving them as **Secrets** instead works too.)
 3. Re-run the deploy: **Actions → Deploy to GitHub Pages → Run workflow**.
+4. Open **Co-op** in the game: it says **Relay: on** when it worked.
 
 Any other TURN server works too: set `TURN_URLS` (comma-separated),
 `TURN_USERNAME` and `TURN_CREDENTIAL` instead.
