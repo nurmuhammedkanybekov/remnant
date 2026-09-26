@@ -8,6 +8,8 @@ import { resolveTheme } from "./theme";
 export interface NoteSpawn {
   pos: THREE.Vector2;
   text: string;
+  /** "infirmary:1" — identifies the note in the journal. */
+  key: string;
 }
 
 export interface LampSpawn {
@@ -181,7 +183,7 @@ export function parseLevel(def: LevelDef): ParsedLevel {
           } else if (ch >= "0" && ch <= "9") {
             const text = def.notes[ch];
             if (!text) fail(`note "${ch}" at ${col},${row} has no text in the notes table`);
-            spawns.notes.push({ pos: c, text });
+            spawns.notes.push({ pos: c, text, key: `${def.id}:${ch}` });
           } else if (ch >= "a" && ch <= "z") {
             if (!def.triggers?.[ch]) fail(`trigger "${ch}" at ${col},${row} has no actions in the triggers table`);
             spawns.triggers.push({ ...at, key: ch });

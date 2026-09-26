@@ -2,9 +2,11 @@ import { ACTIONS, ACTION_LABELS, RESERVED_CODES, keyLabel, rebind, type Action, 
 import { PAD_LAYOUT } from "../core/gamepad";
 import { QUALITY, QUALITY_ORDER } from "../core/quality";
 import { SUBTITLE_SIZES, type Settings } from "../core/settings";
+import { LOOK_ORDER, LOOKS, type CharacterLook } from "../content/characters";
 import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyId } from "../content/difficulty";
 import type { Ending } from "../content/story";
 import { accuracy, type RunStats } from "../game/stats";
+import { gearHtml, journalHtml, radioHtml, type InventoryTab, type InventoryView } from "./inventory";
 import { injectStyles } from "./styles";
 
 export interface MenuItem {
@@ -58,7 +60,7 @@ function esc(s: string): string {
 
 type NumericKey = "sensitivity" | "padSensitivity" | "fov" | "volume" | "musicVolume" | "hudScale";
 type ToggleKey = "invertY" | "reducedShake" | "colorBlind";
-type CycleKey = "quality" | "subtitleSize";
+type CycleKey = "quality" | "subtitleSize" | "look";
 
 /** Full-screen menus. Each method replaces whatever screen is showing. */
 export class Screens {
@@ -143,6 +145,9 @@ export class Screens {
     this.teardown?.();
     this.teardown = null;
     this.onAnyButton = null;
+    // Switching tabs within the same screen shouldn't replay the fade-in.
+    const same = variant !== "" && this.visible && this.root.classList.contains(variant);
+    this.root.style.animation = same ? "none" : "";
     this.root.className = `screen${variant ? ` ${variant}` : ""}`;
     this.root.innerHTML = `${html}<div class="menu${row ? " row" : ""}">${items
       .map(
@@ -298,8 +303,72 @@ export class Screens {
     this.render(`<h2>PAUSED</h2><div class="tag">THE DARK IS PATIENT · ${esc(difficultyName.toUpperCase())}</div>`, items);
   }
 
-  death(stats: RunStats, items: MenuItem[], runOver: boolean): void {
-    const tag = runOver ? "IRONMAN · THE RUN IS OVER" : "THE DARK GOT THERE FIRST";
+  /**
+   * The inventory. `view` is read again after every change (a medkit used
+   * from here, a tab switched), so it always shows the current state.
+   * Esc, the inventory key (`closeCodes`) or Back closes it.
+   */
+  inventory(
+    view: () => InventoryView,
+    /** `onHeal` closes the inventory and starts using a medkit. */
+    opts: { onClose: () => void; onHeal: () => void; closeCodes: readonly string[] },
+    tab: InventoryTab = "gear",
+    note = 0
+  ): void {
+    const v = view();
+    const tabs: [InventoryTab, string][] = [
+      ["gear", "Equipment"],
+      ["journal", `Journal (${v.notes.length})`],
+      ["radio", "Radio log"],
+    ];
+    const body = tab === "gear" ? gearHtml(v) : tab === "journal" ? journalHtml(v, note) : radioHtml(v);
+    const canHeal = v.medkits > 0 && v.health < v.maxHealth;
+    this.render(
+      `<h2>INVENTORY</h2><div class="tag">${esc(v.place.toUpperCase())} · ${esc(v.difficulty.toUpperCase())}${
+        v.live ? " · THE GAME KEEPS RUNNING" : ""
+      }</div>
+       <div class="inv-tabs">${tabs
+         .map(([id, label]) => `<button data-tab="${id}" class="${id === tab ? "on" : ""}">${esc(label)}</button>`)
+         .join("")}</div>
+       <div class="inv-body">${body}</div>`,
+      [
+        { label: "Back", primary: true, detail: `or ${v.closeKey}`, action: opts.onClose },
+        ...(tab === "gear" ? [{ label: "Use Medkit", disabled: !canHeal, action: opts.onHeal }] : []),
+      ],
+      false,
+      true,
+      "inventory"
+    );
+    this.root.querySelectorAll<HTMLButtonElement>("button[data-tab]").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.onUiSound?.();
+        this.inventory(view, opts, b.dataset.tab as InventoryTab);
+      })
+    );
+    this.root.querySelectorAll<HTMLButtonElement>("button[data-note]").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.inventory(view, opts, "journal", Number(b.dataset.note));
+      })
+    );
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Escape" && !opts.closeCodes.includes(e.code)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      opts.onClose();
+    };
+    // Next tick: the key press that opened the inventory mustn't also close it.
+    const t = window.setTimeout(() => window.addEventListener("keydown", onKey, true));
+    this.teardown = () => {
+      window.clearTimeout(t);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }
+
+  /** `runOver` names the one-life mode that just ended, if it did. */
+  death(stats: RunStats, items: MenuItem[], runOver: string | null): void {
+    const tag = runOver ? `${esc(runOver.toUpperCase())} · THE RUN IS OVER` : "THE DARK GOT THERE FIRST";
     this.render(`<h2 class="red">YOU DIED</h2><div class="tag">${tag}</div>${this.statsHtml(stats)}`, items, true);
   }
 
@@ -394,6 +463,8 @@ export class Screens {
            ${slider("MOUSE SENSITIVITY", "sensitivity", 0.2, 3, 0.05)}
            ${slider("GAMEPAD LOOK SPEED", "padSensitivity", 0.2, 3, 0.05)}
            ${toggle("INVERT LOOK Y", "invertY")}
+           <div class="group">CHARACTER</div>
+           ${cycle("YOUR LOOK", "look")}
            <div class="group">AUDIO</div>
            ${slider("VOLUME", "volume", 0, 1, 0.05)}
            ${slider("MUSIC", "musicVolume", 0, 1, 0.05)}
@@ -409,7 +480,7 @@ export class Screens {
            ${toggle("COLOUR-BLIND FRIENDLY HUD", "colorBlind")}
          </section>
        </div>
-       <div class="note-line">Graphics quality fully applies from the next level you load.</div>`,
+       <div class="note-line">Graphics quality fully applies from the next level you load. Your look is what your co-op partner sees.</div>`,
       [{ label: "Back", action: back, primary: true }],
       false,
       false,
@@ -437,6 +508,7 @@ export class Screens {
     const cycles: Record<CycleKey, { values: string[]; label: (v: string) => string }> = {
       quality: { values: QUALITY_ORDER, label: (v) => QUALITY[v as keyof typeof QUALITY].name },
       subtitleSize: { values: SUBTITLE_SIZES, label: (v) => v[0].toUpperCase() + v.slice(1) },
+      look: { values: LOOK_ORDER, label: (v) => LOOKS[v as CharacterLook].label },
     };
     this.root.querySelectorAll<HTMLButtonElement>("button.cycle").forEach((btn) => {
       const key = btn.dataset.c as CycleKey;
