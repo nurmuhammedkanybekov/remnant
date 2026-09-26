@@ -1,4 +1,6 @@
+import type { SampleId } from "../content/sounds";
 import type { VocalKind } from "../enemies/enemy";
+import { SampleBank } from "./samples";
 
 /**
  * All audio is synthesized at runtime with the Web Audio API — no sound files.
@@ -32,6 +34,8 @@ export class SoundManager {
   private reverbIn!: GainNode;
   private noiseBuf!: AudioBuffer;
   private musicBus!: GainNode;
+  /** Recorded weapon sounds; anything missing falls back to synthesis. */
+  private readonly samples = new SampleBank();
   private musicVolume = 0.7;
   /** Called once the audio context exists (the music hooks in here). */
   onReady: ((music: MusicOutput) => void) | null = null;
@@ -81,6 +85,7 @@ export class SoundManager {
     musicSend.gain.value = 0.5;
     this.musicBus.connect(musicSend).connect(this.reverbIn);
 
+    void this.samples.load(ctx);
     this.startAmbient();
     this.onReady?.({ ctx, out: this.musicBus, noise: this.noiseBuf });
   }
@@ -200,9 +205,30 @@ export class SoundManager {
 
   // ---------------------------------------------------------------- weapon
 
+  /** Plays a recording if there is one. `reverb` is how much of it goes to the room. */
+  private sample(id: SampleId, when: number, sp: Spatial = CENTER, gain = 1, reverb = 0.3): boolean {
+    if (!this.ctx || !this.samples.has(id)) return false;
+    const o = this.out(sp, sp === CENTER ? 1 : 40, reverb);
+    return !!o && this.samples.play(this.ctx, id, o, when, gain);
+  }
+
   playGunshot(weapon: "pistol" | "shotgun" | "rivet" = "pistol"): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
+    const recorded: Record<typeof weapon, SampleId> = { pistol: "pistolShot", shotgun: "shotgunShot", rivet: "rivetShot" };
+    if (this.sample(recorded[weapon], t, CENTER, 1, weapon === "rivet" ? 0.3 : 0.9)) {
+      // The recording is the shot; the facility adds its own low rumble, and the brass hits the floor.
+      if (weapon !== "rivet")
+        this.burst(this.out(CENTER, 1, 0.6)!, "lowpass", 380, 0.6, t + 0.05, weapon === "shotgun" ? 1.6 : 1.1, 0.12, 0.05);
+      if (weapon === "shotgun") {
+        if (!this.sample("pumpBack", t + 0.36)) this.action(t + 0.36, 1100, 0.35);
+        if (!this.sample("pumpForward", t + 0.52)) this.action(t + 0.52, 1500, 0.4);
+        if (!this.sample("shellCasing", t + 0.8)) this.casings(t + 0.8, 1, 1500);
+      } else if (weapon === "pistol" && !this.sample("casing", t + 0.38 + Math.random() * 0.08)) {
+        this.casings(t + 0.38 + Math.random() * 0.08, 1, 3800);
+      }
+      return;
+    }
     if (weapon === "rivet") {
       // Pneumatic: a hiss and a hard "chunk". Quiet — that's the point.
       const o = this.out(CENTER, 1, 0.3)!;
@@ -298,6 +324,7 @@ export class SoundManager {
   playShellLoad(): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
+    if (this.sample("shellInsert", t)) return;
     const o = this.out(CENTER, 1, 0.15)!;
     this.burst(o, "bandpass", 1100, 3, t, 0.05, 0.22);
     this.tone(o, "square", 650, 450, t + 0.02, 0.025, 0.1);
@@ -372,6 +399,7 @@ export class SoundManager {
   playEmptyClick(): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
+    if (this.sample("dryFire", t)) return;
     const o = this.out(CENTER, 1, 0.1)!;
     this.tone(o, "square", 2400, 1200, t, 0.02, 0.18);
     this.burst(o, "highpass", 3000, 1, t, 0.03, 0.15);
@@ -386,11 +414,16 @@ export class SoundManager {
       this.tone(o, "square", f, f * 0.5, t + at, 0.025, vol);
       this.burst(o, "bandpass", f * 1.5, 2, t + at, 0.04, vol);
     };
-    click(duration * 0.18, 900, 0.18); // mag release
-    this.burst(o, "bandpass", 500, 1, t + duration * 0.3, 0.12, 0.08); // mag slides out
-    click(duration * 0.62, 700, 0.25); // mag seated
-    click(duration * 0.8, 1200, 0.2); // slide back
-    click(duration * 0.9, 1500, 0.25); // slide forward
+    // Each stage uses a recording if there is one, timed to the animation.
+    if (!this.sample("magOut", t + duration * 0.16)) {
+      click(duration * 0.18, 900, 0.18); // mag release
+      this.burst(o, "bandpass", 500, 1, t + duration * 0.3, 0.12, 0.08); // mag slides out
+    }
+    if (!this.sample("magIn", t + duration * 0.58)) click(duration * 0.62, 700, 0.25); // mag seated
+    if (!this.sample("slideRack", t + duration * 0.78)) {
+      click(duration * 0.8, 1200, 0.2); // slide back
+      click(duration * 0.9, 1500, 0.25); // slide forward
+    }
   }
 
   /** Your round going into flesh: a wet, heavy thud, and a crunch for a headshot. */
@@ -398,6 +431,10 @@ export class SoundManager {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const o = this.out(CENTER, 1, 0.1)!;
+    if (this.sample("impactFlesh", t, CENTER, headshot ? 1.2 : 1, 0.1)) {
+      this.tone(o, "triangle", headshot ? 1500 : 1100, headshot ? 1300 : 950, t, 0.03, 0.05);
+      return;
+    }
     this.burst(o, "lowpass", 420, 1.2, t, 0.1, 0.5, 0.002); // the thud
     this.burst(o, "bandpass", 900, 3, t + 0.01, 0.06, 0.18, 0.003); // wet
     if (headshot) {
@@ -414,6 +451,10 @@ export class SoundManager {
     const t = this.ctx.currentTime;
     const o = this.out(sp, 40, 0.6);
     if (!o) return;
+    if (this.sample("impactConcrete", t, sp, 1, 0.6)) {
+      if (Math.random() < 0.18) this.sample("ricochet", t + 0.01, sp, 0.8, 0.6);
+      return;
+    }
     this.burst(o, "bandpass", 1600 + Math.random() * 800, 1.2, t, 0.03, 0.35, 0.0005);
     this.burst(o, "lowpass", 300, 1, t, 0.07, 0.3, 0.001);
     for (let i = 0; i < 5; i++) {
