@@ -28,7 +28,8 @@ import type { SignalMessage, SignalType } from "./signaling";
 const DEFAULT_REALTIME_KEY = "pk_live_d92343d55efddbd122c16b21de18fdc672cc1ef9";
 
 export function realtimeKey(env: Record<string, string | undefined> = import.meta.env, search = location.search): string | null {
-  const key = (new URLSearchParams(search).get("realtimeKey") ?? env.VITE_METERED_REALTIME_KEY ?? DEFAULT_REALTIME_KEY).trim();
+  // `||`, not `??`: a build variable that isn't set arrives as an empty string, which means "use the default".
+  const key = (new URLSearchParams(search).get("realtimeKey") || env.VITE_METERED_REALTIME_KEY?.trim() || DEFAULT_REALTIME_KEY).trim();
   return key && key !== "off" ? key : null;
 }
 
