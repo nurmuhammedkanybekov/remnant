@@ -2,6 +2,8 @@
 
 /** The package.json version, injected at build time by Vite. */
 declare const __APP_VERSION__: string;
+/** The commit (or build time) this copy of the game was built from. */
+declare const __BUILD_ID__: string;
 
 interface ImportMetaEnv {
   /** Co-op relay (optional): Metered app domain, e.g. "remnant.metered.live", and its API key. */

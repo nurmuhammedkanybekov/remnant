@@ -108,9 +108,11 @@ export class MeteredSignaling {
       clearTimeout(this.presenceTimer);
       this.presenceTimer = 0;
       if (!p.joined || p.joined.length === 0) this.onMessage?.({ type: "EXPIRE" });
+      else this.onNote?.(`room found (${p.joined.length} there)`);
     }) as (p: never) => void);
-    client.on("server-error", ((e: { code?: string }) => {
+    client.on("server-error", ((e: { code?: string; message?: string }) => {
       const code = String(e.code ?? "").toLowerCase();
+      this.onNote?.(`matchmaking error: ${e.code ?? "?"}${e.message ? ` (${e.message})` : ""}`);
       if (/auth|key|unauthori|forbidden|permission/.test(code)) this.fail("server");
     }) as (p: never) => void);
     client.on("disconnected", ((e: { willReconnect?: boolean; code?: number }) => {
@@ -153,7 +155,9 @@ export class MeteredSignaling {
 
   send(dst: string, type: SignalType, payload: unknown): void {
     const env: Envelope = { type, src: this.id, dst, payload };
-    void this.client?.publish(this.channel, env).catch(() => undefined);
+    void this.client
+      ?.publish(this.channel, env)
+      .catch((e: { code?: string; message?: string }) => this.onNote?.(`sending ${type} failed: ${e?.code ?? e?.message ?? "?"}`));
   }
 
   private fail(reason: string): void {
