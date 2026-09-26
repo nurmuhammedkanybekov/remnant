@@ -656,6 +656,30 @@ export class SoundManager {
     this.burst(o, "highpass", 3500, 0.8, t + 0.03, 0.12, vol * 0.4, 0.01);
   }
 
+  // ---------------------------------------------------------------- the other player (co-op)
+
+  /** Their gun, from where they are. Loud guns carry across the level; the rivet gun barely leaves the room. */
+  playGunshotAt(weapon: "pistol" | "shotgun" | "rivet", sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const recorded: Record<typeof weapon, SampleId> = { pistol: "pistolShot", shotgun: "shotgunShot", rivet: "rivetShot" };
+    const reach = weapon === "rivet" ? 16 : 70;
+    if (this.sample(recorded[weapon], t, sp, 0.9, weapon === "rivet" ? 0.3 : 1.2, 1, reach)) return;
+    const o = this.out(sp, reach, 1.2);
+    if (!o) return;
+    this.burst(o, "lowpass", weapon === "rivet" ? 1200 : 1800, 0.8, t, weapon === "shotgun" ? 0.35 : 0.22, 0.9, 0.001);
+    if (weapon !== "rivet") this.tone(o, "sine", 140, 45, t, 0.25, 0.6, 0.002);
+  }
+
+  /** Their footsteps. */
+  playFootstepAt(gait: "crouch" | "walk" | "sprint" | "still", wet: boolean, sp: Spatial): void {
+    if (!this.ctx || gait === "still") return;
+    const t = this.ctx.currentTime;
+    const gain = gait === "sprint" ? 1 : gait === "crouch" ? 0.3 : 0.7;
+    if (wet) this.sample("splash", t, sp, gain, 0.5, 1, 22);
+    else this.sample(gait === "sprint" ? "stepRun" : "stepWalk", t, sp, gain, 0.3, 1, 22);
+  }
+
   playCheckpoint(): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;

@@ -99,13 +99,14 @@ export class RemnantBoss extends Enemy {
     this.onVocal?.(this, "roar");
   }
 
-  override update(dt: number, level: LevelGrid, p: Perception): void {
+  override update(dt: number, level: LevelGrid, ps: Perception | Perception[]): void {
     this.time += dt;
     this.hitFlash = Math.max(0, this.hitFlash - dt * 5);
     if (this.isDead) {
       this.animateDeath(dt);
       return;
     }
+    const p = this.pickTarget(ps);
 
     const me = this.position2D;
     const toPlayer = p.playerPos.clone().sub(me);
@@ -173,6 +174,24 @@ export class RemnantBoss extends Enemy {
     this.mass.open += (wantOpen - this.mass.open) * Math.min(1, dt * (wantOpen ? 5 : 2.5));
     this.speedNow = 0;
     this.finishFrame(dt, true);
+  }
+
+  /** Adds [phase, awake, core open, rage] to the shared layout. */
+  override netState(): number[] {
+    return [...super.netState(), this.phase, this.awake ? 1 : 0, Math.round(this.mass.open * 100) / 100, this.mass.rage];
+  }
+
+  override applyNet(a: number[]): void {
+    super.applyNet(a);
+    this.phase = a[12] ?? this.phase;
+    this.awake = a[13] === 1;
+    this.mass.rage = a[15] ?? 0;
+  }
+
+  override updatePuppet(dt: number): void {
+    const open = this.net?.[14];
+    if (open !== undefined) this.mass.open += (open - this.mass.open) * Math.min(1, dt * 12);
+    super.updatePuppet(dt);
   }
 
   private begin(kind: "melee" | "ranged", windup: number): void {

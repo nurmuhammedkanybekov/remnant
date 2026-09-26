@@ -49,9 +49,13 @@ export class EnemyManager {
     return (this.enemies.find((e) => e instanceof RemnantBoss) as RemnantBoss | undefined) ?? null;
   }
 
-  update(dt: number, perception: Perception): void {
+  /** One perception per player (just one in solo play). Puppets (co-op guest) only animate. */
+  update(dt: number, perception: Perception | Perception[]): void {
     // Copy: an update can spawn more enemies.
-    for (const e of [...this.enemies]) e.update(dt, this.level, perception, this.enemies);
+    for (const e of [...this.enemies]) {
+      if (e.puppet) e.updatePuppet(dt);
+      else e.update(dt, this.level, perception, this.enemies);
+    }
   }
 
   /** Loud noise (gunfire). Walls cut the radius to 60%. */

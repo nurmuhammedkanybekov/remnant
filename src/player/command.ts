@@ -22,6 +22,8 @@ export interface PlayerCommand {
   reload: boolean;
   toggleFlashlight: boolean;
   interact: boolean;
+  /** The use key is being held (reviving a partner takes a few seconds). */
+  interactHeld: boolean;
   melee: boolean;
   heal: boolean;
   /** -1 previous, +1 next, 0 none. */
@@ -42,6 +44,7 @@ export function emptyCommand(): PlayerCommand {
     reload: false,
     toggleFlashlight: false,
     interact: false,
+    interactHeld: false,
     melee: false,
     heal: false,
     cycleWeapon: 0,
@@ -93,6 +96,7 @@ export function buildCommand(input: InputSource, bindings: Bindings, look: LookS
     reload: pressed("reload"),
     toggleFlashlight: pressed("flashlight"),
     interact: pressed("interact"),
+    interactHeld: held("interact"),
     melee: pressed("melee"),
     heal: pressed("heal"),
     cycleWeapon: (pressed("nextWeapon") ? 1 : 0) - (pressed("prevWeapon") ? 1 : 0),
