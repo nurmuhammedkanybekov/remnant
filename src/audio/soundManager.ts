@@ -205,11 +205,12 @@ export class SoundManager {
 
   // ---------------------------------------------------------------- weapon
 
-  /** Plays a recording if there is one. `reverb` is how much of it goes to the room. */
-  private sample(id: SampleId, when: number, sp: Spatial = CENTER, gain = 1, reverb = 0.3): boolean {
+  /** Plays a recording if there is one. `reverb` is how much of it goes to the room; `rate` shifts its pitch. */
+  private sample(id: SampleId, when: number, sp: Spatial = CENTER, gain = 1, reverb = 0.3, rate = 1, maxDist = 40): boolean {
     if (!this.ctx || !this.samples.has(id)) return false;
-    const o = this.out(sp, sp === CENTER ? 1 : 40, reverb);
-    return !!o && this.samples.play(this.ctx, id, o, when, gain);
+    const o = this.out(sp, sp === CENTER ? 1 : maxDist, reverb);
+    // Out of earshot still counts as handled: no synthesized fallback either.
+    return !o || this.samples.play(this.ctx, id, o, when, gain, rate);
   }
 
   playGunshot(weapon: "pistol" | "shotgun" | "rivet" = "pistol"): void {
@@ -484,6 +485,7 @@ export class SoundManager {
     const t = this.ctx.currentTime;
     this.stepFlip = !this.stepFlip;
     const vol = gait === "sprint" ? 0.5 : gait === "crouch" ? 0.08 : 0.25;
+    if (gait !== "still" && this.sample(gait === "sprint" ? "stepRun" : "stepWalk", t, CENTER, gait === "crouch" ? 0.3 : 1, 0.25)) return;
     const o = this.out(CENTER, 1, 0.25)!;
     this.burst(o, "lowpass", this.stepFlip ? 420 : 520, 1, t, 0.09, vol);
     this.burst(o, "bandpass", this.stepFlip ? 2200 : 2600, 2, t + 0.01, 0.04, vol * 0.25); // grit
@@ -492,6 +494,7 @@ export class SoundManager {
   playFlashlight(on: boolean): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
+    if (this.sample("flashlight", t, CENTER, 1, 0.05, on ? 1 : 0.9)) return;
     const o = this.out(CENTER, 1, 0.05)!;
     this.tone(o, "square", on ? 3200 : 2600, 1500, t, 0.015, 0.12);
     this.burst(o, "highpass", 4000, 1, t, 0.02, 0.12);
@@ -501,6 +504,7 @@ export class SoundManager {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const o = this.out(CENTER, 1, 0.3)!;
+    if ((kind === "ammo" || kind === "shells" || kind === "rivets") && this.sample("ammoPickup", t, CENTER, 1, 0.2)) return;
     if (kind === "ammo" || kind === "shells" || kind === "rivets") {
       this.burst(o, "bandpass", 1800, 3, t, 0.05, 0.3);
       this.burst(o, "bandpass", 2400, 3, t + 0.07, 0.05, 0.25);
@@ -523,7 +527,8 @@ export class SoundManager {
     const t = this.ctx.currentTime;
     const o = this.out(CENTER, 1, 0.3)!;
     this.tone(o, "sine", 150, 45, t, 0.3, 0.9);
-    this.burst(o, "bandpass", 900, 1.5, t, 0.25, 0.35, 0.02); // grunt breath
+    // Aida's voice, if there's a recording; otherwise a breathy grunt.
+    if (!this.sample("playerHurt", t + 0.02, CENTER, 1, 0.2)) this.burst(o, "bandpass", 900, 1.5, t, 0.25, 0.35, 0.02);
   }
 
   playDeath(): void {
@@ -614,8 +619,10 @@ export class SoundManager {
       this.tone(o, "square", 660, 660, t, 0.08, 0.08);
       this.tone(o, "square", 990, 990, t + 0.1, 0.1, 0.08);
     }
-    this.tone(o, "sawtooth", 55, 70, t + 0.1, 0.9, 0.18, 0.1); // motor
-    this.burst(o, "lowpass", 400, 1, t + 0.1, 0.9, 0.3, 0.15); // grind
+    if (!this.sample("door", t + 0.05, sp, 1, 0.7, 1, 30)) {
+      this.tone(o, "sawtooth", 55, 70, t + 0.1, 0.9, 0.18, 0.1); // motor
+      this.burst(o, "lowpass", 400, 1, t + 0.1, 0.9, 0.3, 0.15); // grind
+    }
     this.burst(o, "lowpass", 220, 1, t + 1.0, 0.25, 0.6); // clunk at the top
   }
 
@@ -643,6 +650,7 @@ export class SoundManager {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const vol = gait === "sprint" ? 0.45 : gait === "crouch" ? 0.12 : 0.28;
+    if (this.sample("splash", t, CENTER, vol / 0.45, 0.5)) return;
     const o = this.out(CENTER, 1, 0.5)!;
     this.burst(o, "bandpass", 900 + Math.random() * 500, 1.2, t, 0.18, vol, 0.01);
     this.burst(o, "highpass", 3500, 0.8, t + 0.03, 0.12, vol * 0.4, 0.01);
@@ -683,6 +691,7 @@ export class SoundManager {
   playEnemy(kind: "alert" | VocalKind, p: number, sp: Spatial): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
+    if (this.creatureVoice(kind, p, sp, t)) return;
     switch (kind) {
       case "alert": {
         // It has you: a ragged scream torn out of a throat that isn't built for it.
@@ -796,6 +805,33 @@ export class SoundManager {
         break;
       }
     }
+  }
+
+  /**
+   * Recorded creature voices. One voice for everything the Remnant has
+   * rewritten, pitched per creature (`p`: Brutes low, Listeners high); rats
+   * have their own. Kinds without a recording stay synthesized.
+   */
+  private creatureVoice(kind: "alert" | VocalKind, p: number, sp: Spatial, t: number): boolean {
+    if (p >= 2.5) {
+      const rat: Partial<Record<typeof kind, number>> = { idle: 0.6, alert: 1, windup: 0.8, hurt: 0.9, death: 1, takedown: 0.6 };
+      const g = rat[kind];
+      return g !== undefined && this.sample("ratVoice", t, sp, g, 0.4, p / 3, 22);
+    }
+    const map: Partial<Record<typeof kind, [SampleId, number, number]>> = {
+      idle: ["creatureIdle", 0.55, 22],
+      alert: ["creatureAlert", 1, 36],
+      windup: ["creatureWindup", 1, 24],
+      hurt: ["creatureHurt", 1, 30],
+      death: ["creatureDeath", 1, 30],
+      // Choked off, close and muffled.
+      takedown: ["creatureDeath", 0.35, 10],
+    };
+    const m = map[kind];
+    if (!m) return false;
+    const rate = Math.min(1.4, Math.max(0.45, p));
+    const where = kind === "takedown" ? { ...sp, muffled: true } : sp;
+    return this.sample(m[0], t, where, m[1], kind === "alert" ? 0.9 : 0.6, rate, m[2]);
   }
 
   // ---------------------------------------------------------------- ambience

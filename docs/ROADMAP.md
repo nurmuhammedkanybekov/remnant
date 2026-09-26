@@ -10,7 +10,7 @@ ten-level campaign. See [`STORY.md`](STORY.md) for the narrative and
   services. Any backend must fit a free tier.
 - **Generated in code by default.** Textures, models, music and most audio
   are generated in code. Recordings are used only where synthesis can't
-  sound real — weapon shots, reloads and impacts — and only public-domain
+  sound real — weapons, footsteps, creature voices, doors — and only public-domain
   (CC0) ones, credited in `public/sfx/CREDITS.md`, each with a synthesized
   fallback.
 - **Every phase ships.** Each phase ends with a playable build, green CI and

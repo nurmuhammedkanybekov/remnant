@@ -1,8 +1,11 @@
 # Sound credits
 
-Recorded sound effects used by REMNANT (everything else is synthesized in
-code). Each file's source, author and licence is listed here; only files
-that are free to use in this project (CC0 or similar) are included.
+Recorded sound effects used by REMNANT (the music and everything else are
+synthesized in code). Every file here comes from a recording its author
+dedicated to the public domain under Creative Commons 0 — free to use,
+change and ship with no conditions. Recordings were trimmed, faded,
+level-normalized and converted to mono MP3 for the game. Thank you to
+everyone who recorded and shared them.
 
 | File                   | Source                                                                                                              | Author           | Licence |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------- | ------- |
@@ -42,8 +45,44 @@ that are free to use in this project (CC0 or similar) are included.
 | `impactFlesh_1.mp3`    | [Three Flesh Impacts.wav](https://freesound.org/people/jawbutch/sounds/344409/)                                     | jawbutch         | CC0 1.0 |
 | `impactFlesh_2.mp3`    | [Three Flesh Impacts.wav](https://freesound.org/people/jawbutch/sounds/344409/)                                     | jawbutch         | CC0 1.0 |
 | `impactFlesh_3.mp3`    | [VisceralBulletImpacts.wav](https://freesound.org/people/u1769092/sounds/423301/)                                   | u1769092         | CC0 1.0 |
-
-All of these are public-domain dedications (Creative Commons 0): free to
-use, change and ship with no conditions. They were trimmed, faded, level-
-normalized and converted to mono MP3 for the game. Thank you to everyone
-who recorded and shared them.
+| `stepWalk_1.mp3`       | [Footsteps on concrete](https://freesound.org/people/florianreichelt/sounds/459964/)                                | florianreichelt  | CC0 1.0 |
+| `stepWalk_2.mp3`       | [Footsteps on concrete](https://freesound.org/people/florianreichelt/sounds/459964/)                                | florianreichelt  | CC0 1.0 |
+| `stepWalk_3.mp3`       | [Footsteps on concrete](https://freesound.org/people/florianreichelt/sounds/459964/)                                | florianreichelt  | CC0 1.0 |
+| `stepWalk_4.mp3`       | [Footsteps on concrete](https://freesound.org/people/florianreichelt/sounds/459964/)                                | florianreichelt  | CC0 1.0 |
+| `stepWalk_5.mp3`       | [Footsteps on concrete](https://freesound.org/people/florianreichelt/sounds/459964/)                                | florianreichelt  | CC0 1.0 |
+| `stepWalk_6.mp3`       | [Footsteps on concrete](https://freesound.org/people/florianreichelt/sounds/459964/)                                | florianreichelt  | CC0 1.0 |
+| `stepRun_1.mp3`        | [Concrete Footsteps](https://freesound.org/people/SoftDistortionFX/sounds/465299/)                                  | SoftDistortionFX | CC0 1.0 |
+| `stepRun_2.mp3`        | [Concrete Footsteps](https://freesound.org/people/SoftDistortionFX/sounds/465299/)                                  | SoftDistortionFX | CC0 1.0 |
+| `stepRun_3.mp3`        | [Concrete Footsteps](https://freesound.org/people/SoftDistortionFX/sounds/465299/)                                  | SoftDistortionFX | CC0 1.0 |
+| `stepRun_4.mp3`        | [Concrete Footsteps](https://freesound.org/people/SoftDistortionFX/sounds/465299/)                                  | SoftDistortionFX | CC0 1.0 |
+| `stepRun_5.mp3`        | [Concrete Footsteps](https://freesound.org/people/SoftDistortionFX/sounds/465299/)                                  | SoftDistortionFX | CC0 1.0 |
+| `splash_1.mp3`         | [wet footsteps.mp3](https://freesound.org/people/Bia12/sounds/583756/)                                              | Bia12            | CC0 1.0 |
+| `splash_2.mp3`         | [wet footsteps.mp3](https://freesound.org/people/Bia12/sounds/583756/)                                              | Bia12            | CC0 1.0 |
+| `splash_3.mp3`         | [wet footsteps.mp3](https://freesound.org/people/Bia12/sounds/583756/)                                              | Bia12            | CC0 1.0 |
+| `splash_4.mp3`         | [wet footsteps.mp3](https://freesound.org/people/Bia12/sounds/583756/)                                              | Bia12            | CC0 1.0 |
+| `splash_5.mp3`         | [wet footsteps.mp3](https://freesound.org/people/Bia12/sounds/583756/)                                              | Bia12            | CC0 1.0 |
+| `creatureIdle_1.mp3`   | [Zombie Growl 4.wav](https://freesound.org/people/tonsil5/sounds/555413/)                                           | tonsil5          | CC0 1.0 |
+| `creatureIdle_2.mp3`   | [Zombie Growl 5.wav](https://freesound.org/people/tonsil5/sounds/555417/)                                           | tonsil5          | CC0 1.0 |
+| `creatureIdle_3.mp3`   | [Zombie Growl 1.wav](https://freesound.org/people/tonsil5/sounds/555416/)                                           | tonsil5          | CC0 1.0 |
+| `creatureAlert_1.mp3`  | [Zombie Growl 3.wav](https://freesound.org/people/tonsil5/sounds/555414/)                                           | tonsil5          | CC0 1.0 |
+| `creatureAlert_2.mp3`  | [Zombie Growl 2.wav](https://freesound.org/people/tonsil5/sounds/555415/)                                           | tonsil5          | CC0 1.0 |
+| `creatureWindup_1.mp3` | [Zombie Hit 2.wav](https://freesound.org/people/tonsil5/sounds/555419/)                                             | tonsil5          | CC0 1.0 |
+| `creatureWindup_2.mp3` | [Zombie Hit 1.wav](https://freesound.org/people/tonsil5/sounds/555420/)                                             | tonsil5          | CC0 1.0 |
+| `creatureHurt_1.mp3`   | [Zombie Pain 4.wav](https://freesound.org/people/tonsil5/sounds/555421/)                                            | tonsil5          | CC0 1.0 |
+| `creatureHurt_2.mp3`   | [Zombie Pain 3.wav](https://freesound.org/people/tonsil5/sounds/555422/)                                            | tonsil5          | CC0 1.0 |
+| `creatureHurt_3.mp3`   | [Zombie Pain 6.wav](https://freesound.org/people/tonsil5/sounds/555425/)                                            | tonsil5          | CC0 1.0 |
+| `creatureHurt_4.mp3`   | [Zombie Pain 5.wav](https://freesound.org/people/tonsil5/sounds/555426/)                                            | tonsil5          | CC0 1.0 |
+| `creatureDeath_1.mp3`  | [Zombie Death 2.wav](https://freesound.org/people/tonsil5/sounds/555411/)                                           | tonsil5          | CC0 1.0 |
+| `creatureDeath_2.mp3`  | [Zombie Death 1.wav](https://freesound.org/people/tonsil5/sounds/555412/)                                           | tonsil5          | CC0 1.0 |
+| `ratVoice_1.mp3`       | [Creature - Rat - Vocalizations](https://freesound.org/people/MordiAudio/sounds/574107/)                            | MordiAudio       | CC0 1.0 |
+| `ratVoice_2.mp3`       | [Creature - Rat - Vocalizations](https://freesound.org/people/MordiAudio/sounds/574107/)                            | MordiAudio       | CC0 1.0 |
+| `ratVoice_3.mp3`       | [Creature - Rat - Vocalizations](https://freesound.org/people/MordiAudio/sounds/574107/)                            | MordiAudio       | CC0 1.0 |
+| `ratVoice_4.mp3`       | [Creature - Rat - Vocalizations](https://freesound.org/people/MordiAudio/sounds/574107/)                            | MordiAudio       | CC0 1.0 |
+| `ratVoice_5.mp3`       | [Creature - Rat - Vocalizations](https://freesound.org/people/MordiAudio/sounds/574107/)                            | MordiAudio       | CC0 1.0 |
+| `ratVoice_6.mp3`       | [Creature - Rat - Vocalizations](https://freesound.org/people/MordiAudio/sounds/574107/)                            | MordiAudio       | CC0 1.0 |
+| `flashlight_1.mp3`     | [Flashlight Switch Click](https://freesound.org/people/Ralph0o7/sounds/690300/)                                     | Ralph0o7         | CC0 1.0 |
+| `flashlight_2.mp3`     | [Small_Flashlight_Click_on_02.wav](https://freesound.org/people/Rudmer_Rotteveel/sounds/457463/)                    | Rudmer_Rotteveel | CC0 1.0 |
+| `ammoPickup_1.mp3`     | [pickup_ammo.wav](https://freesound.org/people/BBBBilly/sounds/653032/)                                             | BBBBilly         | CC0 1.0 |
+| `playerHurt_1.mp3`     | [Woman getting pain](https://freesound.org/people/Guinamun/sounds/796094/)                                          | Guinamun         | CC0 1.0 |
+| `playerHurt_2.mp3`     | [Woman expressing pain](https://freesound.org/people/hetsumani/sounds/475296/)                                      | hetsumani        | CC0 1.0 |
+| `door_1.mp3`           | [G31-45-Very Heavy Metal Sliding Door.wav](https://freesound.org/people/craigsmith/sounds/438483/)                  | craigsmith       | CC0 1.0 |

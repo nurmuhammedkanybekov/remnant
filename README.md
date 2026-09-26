@@ -4,7 +4,7 @@
 
 **A first-person survival horror shooter that runs in the browser.**
 <br>
-Built from scratch with TypeScript and Three.js. Every texture, model and piece of music is generated in code; only the weapons use real (CC0) recordings.
+Built from scratch with TypeScript and Three.js. Every texture, model and piece of music is generated in code; key sound effects use real (CC0) recordings.
 
 [![Build & Deploy](https://github.com/nurmuhammedkanybekov/remnant/actions/workflows/deploy.yml/badge.svg)](https://github.com/nurmuhammedkanybekov/remnant/actions/workflows/deploy.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
@@ -59,9 +59,9 @@ rendering, game AI, audio and performance all in one codebase. I also set
 myself one constraint to make it interesting: **generate everything in
 code.** Every texture is painted onto a canvas when the game starts, every
 creature is built from primitives, and the music and most sounds are
-synthesized with the Web Audio API. The one exception is weapons: a gun
-never sounds real without a real recording, so shots, reloads and impacts
-use public-domain (CC0) recordings, credited in
+synthesized with the Web Audio API. The exception is sound effects that
+never sound real without a real recording (weapons, footsteps, creature
+voices, the doors): those use public-domain (CC0) recordings, credited in
 [`public/sfx/CREDITS.md`](public/sfx/CREDITS.md). The whole game is
 TypeScript plus one runtime dependency, `three`.
 
