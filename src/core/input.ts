@@ -1,46 +1,45 @@
+/**
+ * Raw device state: which keys and mouse buttons are held, what was pressed
+ * this frame, and accumulated mouse movement. Mouse buttons are reported as
+ * the codes `Mouse0`–`Mouse4` so they can be bound like keys.
+ *
+ * Gameplay code should not read this directly — see `buildCommand`.
+ */
 export class Input {
-  private keys = new Set<string>();
-  private justPressedKeys = new Set<string>();
+  private readonly down = new Set<string>();
+  private readonly pressed = new Set<string>();
   mouseDeltaX = 0;
   mouseDeltaY = 0;
-  mouseDown = false;
-  private mouseJustPressed = false;
   locked = false;
 
   constructor(private readonly domElement: HTMLElement) {
     window.addEventListener("keydown", (e) => {
-      if (!this.keys.has(e.code)) this.justPressedKeys.add(e.code);
-      this.keys.add(e.code);
-    });
-    window.addEventListener("keyup", (e) => this.keys.delete(e.code));
-
-    domElement.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return;
-      this.mouseDown = true;
-      this.mouseJustPressed = true;
-    });
-    domElement.addEventListener("contextmenu", (e) => e.preventDefault());
-    // Stop Space/Tab from scrolling or moving focus while playing.
-    window.addEventListener("keydown", (e) => {
+      if (!e.repeat) this.press(e.code);
+      // Stop Space/Tab from scrolling or moving focus while playing.
       if (this.locked && (e.code === "Space" || e.code === "Tab")) e.preventDefault();
     });
+    window.addEventListener("keyup", (e) => this.down.delete(e.code));
+
+    domElement.addEventListener("mousedown", (e) => this.press(`Mouse${e.button}`));
+    window.addEventListener("mouseup", (e) => this.down.delete(`Mouse${e.button}`));
+    domElement.addEventListener("contextmenu", (e) => e.preventDefault());
+
     // Losing focus (alt-tab) would otherwise leave keys "stuck" down.
-    window.addEventListener("blur", () => {
-      this.keys.clear();
-      this.mouseDown = false;
-    });
-    window.addEventListener("mouseup", () => (this.mouseDown = false));
+    window.addEventListener("blur", () => this.down.clear());
 
     document.addEventListener("mousemove", (e) => {
-      if (this.locked) {
-        this.mouseDeltaX += e.movementX;
-        this.mouseDeltaY += e.movementY;
-      }
+      if (!this.locked) return;
+      this.mouseDeltaX += e.movementX;
+      this.mouseDeltaY += e.movementY;
     });
-
     document.addEventListener("pointerlockchange", () => {
       this.locked = document.pointerLockElement === domElement;
     });
+  }
+
+  private press(code: string): void {
+    if (!this.down.has(code)) this.pressed.add(code);
+    this.down.add(code);
   }
 
   requestLock(): void {
@@ -60,23 +59,24 @@ export class Input {
     document.exitPointerLock();
   }
 
-  isDown(code: string): boolean {
-    return this.keys.has(code);
+  isDown(code: string | null): boolean {
+    return code !== null && this.down.has(code);
   }
 
-  wasJustPressed(code: string): boolean {
-    return this.justPressedKeys.has(code);
+  wasPressed(code: string | null): boolean {
+    return code !== null && this.pressed.has(code);
   }
 
-  wasMouseJustPressed(): boolean {
-    return this.mouseJustPressed;
+  /** Simulate a held key or button (debug/test harness only). */
+  simulateDown(code: string, held: boolean): void {
+    if (held) this.press(code);
+    else this.down.delete(code);
   }
 
   /** Call once per frame after all systems have read input. */
   endFrame(): void {
     this.mouseDeltaX = 0;
     this.mouseDeltaY = 0;
-    this.justPressedKeys.clear();
-    this.mouseJustPressed = false;
+    this.pressed.clear();
   }
 }

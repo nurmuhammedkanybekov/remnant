@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { findPath } from "../world/pathfinding";
-import { circleHitsWall, hasLineOfSight, randomFloorNear, type LevelData } from "../world/level";
+import { ENEMIES, type EnemyDef, type EnemyKind } from "../content/enemies";
+import { circleHitsWall, hasLineOfSight, randomFloorNear, type LevelGrid } from "../world/grid";
 import { buildCreature, type CreatureRig } from "./enemyMesh";
 
-export type EnemyKind = "husk" | "brute";
 /**
  *  patrol      – wandering near home, unaware
  *  investigate – heard something, walking to where it came from
@@ -14,51 +14,15 @@ export type EnemyKind = "husk" | "brute";
  */
 export type EnemyState = "patrol" | "investigate" | "chase" | "attack" | "search" | "dead";
 
-interface KindStats {
+/** Difficulty scaling applied on top of an enemy's definition. */
+export interface EnemyModifiers {
   health: number;
-  scale: number;
-  tint: number;
-  patrolSpeed: number;
-  investigateSpeed: number;
-  chaseSpeed: number;
-  attackRange: number;
-  attackDamage: number;
-  windup: number;
-  recover: number;
-  hearing: number; // multiplier on noise radius
-  radius: number;
+  damage: number;
+  /** Scales sight range and hearing. */
+  perception: number;
 }
 
-export const ENEMY_STATS: Record<EnemyKind, KindStats> = {
-  husk: {
-    health: 60,
-    scale: 1,
-    tint: 0x2a201c,
-    patrolSpeed: 1.0,
-    investigateSpeed: 1.9,
-    chaseSpeed: 3.6,
-    attackRange: 1.35,
-    attackDamage: 16,
-    windup: 0.38,
-    recover: 0.8,
-    hearing: 1,
-    radius: 0.35,
-  },
-  brute: {
-    health: 190,
-    scale: 1.4,
-    tint: 0x281a1c,
-    patrolSpeed: 0.8,
-    investigateSpeed: 1.5,
-    chaseSpeed: 2.5,
-    attackRange: 1.75,
-    attackDamage: 34,
-    windup: 0.65,
-    recover: 0.9,
-    hearing: 0.8,
-    radius: 0.5,
-  },
-};
+export const NO_MODIFIERS: EnemyModifiers = { health: 1, damage: 1, perception: 1 };
 
 const VISION_HALF_ANGLE = Math.PI / 3; // 60° each side
 const SIGHT_DARK = 6; // how far they see you with your light off
@@ -76,7 +40,7 @@ export interface Perception {
 
 export class Enemy {
   readonly kind: EnemyKind;
-  readonly stats: KindStats;
+  readonly stats: EnemyDef;
   readonly rig: CreatureRig;
   state: EnemyState = "patrol";
   health: number;
@@ -109,11 +73,12 @@ export class Enemy {
   constructor(
     private readonly scene: THREE.Scene,
     spawn: THREE.Vector2,
-    kind: EnemyKind
+    kind: EnemyKind,
+    private readonly mods: EnemyModifiers = NO_MODIFIERS
   ) {
     this.kind = kind;
-    this.stats = ENEMY_STATS[kind];
-    this.health = this.stats.health;
+    this.stats = ENEMIES[kind];
+    this.health = this.stats.health * mods.health;
     this.home = spawn.clone();
     this.patrolTarget = spawn.clone();
     this.rig = buildCreature(this.stats.tint, this.stats.scale);
@@ -166,7 +131,7 @@ export class Enemy {
   /** A loud noise (gunshot) at `pos`. `radius` is already reduced for walls by the caller. */
   hearNoise(pos: THREE.Vector2, radius: number): void {
     if (this.isDead) return;
-    if (this.position2D.distanceTo(pos) > radius * this.stats.hearing) return;
+    if (this.position2D.distanceTo(pos) > radius * this.stats.hearing * this.mods.perception) return;
     this.lastKnown.copy(pos);
     if (this.isHunting) {
       this.sinceContact = 0;
@@ -190,7 +155,7 @@ export class Enemy {
     this.repathTimer = 0;
   }
 
-  update(dt: number, level: LevelData, p: Perception, others: Enemy[]): void {
+  update(dt: number, level: LevelGrid, p: Perception, others: Enemy[]): void {
     this.hitFlash = Math.max(0, this.hitFlash - dt * 6);
     this.stagger = Math.max(0, this.stagger - dt * 2.5);
     this.rig.skin.emissive.setRGB(this.hitFlash * 0.6, this.hitFlash * 0.05, 0);
@@ -208,7 +173,7 @@ export class Enemy {
     // --- Sight ---
     const angleTo = Math.atan2(toPlayer.x, toPlayer.y);
     const inCone = Math.abs(wrapAngle(angleTo - this.facing)) < VISION_HALF_ANGLE;
-    const sightRange = p.torchOn ? SIGHT_LIT : SIGHT_DARK;
+    const sightRange = (p.torchOn ? SIGHT_LIT : SIGHT_DARK) * this.mods.perception;
     const hunting = this.isHunting;
     // Once hunting, they track you all round (they know roughly where you are).
     const canSee = los && dist < sightRange && (inCone || hunting || dist < 2);
@@ -221,7 +186,7 @@ export class Enemy {
     }
 
     // --- Hearing (movement noise; walls muffle it to 40%) ---
-    const heardRadius = p.playerNoise * this.stats.hearing * (los ? 1 : 0.4);
+    const heardRadius = p.playerNoise * this.stats.hearing * this.mods.perception * (los ? 1 : 0.4);
     const canHear = !p.playerDead && dist < heardRadius;
 
     if (!p.playerDead && (this.suspicion >= 1 || (hunting && (canSee || canHear)))) {
@@ -279,7 +244,7 @@ export class Enemy {
         if (this.attackPhase === "windup" && this.attackTimer <= 0) {
           // Strike lands only if you're still in reach (plus a little lunge).
           if (dist < this.stats.attackRange + 0.35 && los && !p.playerDead) {
-            this.onAttackHit?.(this.stats.attackDamage, me);
+            this.onAttackHit?.(this.stats.attackDamage * this.mods.damage, me);
           }
           this.attackPhase = "recover";
           this.attackTimer = this.stats.recover;
@@ -313,7 +278,7 @@ export class Enemy {
     this.animate(dt);
   }
 
-  private updatePatrol(dt: number, level: LevelData, others: Enemy[]): void {
+  private updatePatrol(dt: number, level: LevelGrid, others: Enemy[]): void {
     if (this.patrolWait > 0) {
       this.patrolWait -= dt;
       this.speedNow = 0;
@@ -326,7 +291,7 @@ export class Enemy {
   }
 
   /** Walk along a BFS path to `target`. Returns true once arrived. */
-  private followPathTo(dt: number, level: LevelData, target: THREE.Vector2, speed: number, others: Enemy[]): boolean {
+  private followPathTo(dt: number, level: LevelGrid, target: THREE.Vector2, speed: number, others: Enemy[]): boolean {
     const me = this.position2D;
     if (me.distanceTo(target) < 0.6) {
       this.speedNow = 0;
@@ -348,7 +313,7 @@ export class Enemy {
     return false;
   }
 
-  private moveToward(dt: number, level: LevelData, me: THREE.Vector2, target: THREE.Vector2, speed: number, others: Enemy[]): void {
+  private moveToward(dt: number, level: LevelGrid, me: THREE.Vector2, target: THREE.Vector2, speed: number, others: Enemy[]): void {
     const dir = target.clone().sub(me);
     const d = dir.length();
     if (d < 0.001) return;
@@ -383,7 +348,7 @@ export class Enemy {
   private animate(dt: number): void {
     const r = this.rig;
     const t = performance.now() / 1000;
-    this.walkPhase += dt * this.speedNow * (this.kind === "brute" ? 2.6 : 3.6);
+    this.walkPhase += dt * this.speedNow * this.stats.stride;
     const stride = Math.min(1, this.speedNow / 2);
     const s = Math.sin(this.walkPhase);
     const c = Math.cos(this.walkPhase);

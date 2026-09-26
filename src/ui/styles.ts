@@ -123,6 +123,22 @@ const CSS = /* css */ `
 .menu button:hover, .menu button:focus-visible { color: #fff; letter-spacing: 8px; outline: none; }
 .menu button:hover::before, .menu button:focus-visible::before { content: "›"; position: absolute; left: 12px; color: var(--ui-red); }
 .menu button.primary { color: var(--ui-fg); }
+.menu.row { flex-direction: row; gap: 18px; }
+.menu button small { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: none;
+  color: var(--ui-dim); margin-top: 3px; opacity: .8; }
+.menu button:disabled { opacity: .3; cursor: default; }
+.menu button:disabled:hover { letter-spacing: 6px; }
+.menu button:disabled:hover::before { content: none; }
+.screen .best { color: var(--ui-amber); }
+.binds { display: grid; grid-template-columns: 1fr auto auto; gap: 5px 10px; font-size: 13px; align-items: center; }
+.binds > span { color: var(--ui-dim); letter-spacing: 1px; }
+.binds kbd, .binds button.slot { font-family: var(--font-mono); font-size: 12px; min-width: 92px; padding: 4px 8px; text-align: center;
+  border: 1px solid rgba(255,255,255,.3); border-bottom-width: 2px; border-radius: 3px; background: rgba(0,0,0,.35); color: var(--ui-fg); }
+.binds kbd { color: var(--ui-dim); border-color: rgba(255,255,255,.12); }
+.binds button.slot { cursor: pointer; transition: border-color .15s, color .15s; }
+.binds button.slot:hover, .binds button.slot:focus-visible { border-color: var(--ui-red); outline: none; }
+.binds button.slot.listening { color: var(--ui-amber); border-color: var(--ui-amber); animation: pulse .9s ease-in-out infinite; }
+.version { position: absolute; bottom: 26px; right: 28px; font-size: 11px; letter-spacing: 2px; color: rgba(232,226,214,.3); }
 .stats { display: grid; grid-template-columns: auto auto; gap: 6px 36px; margin: 10px 0 34px; font-size: 14px; text-align: left; }
 .stats span:nth-child(odd) { color: var(--ui-dim); letter-spacing: 2px; }
 .stats span:nth-child(even) { text-align: right; }

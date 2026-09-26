@@ -1,25 +1,12 @@
 import * as THREE from "three";
-
-export interface WeaponConfig {
-  name: string;
-  damage: number;
-  headshotMultiplier: number;
-  fireCooldown: number;
-  magSize: number;
-  reserveMax: number;
-  reloadTime: number;
-  range: number;
-  /** Base cone half-angle in radians; grows with movement and rapid fire. */
-  spread: number;
-  /** How far enemies hear a shot. Gunfire is loud — every shot is a decision. */
-  noiseRadius: number;
-}
+import type { WeaponDef } from "../content/weapons";
 
 export interface Shot {
   origin: THREE.Vector3;
   dir: THREE.Vector3;
 }
 
+/** Ammo, cooldown, reload and spread for any `WeaponDef`. */
 export class Weapon {
   ammoInMag: number;
   reserveAmmo: number;
@@ -35,7 +22,7 @@ export class Weapon {
   onReloadEnd: (() => void) | null = null;
 
   constructor(
-    readonly config: WeaponConfig,
+    readonly config: WeaponDef,
     reserveAmmo: number,
     ammoInMag = config.magSize
   ) {
@@ -86,8 +73,12 @@ export class Weapon {
     return this.config.spread * (1 + moveFactor * 3 + this.bloom * 4);
   }
 
-  /** Attempts to fire. Returns the shot ray (spread already applied) or null. */
-  tryFire(camera: THREE.Camera, moveFactor: number): Shot | null {
+  /**
+   * Attempts to fire from `origin` along `aim` (unit vector). Returns the shot
+   * ray with spread applied, or null if the weapon can't fire right now.
+   * `random` is injectable so tests can make spread deterministic.
+   */
+  tryFire(origin: THREE.Vector3, aim: THREE.Vector3, moveFactor: number, random: () => number = Math.random): Shot | null {
     if (this.reloading || this.cooldownRemaining > 0) return null;
     if (this.ammoInMag <= 0) {
       this.cooldownRemaining = 0.25;
@@ -98,8 +89,7 @@ export class Weapon {
     this.ammoInMag -= 1;
     this.cooldownRemaining = this.config.fireCooldown;
 
-    const origin = camera.getWorldPosition(new THREE.Vector3());
-    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const dir = aim.clone();
     const spread = this.currentSpread(moveFactor);
     this.bloom = Math.min(1, this.bloom + 0.35);
     if (spread > 0) {
@@ -107,14 +97,14 @@ export class Weapon {
       const up = Math.abs(dir.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
       const right = new THREE.Vector3().crossVectors(dir, up).normalize();
       const realUp = new THREE.Vector3().crossVectors(right, dir).normalize();
-      const r = Math.sqrt(Math.random()) * Math.tan(spread);
-      const a = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(random()) * Math.tan(spread);
+      const a = random() * Math.PI * 2;
       dir
         .addScaledVector(right, Math.cos(a) * r)
         .addScaledVector(realUp, Math.sin(a) * r)
         .normalize();
     }
     this.onFire?.();
-    return { origin, dir };
+    return { origin: origin.clone(), dir };
   }
 }

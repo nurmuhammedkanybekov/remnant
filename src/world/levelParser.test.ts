@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+import { CELL_SIZE } from "./grid";
+import type { LevelDef } from "./levelDef";
+import { LevelParseError, parseLevel } from "./levelParser";
+
+function def(map: string[], notes: Record<string, string> = {}): LevelDef {
+  return { id: "test", name: "Test", subtitle: "", objective: "", map, notes, spawnYaw: 0 };
+}
+
+describe("parseLevel", () => {
+  it("reads spawns, props and the solid grid", () => {
+    const level = parseLevel(def(["#######", "#S.A.E#", "#C.K.X#", "#1L.H.#", "#######"], { "1": "hello" }));
+    expect(level.cols).toBe(7);
+    expect(level.rows).toBe(5);
+    expect(level.startCell).toEqual({ col: 1, row: 1 });
+    expect(level.exitCell).toEqual({ col: 5, row: 2 });
+    expect(level.spawns.playerStart.x).toBe(1.5 * CELL_SIZE);
+    expect(level.spawns.ammo).toHaveLength(1);
+    expect(level.spawns.keycards).toHaveLength(1);
+    expect(level.spawns.lamps).toHaveLength(1);
+    expect(level.spawns.notes[0].text).toBe("hello");
+    expect(level.spawns.enemies.map((e) => e.kind)).toEqual(["husk", "brute"]);
+    expect(level.solid[2][1]).toBe(true); // crate blocks
+    expect(level.solid[1][3]).toBe(false); // pickup cell is walkable
+    expect(level.props.crates).toHaveLength(1);
+  });
+
+  it("pads short rows with walls so maps can't leak", () => {
+    const level = parseLevel(def(["#####", "#SX#", "#####"]));
+    expect(level.cols).toBe(5);
+    expect(level.solid[1][4]).toBe(true);
+  });
+
+  it.each([
+    ["no spawn", ["####", "#.X#", "####"], /no player spawn/],
+    ["no exit", ["####", "#S.#", "####"], /no exit/],
+    ["two spawns", ["#####", "#SSX#", "#####"], /more than one player spawn/],
+    ["unknown glyph", ["#####", "#S?X#", "#####"], /unknown map character "\?"/],
+    ["note without text", ["#####", "#S7X#", "#####"], /note "7"/],
+  ])("rejects a map with %s", (_, map, message) => {
+    expect(() => parseLevel(def(map))).toThrow(LevelParseError);
+    expect(() => parseLevel(def(map))).toThrow(message);
+  });
+});

@@ -112,6 +112,17 @@ export class Engine {
     window.addEventListener("resize", () => this.onResize());
   }
 
+  /** Removes everything from the world scene except the camera, whose children (lights) are dropped too. */
+  resetWorld(): void {
+    for (const child of [...this.scene.children]) {
+      if (child === this.camera) continue;
+      this.scene.remove(child);
+      child.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    }
+    this.camera.clear();
+    this.scene.fog = null;
+  }
+
   setFov(fov: number): void {
     this.camera.fov = fov;
     this.camera.updateProjectionMatrix();

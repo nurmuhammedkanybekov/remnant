@@ -1,22 +1,26 @@
+import { ACTIONS, ACTION_LABELS, RESERVED_CODES, keyLabel, rebind, type Action, type Bindings } from "../core/actions";
 import type { Settings } from "../core/settings";
+import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyId } from "../content/difficulty";
+import { accuracy, type RunStats } from "../game/stats";
 import { injectStyles } from "./styles";
 
 export interface MenuItem {
   label: string;
   action: () => void;
   primary?: boolean;
+  /** Small second line under the label. */
+  detail?: string;
+  disabled?: boolean;
 }
 
-export interface RunStats {
-  time: number; // seconds
-  kills: number;
-  shots: number;
-  hits: number;
-  headshots: number;
-  damageTaken: number;
+export interface ChapterEntry {
+  name: string;
+  subtitle: string;
+  unlocked: boolean;
+  bestTime?: number;
 }
 
-function fmtTime(s: number): string {
+export function formatTime(s: number): string {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, "0")}`;
@@ -26,9 +30,11 @@ function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
 
-/** Full-screen menus: main, pause, settings, controls, death, level complete, victory. */
+/** Full-screen menus. Each method replaces whatever screen is showing. */
 export class Screens {
   private readonly root: HTMLDivElement;
+  /** Cleanup for listeners a screen installs outside its own DOM (key capture). */
+  private teardown: (() => void) | null = null;
   onUiSound: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
@@ -36,9 +42,9 @@ export class Screens {
     this.root = document.createElement("div");
     this.root.className = "screen";
     container.appendChild(this.root);
-    // Hover ticks
     this.root.addEventListener("mouseover", (e) => {
-      if ((e.target as HTMLElement).tagName === "BUTTON") this.onUiSound?.();
+      const b = (e.target as HTMLElement).closest("button");
+      if (b && !b.disabled) this.onUiSound?.();
     });
   }
 
@@ -47,63 +53,125 @@ export class Screens {
   }
 
   hide(): void {
+    this.teardown?.();
+    this.teardown = null;
     this.root.classList.remove("show");
   }
 
-  private render(html: string, items: MenuItem[], opaque = false): void {
-    this.root.innerHTML = `${html}<div class="menu">${items
-      .map((it, i) => `<button data-i="${i}" class="${it.primary ? "primary" : ""}">${esc(it.label)}</button>`)
+  private render(html: string, items: MenuItem[], opaque = false, row = false): void {
+    this.teardown?.();
+    this.teardown = null;
+    this.root.innerHTML = `${html}<div class="menu${row ? " row" : ""}">${items
+      .map(
+        (it, i) =>
+          `<button data-i="${i}" class="${it.primary ? "primary" : ""}" ${it.disabled ? "disabled" : ""}>${esc(it.label)}${
+            it.detail ? `<small>${esc(it.detail)}</small>` : ""
+          }</button>`
+      )
       .join("")}</div>`;
-    this.root.querySelectorAll("button[data-i]").forEach((b) => {
+    this.root.querySelectorAll<HTMLButtonElement>("button[data-i]").forEach((b) => {
       b.addEventListener("click", (e) => {
         e.stopPropagation();
-        items[Number((b as HTMLElement).dataset.i)].action();
+        items[Number(b.dataset.i)].action();
       });
     });
     this.root.classList.toggle("opaque", opaque);
     this.root.classList.add("show");
-    (this.root.querySelector("button.primary") as HTMLButtonElement | null)?.focus({ preventScroll: true });
+    this.root.querySelector<HTMLButtonElement>("button.primary:not(:disabled)")?.focus({ preventScroll: true });
   }
 
-  main(items: MenuItem[]): void {
-    this.render(
-      `<h1>REMNANT</h1>
-       <div class="tag">SURVIVE THE SUBLEVELS</div>`,
-      items
+  // ------------------------------------------------------------------ main flow
+
+  main(items: MenuItem[], version: string): void {
+    this.render(`<h1>REMNANT</h1><div class="tag">OBJECT 9 · TIAN SHAN · SUBLEVEL 10</div>`, items);
+    this.root.insertAdjacentHTML(
+      "beforeend",
+      `<div class="hint">HEADPHONES RECOMMENDED · THEY HUNT BY SOUND</div><div class="version">v${esc(version)}</div>`
     );
-    this.root.insertAdjacentHTML("beforeend", `<div class="hint">HEADPHONES RECOMMENDED · THEY HUNT BY SOUND</div>`);
   }
 
-  pause(items: MenuItem[]): void {
-    this.render(`<h2>PAUSED</h2><div class="tag">THE DARK IS PATIENT</div>`, items);
-  }
-
-  death(stats: RunStats, items: MenuItem[]): void {
-    this.render(`<h2 class="red">YOU DIED</h2><div class="tag">THE DARK GOT THERE FIRST</div>${this.statsHtml(stats)}`, items, true);
-  }
-
-  levelComplete(name: string, subtitle: string, stats: RunStats, items: MenuItem[]): void {
+  difficulty(onPick: (id: DifficultyId) => void, back: () => void, completed: readonly DifficultyId[]): void {
     this.render(
-      `<h2>${esc(name.toUpperCase())}</h2><div class="tag">${esc(subtitle.toUpperCase())} · CLEARED</div>${this.statsHtml(stats)}`,
+      `<h2>NEW GAME</h2><div class="tag">CHOOSE HOW MUCH THE DARK WANTS YOU</div>`,
+      [
+        ...DIFFICULTY_ORDER.map((id) => ({
+          label: DIFFICULTIES[id].name + (completed.includes(id) ? " ✓" : ""),
+          detail: DIFFICULTIES[id].description,
+          primary: id === "normal",
+          action: () => onPick(id),
+        })),
+        { label: "Back", action: back },
+      ],
+      true
+    );
+  }
+
+  chapters(entries: ChapterEntry[], onPick: (index: number) => void, back: () => void): void {
+    this.render(
+      `<h2>CHAPTERS</h2><div class="tag">REPLAY ANY SUBLEVEL YOU HAVE REACHED</div>`,
+      [
+        ...entries.map((c, i) => ({
+          label: c.unlocked ? `${i + 1}. ${c.name}` : `${i + 1}. ???`,
+          detail: c.unlocked ? `${c.subtitle}${c.bestTime ? ` · best ${formatTime(c.bestTime)}` : ""}` : "Locked",
+          disabled: !c.unlocked,
+          primary: i === 0,
+          action: () => onPick(i),
+        })),
+        { label: "Back", action: back },
+      ],
+      true
+    );
+  }
+
+  confirm(title: string, text: string, confirmLabel: string, onConfirm: () => void, onCancel: () => void): void {
+    this.render(
+      `<h2>${esc(title)}</h2><div class="sub">${esc(text)}</div>`,
+      [
+        { label: "Cancel", primary: true, action: onCancel },
+        { label: confirmLabel, action: onConfirm },
+      ],
+      true
+    );
+  }
+
+  pause(items: MenuItem[], difficultyName: string): void {
+    this.render(`<h2>PAUSED</h2><div class="tag">THE DARK IS PATIENT · ${esc(difficultyName.toUpperCase())}</div>`, items);
+  }
+
+  death(stats: RunStats, items: MenuItem[], runOver: boolean): void {
+    const tag = runOver ? "IRONMAN · THE RUN IS OVER" : "THE DARK GOT THERE FIRST";
+    this.render(`<h2 class="red">YOU DIED</h2><div class="tag">${tag}</div>${this.statsHtml(stats)}`, items, true);
+  }
+
+  levelComplete(name: string, subtitle: string, stats: RunStats, newBest: boolean, items: MenuItem[]): void {
+    this.render(
+      `<h2>${esc(name.toUpperCase())}</h2><div class="tag">${esc(subtitle.toUpperCase())} · CLEARED${
+        newBest ? ` · <span class="best">NEW BEST</span>` : ""
+      }</div>${this.statsHtml(stats)}`,
       items,
       true
     );
   }
 
-  victory(stats: RunStats, items: MenuItem[]): void {
-    this.render(`<h2>DAYLIGHT</h2><div class="tag">YOU MADE IT OUT. NOT EVERYONE DOES.</div>${this.statsHtml(stats)}`, items, true);
+  victory(stats: RunStats, difficultyName: string, items: MenuItem[]): void {
+    this.render(
+      `<h2>DAYLIGHT</h2><div class="tag">YOU MADE IT OUT · ${esc(difficultyName.toUpperCase())}</div>${this.statsHtml(stats)}`,
+      items,
+      true
+    );
   }
 
   private statsHtml(s: RunStats): string {
-    const acc = s.shots > 0 ? Math.round((s.hits / s.shots) * 100) : 0;
     return `<div class="stats">
-      <span>TIME</span><span>${fmtTime(s.time)}</span>
+      <span>TIME</span><span>${formatTime(s.time)}</span>
       <span>KILLS</span><span>${s.kills}</span>
-      <span>ACCURACY</span><span>${acc}%</span>
+      <span>ACCURACY</span><span>${Math.round(accuracy(s) * 100)}%</span>
       <span>HEADSHOTS</span><span>${s.headshots}</span>
       <span>DAMAGE TAKEN</span><span>${Math.round(s.damageTaken)}</span>
     </div>`;
   }
+
+  // ------------------------------------------------------------------ options
 
   settings(settings: Settings, onChange: (s: Settings) => void, back: () => void): void {
     this.render(
@@ -116,49 +184,107 @@ export class Screens {
        </div>`,
       [{ label: "Back", action: back, primary: true }]
     );
-    const fmt = (k: string, v: number) => (k === "volume" ? `${Math.round(v * 100)}%` : k === "fov" ? `${v}°` : `${v.toFixed(2)}×`);
+    type NumericKey = "sensitivity" | "fov" | "volume";
+    const fmt = (k: NumericKey, v: number) => (k === "volume" ? `${Math.round(v * 100)}%` : k === "fov" ? `${v}°` : `${v.toFixed(2)}×`);
     this.root.querySelectorAll<HTMLInputElement>("input[data-s]").forEach((input) => {
-      const key = input.dataset.s as keyof Settings;
+      const key = input.dataset.s as NumericKey | "invertY";
       const out = input.nextElementSibling as HTMLOutputElement | null;
-      if (input.type === "checkbox") input.checked = Boolean(settings[key]);
+      if (key === "invertY") input.checked = settings.invertY;
       else {
         input.value = String(settings[key]);
-        if (out) out.textContent = fmt(key, Number(input.value));
+        if (out) out.textContent = fmt(key, settings[key]);
       }
       input.addEventListener("input", () => {
-        const next = { ...settings };
-        if (input.type === "checkbox") (next[key] as boolean) = input.checked;
+        if (key === "invertY") settings.invertY = input.checked;
         else {
-          (next[key] as number) = Number(input.value);
-          if (out) out.textContent = fmt(key, Number(input.value));
+          settings[key] = Number(input.value);
+          if (out) out.textContent = fmt(key, settings[key]);
         }
-        Object.assign(settings, next);
         onChange(settings);
       });
     });
   }
 
-  controls(back: () => void): void {
-    const rows: [string, string][] = [
-      ["W A S D", "Move"],
-      ["Mouse", "Look"],
-      ["Left click", "Fire"],
-      ["R", "Reload"],
-      ["Shift", "Sprint (loud)"],
-      ["C / Ctrl", "Crouch (quiet)"],
-      ["F", "Flashlight"],
-      ["Esc", "Pause"],
-    ];
+  /**
+   * Controls with rebinding. Click a slot, then press a key or mouse button.
+   * Escape cancels, Backspace/Delete clears the slot.
+   */
+  controls(bindings: Bindings, onChange: (b: Bindings) => void, onReset: () => void, back: () => void): void {
+    let current = bindings;
+    const slotHtml = (a: Action, s: 0 | 1) => `<button class="slot" data-a="${a}" data-s="${s}">${esc(keyLabel(current[a][s]))}</button>`;
     this.render(
-      `<h2>CONTROLS</h2><div class="tag">&nbsp;</div>
-       <div class="panel"><div class="keys">${rows.map(([k, v]) => `<kbd>${k}</kbd><span>${v}</span>`).join("")}</div>
-       <div class="tips">
-         · Everything you do makes noise. Gunshots carry through walls.<br>
-         · Your flashlight lets you see — and lets them see you from much further.<br>
-         · Break line of sight and stay quiet: they give up eventually.<br>
-         · Headshots do 2.5× damage. Their wind-up can be dodged.
-       </div></div>`,
-      [{ label: "Back", action: back, primary: true }]
+      `<h2>CONTROLS</h2><div class="tag">CLICK A KEY TO CHANGE IT · BACKSPACE CLEARS</div>
+       <div class="panel">
+         <div class="binds">${ACTIONS.map((a) => `<span>${ACTION_LABELS[a]}</span>${slotHtml(a, 0)}${slotHtml(a, 1)}`).join(
+           ""
+         )}<span>Look</span><kbd>Mouse</kbd><kbd>—</kbd><span>Pause</span><kbd>Esc</kbd><kbd>—</kbd></div>
+         <div class="tips">
+           Everything makes noise, and gunshots carry through walls. Your flashlight lets them see you from much
+           further. Break line of sight and stay quiet — they give up eventually. Headshots do 2.5× damage.
+         </div>
+       </div>`,
+      [
+        { label: "Back", action: back, primary: true },
+        { label: "Reset to Defaults", action: onReset },
+      ],
+      false,
+      true
+    );
+
+    const refresh = () =>
+      this.root.querySelectorAll<HTMLButtonElement>("button.slot").forEach((b) => {
+        b.textContent = keyLabel(current[b.dataset.a as Action][Number(b.dataset.s) as 0 | 1]);
+        b.classList.remove("listening");
+      });
+
+    let stopListening: (() => void) | null = null;
+    const listen = (btn: HTMLButtonElement) => {
+      stopListening?.();
+      refresh();
+      const action = btn.dataset.a as Action;
+      const slot = Number(btn.dataset.s) as 0 | 1;
+      btn.textContent = "PRESS A KEY";
+      btn.classList.add("listening");
+      const finish = (code: string | null | undefined) => {
+        stopListening?.();
+        if (code !== undefined) {
+          current = rebind(current, action, slot, code);
+          onChange(current);
+        }
+        refresh();
+      };
+      const onKey = (e: KeyboardEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.code === "Escape") finish(undefined);
+        else if (e.code === "Backspace" || e.code === "Delete") finish(null);
+        else if (!RESERVED_CODES.has(e.code)) finish(e.code);
+      };
+      const onMouse = (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        finish(`Mouse${e.button}`);
+      };
+      const noMenu = (e: Event) => e.preventDefault();
+      window.addEventListener("keydown", onKey, true);
+      window.addEventListener("contextmenu", noMenu, true);
+      // Attach on the next tick so the click that started listening isn't captured as the binding.
+      const t = window.setTimeout(() => window.addEventListener("mousedown", onMouse, true));
+      stopListening = () => {
+        window.clearTimeout(t);
+        window.removeEventListener("keydown", onKey, true);
+        window.removeEventListener("mousedown", onMouse, true);
+        window.removeEventListener("contextmenu", noMenu, true);
+        stopListening = null;
+      };
+      this.teardown = () => stopListening?.();
+    };
+
+    this.root.querySelectorAll<HTMLButtonElement>("button.slot").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        listen(b);
+      })
     );
   }
 }

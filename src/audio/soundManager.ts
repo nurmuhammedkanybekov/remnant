@@ -318,10 +318,10 @@ export class SoundManager {
 
   // ---------------------------------------------------------------- enemies
 
-  playEnemy(kind: "alert" | "idle" | "windup" | "hurt" | "death", brute: boolean, sp: Spatial): void {
+  /** `p` is the creature's voice pitch multiplier (1 = husk, lower = bigger). */
+  playEnemy(kind: "alert" | "idle" | "windup" | "hurt" | "death", p: number, sp: Spatial): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    const p = brute ? 0.6 : 1; // pitch multiplier
     switch (kind) {
       case "alert": {
         // A rising, wavering shriek.

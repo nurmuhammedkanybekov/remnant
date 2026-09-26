@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CELL_SIZE, isSolid, worldToCell, type LevelData } from "./level";
+import { CELL_SIZE, isSolid, worldToCell, type LevelGrid } from "./grid";
 
 /**
  * Breadth-first search on the 4-connected level grid. Returns cell-centre
@@ -7,7 +7,7 @@ import { CELL_SIZE, isSolid, worldToCell, type LevelData } from "./level";
  * Uses flat typed arrays + an index-based queue — cheap enough to run for
  * every chasing enemy several times a second on these map sizes.
  */
-export function findPath(level: LevelData, fromX: number, fromZ: number, toX: number, toZ: number): THREE.Vector2[] {
+export function findPath(level: LevelGrid, fromX: number, fromZ: number, toX: number, toZ: number): THREE.Vector2[] {
   const start = worldToCell(fromX, fromZ);
   const goal = worldToCell(toX, toZ);
   if (isSolid(level, goal.col, goal.row)) return [];

@@ -1,4 +1,4 @@
-import type { LevelDef } from "../level";
+import type { LevelDef } from "../levelDef";
 
 export const LEVEL_1: LevelDef = {
   id: "sublevel-3",

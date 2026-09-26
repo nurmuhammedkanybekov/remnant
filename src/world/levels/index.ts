@@ -1,4 +1,4 @@
-import type { LevelDef } from "../level";
+import type { LevelDef } from "../levelDef";
 import { LEVEL_1 } from "./level1";
 import { LEVEL_2 } from "./level2";
 

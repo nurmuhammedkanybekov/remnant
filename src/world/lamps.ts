@@ -1,5 +1,7 @@
 import * as THREE from "three";
-import { WALL_HEIGHT, type LampSpawn } from "./level";
+import { WALL_HEIGHT } from "./grid";
+import type { LampFixture } from "./levelBuilder";
+import type { LampSpawn } from "./levelParser";
 
 const POOL_SIZE = 6;
 const MAX_LIGHT_DIST = 26;
@@ -8,6 +10,7 @@ type Mode = "steady" | "flicker" | "dying" | "pulse";
 
 interface Lamp {
   spawn: LampSpawn;
+  fixture: LampFixture | undefined;
   mode: Mode;
   brightness: number;
   timer: number;
@@ -26,9 +29,10 @@ export class LampSystem {
   private readonly lamps: Lamp[];
   private readonly pool: THREE.PointLight[] = [];
 
-  constructor(scene: THREE.Scene, spawns: LampSpawn[]) {
+  constructor(scene: THREE.Scene, spawns: LampSpawn[], fixtures: LampFixture[] = []) {
     this.lamps = spawns.map((spawn, i) => ({
       spawn,
+      fixture: fixtures[i],
       mode: spawn.emergency ? "pulse" : (["steady", "steady", "flicker", "steady", "dying"] as Mode[])[i % 5],
       brightness: 1,
       timer: Math.random(),
@@ -68,11 +72,9 @@ export class LampSystem {
           }
           break;
       }
-      const fixture = lamp.spawn.fixture;
-      if (fixture) {
-        (fixture.material as THREE.MeshBasicMaterial).color.copy(lamp.baseColor).multiplyScalar(0.15 + lamp.brightness);
-        const halo = fixture.userData.halo as THREE.Sprite | undefined;
-        if (halo) halo.material.opacity = (lamp.spawn.emergency ? 0.5 : 0.35) * lamp.brightness;
+      if (lamp.fixture) {
+        (lamp.fixture.mesh.material as THREE.MeshBasicMaterial).color.copy(lamp.baseColor).multiplyScalar(0.15 + lamp.brightness);
+        lamp.fixture.halo.material.opacity = (lamp.spawn.emergency ? 0.5 : 0.35) * lamp.brightness;
       }
     }
 

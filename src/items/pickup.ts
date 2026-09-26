@@ -1,15 +1,8 @@
 import * as THREE from "three";
 import { textures } from "../fx/textures";
+import { ITEMS, type PickupType } from "../content/items";
 
-export type PickupType = "ammo" | "medkit" | "battery" | "keycard" | "note";
-
-const GLOW_COLOR: Record<PickupType, number> = {
-  ammo: 0xffc14d,
-  medkit: 0xff5a5a,
-  battery: 0x7fd8ff,
-  keycard: 0x5aff9a,
-  note: 0xfff0c0,
-};
+export type { PickupType };
 
 export class Pickup {
   readonly group = new THREE.Group();
@@ -30,7 +23,7 @@ export class Pickup {
     this.glow = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: textures().glow,
-        color: GLOW_COLOR[type],
+        color: ITEMS[type].glow,
         transparent: true,
         opacity: 0.35,
         blending: THREE.AdditiveBlending,

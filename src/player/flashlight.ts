@@ -6,6 +6,7 @@ const RECHARGE_PER_SEC = 0.8; // passive trickle while off...
 const RECHARGE_CAP = 25; // ...but only up to this — real charge comes from batteries
 const LOW_BATTERY_THRESHOLD = 20;
 const FULL_INTENSITY = 22;
+const BEAM_SWAY = 1.15; // beam offset per radian of look change
 
 export class Flashlight {
   readonly light: THREE.SpotLight;
@@ -15,6 +16,8 @@ export class Flashlight {
   private flickerTimer = 0;
   private flickerValue = 1;
   private sway = new THREE.Vector2();
+  /** Scales battery drain (difficulty). */
+  drainMultiplier = 1;
   onToggle: ((on: boolean) => void) | null = null;
 
   constructor(camera: THREE.Camera) {
@@ -46,10 +49,10 @@ export class Flashlight {
     this.onToggle?.(this.on);
   }
 
-  /** lookDX/lookDY are this frame's mouse deltas — the beam lags slightly behind the view. */
-  update(dt: number, lookDX: number, lookDY: number): void {
+  /** `turn`/`tilt` are this frame's look change in radians — the beam lags slightly behind the view. */
+  update(dt: number, turn: number, tilt: number): void {
     if (this.on) {
-      this.battery = Math.max(0, this.battery - DRAIN_PER_SEC * dt);
+      this.battery = Math.max(0, this.battery - DRAIN_PER_SEC * this.drainMultiplier * dt);
       if (this.battery === 0) {
         this.on = false;
         this.onToggle?.(false);
@@ -59,8 +62,8 @@ export class Flashlight {
     }
 
     // Beam sway: drift opposite to mouse motion, spring back to centre.
-    this.sway.x += -lookDX * 0.0025;
-    this.sway.y += lookDY * 0.0025;
+    this.sway.x -= turn * BEAM_SWAY;
+    this.sway.y += tilt * BEAM_SWAY;
     this.sway.multiplyScalar(Math.exp(-dt * 7));
     this.sway.clampLength(0, 0.9);
     this.target.position.set(this.sway.x, this.sway.y, -6);

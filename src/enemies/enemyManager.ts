@@ -1,6 +1,7 @@
 import * as THREE from "three";
-import { Enemy, type Perception } from "./enemy";
-import { hasLineOfSight, type EnemySpawn, type LevelData } from "../world/level";
+import { Enemy, NO_MODIFIERS, type EnemyModifiers, type Perception } from "./enemy";
+import { hasLineOfSight, type LevelGrid } from "../world/grid";
+import type { EnemySpawn } from "../world/levelParser";
 
 export interface EnemyHit {
   enemy: Enemy;
@@ -14,10 +15,11 @@ export class EnemyManager {
 
   constructor(
     scene: THREE.Scene,
-    private readonly level: LevelData,
-    spawns: EnemySpawn[]
+    private readonly level: LevelGrid,
+    spawns: EnemySpawn[],
+    modifiers: EnemyModifiers = NO_MODIFIERS
   ) {
-    for (const s of spawns) this.enemies.push(new Enemy(scene, s.pos, s.kind));
+    for (const s of spawns) this.enemies.push(new Enemy(scene, s.pos, s.kind, modifiers));
   }
 
   update(dt: number, perception: Perception): void {

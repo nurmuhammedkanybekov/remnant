@@ -1,7 +1,6 @@
 import * as THREE from "three";
-import type { Input } from "../core/input";
-import type { Settings } from "../core/settings";
-import { resolveCollision, type LevelData } from "../world/level";
+import { resolveCollision, type LevelGrid } from "../world/grid";
+import type { PlayerCommand } from "./command";
 import { Health } from "./health";
 import { Flashlight } from "./flashlight";
 
@@ -10,7 +9,6 @@ const SPRINT_SPEED = 5.8;
 const CROUCH_SPEED = 1.7;
 const ACCEL = 14;
 const RADIUS = 0.35;
-const BASE_SENSITIVITY = 0.0022;
 const STAND_HEIGHT = 1.7;
 const CROUCH_HEIGHT = 1.05;
 export const MAX_STAMINA = 100;
@@ -32,6 +30,8 @@ export class PlayerController {
   private exhausted = false;
   private yaw = 0;
   private pitch = 0;
+  /** This frame's look change in radians (turn right +, tilt down +), for weapon and beam sway. */
+  readonly lookDelta = new THREE.Vector2();
   private velocity = new THREE.Vector2();
   private eyeHeight = STAND_HEIGHT;
   private bobPhase = 0;
@@ -44,10 +44,9 @@ export class PlayerController {
 
   constructor(
     private readonly camera: THREE.PerspectiveCamera,
-    private readonly level: LevelData,
+    private readonly level: LevelGrid,
     start: THREE.Vector2,
-    yaw: number,
-    private readonly settings: Settings
+    yaw: number
   ) {
     this.camera.rotation.order = "YXZ";
     this.position.set(start.x, STAND_HEIGHT, start.y);
@@ -85,30 +84,23 @@ export class PlayerController {
     this.recoil += amount;
   }
 
-  update(dt: number, input: Input): void {
+  update(dt: number, cmd: PlayerCommand): void {
     this.health.update(dt);
 
     // --- Look ---
-    const sens = BASE_SENSITIVITY * this.settings.sensitivity;
-    if (input.locked) {
-      this.yaw -= input.mouseDeltaX * sens;
-      this.pitch -= input.mouseDeltaY * sens * (this.settings.invertY ? -1 : 1);
-      this.pitch = THREE.MathUtils.clamp(this.pitch, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
-    }
+    this.lookDelta.set(cmd.turn, cmd.tilt);
+    this.yaw -= cmd.turn;
+    this.pitch = THREE.MathUtils.clamp(this.pitch - cmd.tilt, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
 
-    // --- Move intent ---
-    let mx = 0;
-    let mz = 0;
-    if (input.isDown("KeyW") || input.isDown("ArrowUp")) mz -= 1;
-    if (input.isDown("KeyS") || input.isDown("ArrowDown")) mz += 1;
-    if (input.isDown("KeyA") || input.isDown("ArrowLeft")) mx -= 1;
-    if (input.isDown("KeyD") || input.isDown("ArrowRight")) mx += 1;
+    // --- Move intent (mz is negative forward, matching camera space) ---
+    let mx = THREE.MathUtils.clamp(cmd.moveX, -1, 1);
+    let mz = -THREE.MathUtils.clamp(cmd.moveY, -1, 1);
     const wantsMove = mx !== 0 || mz !== 0;
-    const crouching = input.isDown("KeyC") || input.isDown("ControlLeft");
+    const crouching = cmd.crouch;
 
     if (this.stamina <= 0) this.exhausted = true;
     if (this.exhausted && this.stamina >= EXHAUSTED_UNTIL) this.exhausted = false;
-    const sprinting = (input.isDown("ShiftLeft") || input.isDown("ShiftRight")) && wantsMove && mz < 0 && !crouching && !this.exhausted;
+    const sprinting = cmd.sprint && wantsMove && mz < 0 && !crouching && !this.exhausted;
 
     this.stamina = sprinting
       ? Math.max(0, this.stamina - STAMINA_DRAIN_PER_SEC * dt)
@@ -170,8 +162,8 @@ export class PlayerController {
     this.recoil = Math.max(0, this.recoil - dt * this.recoil * 7 - dt * 0.02);
     this.trauma = Math.max(0, this.trauma - dt * 1.6);
 
-    if (input.wasJustPressed("KeyF")) this.flashlight.toggle();
-    this.flashlight.update(dt, input.locked ? input.mouseDeltaX : 0, input.locked ? input.mouseDeltaY : 0);
+    if (cmd.toggleFlashlight) this.flashlight.toggle();
+    this.flashlight.update(dt, cmd.turn, cmd.tilt);
 
     this.applyCamera(performance.now() / 1000);
   }

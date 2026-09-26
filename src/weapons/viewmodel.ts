@@ -135,21 +135,13 @@ export class Viewmodel {
     this.root.visible = v;
   }
 
-  update(
-    dt: number,
-    lookDX: number,
-    lookDY: number,
-    moveFactor: number,
-    sprinting: boolean,
-    reloadProgress: number,
-    torchLevel: number
-  ): void {
+  update(dt: number, turn: number, tilt: number, moveFactor: number, sprinting: boolean, reloadProgress: number, torchLevel: number): void {
     this.root.position.copy(this.camera.getWorldPosition(new THREE.Vector3()));
     this.root.quaternion.copy(this.camera.getWorldQuaternion(new THREE.Quaternion()));
 
-    // Sway lags behind mouse motion
-    this.sway.x += lookDX * 0.00012;
-    this.sway.y += lookDY * 0.00012;
+    // Sway lags behind look motion (turn/tilt in radians).
+    this.sway.x += turn * 0.055;
+    this.sway.y += tilt * 0.055;
     this.sway.multiplyScalar(Math.exp(-dt * 9));
     this.sway.clampLength(0, 0.05);
 
