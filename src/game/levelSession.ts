@@ -55,6 +55,8 @@ const MELEE_FACING = Math.cos(THREE.MathUtils.degToRad(50));
 const RESTOCK_RADIUS = 40;
 const RESTOCK_TIME = 25;
 const AMMO_LABEL: Record<WeaponId, string> = { pistol: "ROUNDS", rivet: "RIVETS", shotgun: "SHELLS" };
+/** The boss stops summoning while this many of its brood are still alive. */
+const MAX_BROOD = 12;
 /** Co-op: player states go out this often, creature snapshots (host) this often. */
 const STATE_INTERVAL = 1 / 20;
 const SNAPSHOT_INTERVAL = 1 / 15;
@@ -513,6 +515,10 @@ export class LevelSession {
 
   /** The mass births a swarm (and later, a husk) between itself and the player. */
   private handleSummon(boss: RemnantBoss): void {
+    // A long fight mustn't pile up an endless horde: it only calls for more while few of its brood are left.
+    let alive = 0;
+    for (const e of this.brood) if (!e.isDead) alive++;
+    if (alive >= MAX_BROOD) return;
     const b = boss.position2D;
     const toward = this.player.position2D.sub(b).normalize();
     const base = b.clone().addScaledVector(toward, boss.stats.radius + 1.6);

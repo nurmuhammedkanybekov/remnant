@@ -477,8 +477,10 @@ after — and 35% while shut.
 | 3              | 0.7 s wind-up             | 5-glob fan, 2.6 s   | 4 rats and a husk every 10 s |
 
 Entering a new phase it screams (every creature on the level hears it),
-opens its core for 3.5 s and summons at once. The exit is sealed until it
-dies; when it does, everything it birthed dies with it. The player can't
+opens its core for 3.5 s and summons at once. It holds back while 12 or
+more of its brood are still alive, so a long fight never piles up an
+endless horde. The exit is sealed until it dies; when it does, everything
+it birthed dies with it. The player can't
 walk into it.
 
 Hits the hide soaks get a small grey hit marker and a dull impact sound
