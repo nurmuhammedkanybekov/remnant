@@ -42,13 +42,15 @@ src/
 │   ├── menuBackdrop.ts        The live 3D scene behind the main menu
 │   ├── save.ts                Versioned save data: campaign checkpoint, unlocks, best times
 │   ├── remotePlayer.ts        Co-op: the other player's figure, headlamp and footsteps
+│   ├── characterModel.ts      The partner's body, built for each character look
 │   ├── loadout.ts             What carries between levels
 │   └── stats.ts               Run statistics
 ├── content/                   Game data — balancing is a data change, not a code change
 │   ├── enemies.ts             Enemy definitions and map glyphs
 │   ├── weapons.ts             Weapon definitions
 │   ├── items.ts               Pickup amounts and glow colours
-│   └── difficulty.ts          Difficulty modes
+│   ├── difficulty.ts          Difficulty modes
+│   └── characters.ts          Character looks (cosmetic)
 ├── core/
 │   ├── engine.ts              Renderer, tone mapping, post-processing, world + viewmodel scenes
 │   ├── input.ts               Raw keyboard / mouse / wheel / gamepad / pointer-lock state
@@ -90,7 +92,7 @@ src/
 ├── fx/                        Procedural canvas textures, particles
 ├── audio/soundManager.ts      Synth SFX, stereo panning, wall muffling, reverb, ambience
 ├── audio/music.ts             Adaptive in-level music: layers and intensity
-└── ui/                        HUD, menus, styles
+└── ui/                        HUD, menus, inventory, styles
 ```
 
 Unit tests live next to the code they cover (`*.test.ts`).
@@ -127,7 +129,7 @@ title ──any key──► menu ──New Game / Chapters──► difficulty 
   │                                               ▼ │
   └──────────────Quit───────────────────────── paused ──Restart──► playing
 playing ──health 0──► dead ──Retry──► playing (same level, same starting loadout)
-                          └─(Ironman)──► run over, save deleted ──► menu
+                          └─(Ironman, Aizi)──► run over, save deleted ──► menu
 ```
 
 - A **loading screen** is plain HTML, so it shows before any script runs;
@@ -170,22 +172,22 @@ Per playing frame, `Game` builds a `PlayerCommand` and calls
 
 ### Difficulty (`content/difficulty.ts`)
 
-|                                       | Story   | Normal  | Nightmare | Ironman |
-| ------------------------------------- | ------- | ------- | --------- | ------- |
-| Extra creatures per level             | —       | +60%    | +100%     | +60%    |
-| Enemy health                          | ×0.7    | ×1      | ×1.35     | ×1      |
-| Enemy damage                          | ×0.5    | ×1.25   | ×1.75     | ×1.25   |
-| Enemy sight & hearing                 | ×0.75   | ×1.1    | ×1.3      | ×1.1    |
-| Enemy chase speed                     | ×0.9    | ×1.1    | ×1.2      | ×1.1    |
-| Pickup amounts                        | ×1.5    | ×1      | ×0.75     | ×1      |
-| Flashlight drain                      | ×0.6    | ×1      | ×1.3      | ×1      |
-| Starting reserve ammo                 | 32      | 16      | 8         | 16      |
-| Starting medkits                      | 2       | 1       | 0         | 1       |
-| Health / battery floor between levels | 70 / 50 | 40 / 30 | 25 / 20   | 40 / 30 |
-| Lives                                 | ∞       | ∞       | ∞         | **1**   |
+|                                       | Story   | Normal  | Nightmare | Ironman | Aizi    |
+| ------------------------------------- | ------- | ------- | --------- | ------- | ------- |
+| Extra creatures per level             | —       | +80%    | +130%     | +80%    | +180%   |
+| Enemy health                          | ×0.7    | ×1      | ×1.35     | ×1      | ×1.6    |
+| Enemy damage                          | ×0.5    | ×1.25   | ×1.75     | ×1.25   | ×2.2    |
+| Enemy sight & hearing                 | ×0.75   | ×1.1    | ×1.3      | ×1.1    | ×1.5    |
+| Enemy chase speed                     | ×0.9    | ×1.1    | ×1.2      | ×1.1    | ×1.3    |
+| Pickup amounts                        | ×1.5    | ×1      | ×0.75     | ×1      | ×0.6    |
+| Flashlight drain                      | ×0.6    | ×1      | ×1.3      | ×1      | ×1.5    |
+| Starting reserve ammo                 | 32      | 16      | 8         | 16      | 6       |
+| Starting medkits                      | 2       | 1       | 0         | 1       | 0       |
+| Health / battery floor between levels | 70 / 50 | 40 / 30 | 25 / 20   | 40 / 30 | 15 / 15 |
+| Lives                                 | ∞       | ∞       | ∞         | **1**   | **1**   |
 
 **Extra creatures** (`world/reinforcements.ts`) come on top of each level's
-hand-placed ones: that fraction of its own count (at most 10 more), plus
+hand-placed ones: that fraction of its own count, a small level counting as four (at most 14 more), plus
 another +40% in co-op, where creatures also have ×1.3 health. Placement is
 seeded by the level and amount, so it's the same every time (and for both
 co-op players, and checkpoint indices stay valid): only kinds already on the
@@ -511,6 +513,14 @@ agitated. A hit flashes the whole body. Procedural walk cycles are driven by
 actual speed, with wind-up and strike poses, hit flinches, and a collapse on
 death (a Crawler killed on the ceiling falls first).
 
+Every humanoid also carries the details that make it unpleasant up close: a
+long skull under a heavy brow, sunken sockets whose glow flares when it's
+hunting, rows of teeth in front of a dark gullet with one cheek torn open,
+ribs through split flanks, a knotted spine and shoulder blades, glowing
+growths (placed by a seed per kind), and long fingers with hooked claws. It
+breathes, its jaw chatters while it hunts, and every few seconds the neck
+spasms, snapping the head sideways — each creature on its own rhythm.
+
 ---
 
 ## 9. Items
@@ -613,6 +623,14 @@ the chase over 0.8–0.97. Death cuts the music; a new level starts calm.
   Backspace clears; a key moved to a new action is removed from its old one),
   death with run stats, level complete with stats and "new best", victory with
   run totals.
+- **Inventory** (`ui/inventory.ts`; Tab or I, the gamepad's View): three
+  tabs. _Equipment_ — health, battery, medkits (one can be used from here),
+  the keycard, every weapon with its magazine and reserve, and the
+  objective. _Journal_ — every note ever found, newest level first, read on
+  a sheet of paper; the journal lives in the save (`progress.notes`), so it
+  survives runs. _Radio log_ — every line heard on this level. It pauses
+  the game offline; online the world keeps going. Esc, the inventory key or
+  Back closes it.
 
 ---
 
@@ -632,6 +650,13 @@ become orange/blue). All validated field by field on load.
 
 Resolution and film effects apply at once; lights, bump maps and dust from
 the next level loaded.
+
+**Character look** (`content/characters.ts`, Settings → Character): a
+light-skinned man, a dark-skinned man or a woman. Purely cosmetic. It sets
+the skin tone of your own first-person hands, and in co-op it travels with
+your position updates, so your partner sees you as you chose
+(`game/characterModel.ts` builds the figure: face, hair, beard, build,
+coverall colour).
 
 ### Gamepad
 

@@ -158,11 +158,10 @@ export function buildCharacter(look: LookDef): CharacterParts {
   }
   if (look.beard) {
     // A short beard along the jaw and chin.
-    const beard = new THREE.SphereGeometry(0.079, 14, 8, Math.PI * 0.15, Math.PI * 0.7, Math.PI * 0.5, Math.PI * 0.32);
+    // The face is towards -Z, which is phi = 1.5π on a sphere.
+    const beard = new THREE.SphereGeometry(0.079, 14, 8, Math.PI * 1.12, Math.PI * 0.76, Math.PI * 0.5, Math.PI * 0.32);
     beard.scale(1.08, 1.05, 1.08);
-    const m = mesh(beard, hair, 0, 0.085, -0.018);
-    m.rotation.y = Math.PI / 2;
-    head.add(m);
+    head.add(mesh(beard, hair, 0, 0.085, -0.018));
   }
   const hat = new THREE.SphereGeometry(0.135, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
   hat.scale(1, 0.82, 1.12);
