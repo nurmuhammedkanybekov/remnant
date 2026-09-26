@@ -1,3 +1,4 @@
+import { BUILD_ID } from "../net/build";
 import { MusicDirector } from "../audio/music";
 import { SoundManager } from "../audio/soundManager";
 import { DIFFICULTIES, type DifficultyDef, type DifficultyId } from "../content/difficulty";
@@ -556,7 +557,8 @@ export class Game {
         "CO-OP",
         "TWO PLAYERS · ONLINE",
         "One of you hosts and picks the sublevel; the other joins with the host's room code.\nYou leave each sublevel together — and when one of you goes down, the other has 45 seconds to get them back up.\n" +
-          relay,
+          relay +
+          ` · build ${BUILD_ID}`,
         [
           { label: "Host a Game", primary: true, action: () => this.showCoopChapters() },
           { label: "Join a Game", action: () => this.showJoin() },
@@ -602,7 +604,7 @@ export class Game {
     this.screens.lobby(
       "HOST",
       "ROOM CODE",
-      `${note}Send this code to your partner.\nWaiting for them to join…`,
+      `${note}Send this code to your partner.\nWaiting for them to join…\n(build ${BUILD_ID})`,
       [{ label: "Cancel", action: () => this.showCoopMenu() }],
       code
     );
@@ -629,7 +631,17 @@ export class Game {
       showStep("setting up");
     };
     link.onStatus = (step) => {
-      if (joining && !link.open && this.link === link) showStep(step);
+      if (link.open || this.link !== link) return;
+      // Before anyone knocks, only show trouble with the room itself (e.g. matchmaking dropping).
+      if (joining) showStep(step);
+      else if (step !== "room open, waiting")
+        this.screens.lobby(
+          "HOST",
+          "ROOM CODE",
+          `Send this code to your partner.\nWaiting for them to join…\n(${step} · build ${BUILD_ID})`,
+          [{ label: "Cancel", action: () => this.showCoopMenu() }],
+          code
+        );
     };
     link.onOpen = () => void this.hostReady(link, code, level, difficulty);
     return code;
@@ -743,7 +755,10 @@ export class Game {
     }
     // For failed connections, add how far it got — a screenshot of this pins the problem down.
     const text =
-      describeClose(reason) + (["timeout", "no-answer", "lost", "closed"].includes(reason) ? `\n(Last step: ${link.lastStep}.)` : "");
+      describeClose(reason) +
+      (["timeout", "no-answer", "lost", "closed"].includes(reason)
+        ? `\n\nWhat happened (build ${BUILD_ID}):\n${link.log.slice(-5).join("\n")}`
+        : "");
     const playing = this.run?.coop && this.state !== "menu" && this.state !== "title";
     if (!playing) {
       this.screens.lobby("CO-OP", "NOT CONNECTED", text, [{ label: "Back", primary: true, action: () => this.showCoopMenu() }]);

@@ -1,6 +1,7 @@
+import { BUILD_ID } from "./build";
 import { iceConfig, iceServers, lastRelayState } from "./ice";
 import { roomPeerId } from "./protocol";
-import { steadyInterval } from "./timer";
+import { steadyInterval, steadyTimeout } from "./timer";
 import { MeteredSignaling, realtimeKey } from "./meteredSignaling";
 import { DEFAULT_SIGNAL_URL, Signaling, type SignalMessage } from "./signaling";
 
@@ -58,13 +59,16 @@ export const CLOSE_REASONS: Record<string, string> = {
   timeout:
     "Couldn't connect to the other player. Some networks (school, office, some mobile data) block direct connections between browsers — try another network, or turn on the free relay (see the README).",
   unsupported: "This browser can't make direct connections (WebRTC). Try an up-to-date Chrome, Edge or Firefox.",
-  version: "The other player is running a different version of REMNANT. Both refresh the page and try again.",
+  version:
+    "You and your partner have different copies of REMNANT (one is an older one saved by the browser). Both press Ctrl+Shift+R (or Cmd+Shift+R) to reload, then try again.",
   left: "The other player left the game.",
   lost: "The connection to the other player was lost.",
 };
 
 interface Offer {
   sdp: RTCSessionDescriptionInit;
+  /** The guest's build; the host turns away a different one. */
+  build?: string;
 }
 
 export class PeerLink {
@@ -81,6 +85,9 @@ export class PeerLink {
   onStatus: ((step: string) => void) | null = null;
   /** The last step reached (see `onStatus`). */
   lastStep = "starting";
+  /** Every step with its time, for the failure screen. */
+  readonly log: string[] = [];
+  private readonly t0 = performance.now();
   private answered = false;
   /** Host: the answer sent to the current guest, to repeat if they knock again. */
   private lastAnswer: { sdp: RTCSessionDescriptionInit } | null = null;
@@ -95,6 +102,8 @@ export class PeerLink {
   private timers: number[] = [];
   private lastHeard = 0;
   private stopPing: (() => void) | null = null;
+  /** Steady timers to cancel on close. */
+  private readonly stops: (() => void)[] = [];
   private closed = false;
   private isOpen = false;
 
@@ -110,8 +119,8 @@ export class PeerLink {
       !signalUrl && key
         ? new MeteredSignaling(id, roomPeerId(code), key, role === "guest")
         : new Signaling(id, signalUrl ?? DEFAULT_SIGNAL_URL);
-    this.signaling.onOpen = () => {
-      this.status(role === "host" ? "room open, waiting" : "room found");
+    this.signaling.onOpen = (reconnected: boolean) => {
+      this.status(reconnected ? "matchmaking reconnected" : role === "host" ? "room open, waiting" : "matchmaking connected");
       // A guest calls the host once; after a reconnection mid-handshake the call already under way carries on.
       if (role === "guest" && !this.remoteId) void this.call();
     };
@@ -139,7 +148,7 @@ export class PeerLink {
       return;
     }
     this.signaling.connect();
-    if (this.role === "guest") this.timers.push(window.setTimeout(() => !this.isOpen && this.close("timeout"), CONNECT_TIMEOUT_MS));
+    if (this.role === "guest") this.stops.push(steadyTimeout(CONNECT_TIMEOUT_MS, () => !this.isOpen && this.close("timeout")));
   }
 
   /** Sends a message. `fast` ones may be dropped; everything else arrives in order. */
@@ -159,6 +168,7 @@ export class PeerLink {
     // Tell the other side straight away rather than letting it time out.
     if (reason === "left") this.send({ t: "bye" });
     this.timers.forEach((t) => window.clearTimeout(t));
+    this.stops.forEach((stop) => stop());
     this.stopPing?.();
     this.signaling.close();
     this.reliable?.close();
@@ -210,7 +220,7 @@ export class PeerLink {
     };
     // Host: a guest that never gets through mustn't hold the room.
     if (this.role === "host")
-      this.timers.push(window.setTimeout(() => this.pc === pc && !this.isOpen && this.dropPending(), CONNECT_TIMEOUT_MS));
+      this.stops.push(steadyTimeout(CONNECT_TIMEOUT_MS, () => this.pc === pc && !this.isOpen && this.dropPending()));
     pc.ondatachannel = (e) => this.adopt(e.channel);
     return pc;
   }
@@ -264,19 +274,30 @@ export class PeerLink {
     await gathered(pc);
     if (this.closed) return;
     this.status(`asking the host (${describeCandidates(pc.localDescription?.sdp)})`);
-    const send = () => this.signaling.send(this.remoteId!, "OFFER", { sdp: pc.localDescription!.toJSON() } satisfies Offer);
+    const send = () =>
+      this.signaling.send(this.remoteId!, "OFFER", { sdp: pc.localDescription!.toJSON(), build: BUILD_ID } satisfies Offer);
     send();
     // No answer yet: keep knocking, then conclude nobody is hosting this code.
-    const retry = window.setInterval(() => {
-      if (this.answered || this.closed) return window.clearInterval(retry);
+    const stopRetry = steadyInterval(ANSWER_RETRY_MS, () => {
+      if (this.answered || this.closed) return stopRetry();
       this.status(`asking the host again (${describeCandidates(pc.localDescription?.sdp)})`);
       send();
-    }, ANSWER_RETRY_MS);
-    this.timers.push(retry);
-    this.timers.push(window.setTimeout(() => !this.answered && !this.isOpen && this.close("no-answer"), ANSWER_TIMEOUT_MS));
+    });
+    this.stops.push(stopRetry);
+    this.stops.push(steadyTimeout(ANSWER_TIMEOUT_MS, () => !this.answered && !this.isOpen && this.close("no-answer")));
   }
 
   private async onSignal(m: SignalMessage): Promise<void> {
+    try {
+      await this.handleSignal(m);
+    } catch (e) {
+      // Never get stuck silently: say what broke, and let the next knock start afresh.
+      this.status(`error while ${m.type === "OFFER" ? "answering" : "connecting"}: ${(e as Error)?.message ?? e}`);
+      if (this.role === "host") this.dropPending();
+    }
+  }
+
+  private async handleSignal(m: SignalMessage): Promise<void> {
     const payload = (m.payload ?? {}) as Record<string, unknown>;
     switch (m.type) {
       case "OFFER": {
@@ -289,6 +310,12 @@ export class PeerLink {
           }
           // Someone else is already in (or on their way in): turn the newcomer away.
           this.signaling.send(m.src, "ANSWER", { full: true });
+          return;
+        }
+        const offer = payload as unknown as Offer;
+        if (offer.build && offer.build !== BUILD_ID) {
+          this.status(`turned away a different build (${offer.build}, this is ${BUILD_ID})`);
+          this.signaling.send(m.src, "ANSWER", { version: true, build: BUILD_ID });
           return;
         }
         this.onJoining?.();
@@ -309,6 +336,7 @@ export class PeerLink {
       case "ANSWER": {
         if (this.role !== "guest" || !this.pc || this.answered) return;
         if (payload.full) return this.close("full");
+        if (payload.version) return this.close("version");
         this.answered = true;
         this.status(`host answered (${describeCandidates((payload.sdp as RTCSessionDescriptionInit | undefined)?.sdp)}), connecting`);
         await this.pc.setRemoteDescription(payload.sdp as RTCSessionDescriptionInit);
@@ -331,6 +359,8 @@ export class PeerLink {
 
   private status(step: string): void {
     this.lastStep = step;
+    this.log.push(`${((performance.now() - this.t0) / 1000).toFixed(1)}s ${step}`);
+    if (this.log.length > 30) this.log.shift();
     this.onStatus?.(step);
   }
 
@@ -353,18 +383,28 @@ export class PeerLink {
   }
 }
 
-/** Wait (briefly) until the connection has found its network routes, so they all go out in one message. */
-function gathered(pc: RTCPeerConnection, maxMs = 4000): Promise<void> {
+/**
+ * Wait (briefly) until the connection has found its network routes, so they
+ * all go out in one message. Relay routes often never report "done", so the
+ * time limit is what usually ends this — and it runs on a steady timer,
+ * because the host is often in a background tab where ordinary timers are
+ * delayed by up to a minute.
+ */
+function gathered(pc: RTCPeerConnection, maxMs = 3000): Promise<void> {
   if (pc.iceGatheringState === "complete") return Promise.resolve();
   return new Promise((resolve) => {
+    let cancel: () => void = () => {};
     const done = () => {
-      clearTimeout(timer);
+      cancel();
       pc.removeEventListener("icegatheringstatechange", check);
+      pc.removeEventListener("icecandidate", end);
       resolve();
     };
     const check = () => pc.iceGatheringState === "complete" && done();
-    const timer = setTimeout(done, maxMs);
+    const end = (e: RTCPeerConnectionIceEvent) => !e.candidate && done();
+    cancel = steadyTimeout(maxMs, done);
     pc.addEventListener("icegatheringstatechange", check);
+    pc.addEventListener("icecandidate", end);
   });
 }
 
