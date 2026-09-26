@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { textures } from "../fx/textures";
+import { textures, type Surface } from "../fx/textures";
 import { CELL_SIZE, WALL_HEIGHT, cellCenter, isSolid, type Cell } from "./grid";
 import type { ParsedLevel } from "./levelParser";
 import { resolveTheme } from "./theme";
@@ -18,6 +18,54 @@ export interface LevelData extends ParsedLevel {
   exitLight: THREE.PointLight;
 }
 
+/**
+ * Material maps for a surface, repeated `rx` × `ry` times. `detail` (a
+ * quality option) turns on normal maps — or, for a painted surface, a bump
+ * map from its colour.
+ */
+function surfaceMaps(s: Surface, detail: boolean, rx = 1, ry = 1): Partial<THREE.MeshStandardMaterialParameters> {
+  const rep = (t: THREE.Texture | null) => {
+    if (!t || (rx === 1 && ry === 1)) return t;
+    const c = t.clone();
+    c.repeat.set(rx, ry);
+    c.needsUpdate = true;
+    return c;
+  };
+  const map = rep(s.map);
+  return {
+    map,
+    normalMap: detail ? rep(s.normalMap) : null,
+    bumpMap: detail && !s.normalMap ? map : null,
+    roughnessMap: rep(s.roughnessMap),
+  };
+}
+
+/**
+ * Every wall block shares one texture, so without help the same stains line
+ * up on every face. This picks one of four variants per face — mirrored
+ * and/or shifted half a texture sideways, which keeps the panel seams on
+ * the seams — from a hash of the block's position and the face's direction.
+ */
+function varyPanels(mat: THREE.MeshStandardMaterial): void {
+  const uvs = ["vMapUv", "vNormalMapUv", "vRoughnessMapUv", "vBumpMapUv"];
+  const defines = ["USE_MAP", "USE_NORMALMAP", "USE_ROUGHNESSMAP", "USE_BUMPMAP"];
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <uv_vertex>",
+      `#include <uv_vertex>
+      #ifdef USE_INSTANCING
+      {
+        vec3 cell = floor(instanceMatrix[3].xyz + normal * 0.5);
+        float h = fract(sin(dot(cell.xz, vec2(12.9898, 78.233)) + normal.x * 3.1 + normal.z * 5.7) * 43758.5453);
+        float flip = step(0.5, h);
+        float shift = step(0.5, fract(h * 4.0)) * 0.5;
+        ${uvs.map((v, i) => `#ifdef ${defines[i]}\n        ${v}.x = mix(${v}.x, 1.0 - ${v}.x, flip) + shift;\n        #endif`).join("\n        ")}
+      }
+      #endif`
+    );
+  };
+}
+
 /** Builds a parsed level's geometry, props, lamps and exit into `scene`. `bumpMaps` is a quality option. */
 export function buildLevel(scene: THREE.Scene, level: ParsedLevel, bumpMaps = true): LevelData {
   const lampFixtures = buildGeometry(scene, level, bumpMaps);
@@ -34,12 +82,12 @@ function buildGeometry(scene: THREE.Scene, level: ParsedLevel, bumpMaps: boolean
   const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
   const wallMat = new THREE.MeshStandardMaterial({
     color: theme.wallTint,
-    map: tex.wall,
-    bumpMap: bumpMaps ? tex.wall : null,
+    ...surfaceMaps(tex.wall, bumpMaps),
     bumpScale: 1.2,
-    roughness: 0.92,
+    roughness: tex.wall.roughnessMap ? 1 : 0.92,
     metalness: 0.05,
   });
+  varyPanels(wallMat);
   const wallMesh = new THREE.InstancedMesh(wallGeo, wallMat, walls.length);
   const dummy = new THREE.Object3D();
   walls.forEach((pos, i) => {
@@ -55,15 +103,11 @@ function buildGeometry(scene: THREE.Scene, level: ParsedLevel, bumpMaps: boolean
   const width = level.cols * CELL_SIZE;
   const depth = level.rows * CELL_SIZE;
 
-  const floorTex = tex.floor.clone();
-  floorTex.repeat.set(level.cols, level.rows);
-  floorTex.needsUpdate = true;
   const floorMat = new THREE.MeshStandardMaterial({
     color: theme.floorTint,
-    map: floorTex,
-    bumpMap: bumpMaps ? floorTex : null,
+    ...surfaceMaps(tex.floor, bumpMaps, level.cols, level.rows),
     bumpScale: 0.8,
-    roughness: 0.75,
+    roughness: tex.floor.roughnessMap ? 0.9 : 0.75,
     metalness: 0.15,
   });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), floorMat);
@@ -71,10 +115,12 @@ function buildGeometry(scene: THREE.Scene, level: ParsedLevel, bumpMaps: boolean
   floor.position.set(width / 2, 0, depth / 2);
   scene.add(floor);
 
-  const ceilTex = tex.ceiling.clone();
-  ceilTex.repeat.set(level.cols * 2, level.rows * 2);
-  ceilTex.needsUpdate = true;
-  const ceilMat = new THREE.MeshStandardMaterial({ map: ceilTex, roughness: 1 });
+  // The photo ceiling holds a whole cell's tiles; the painted one a quarter.
+  const ceilPerCell = tex.ceiling.photo ? 1 : 2;
+  const ceilMat = new THREE.MeshStandardMaterial({
+    ...surfaceMaps(tex.ceiling, bumpMaps, level.cols * ceilPerCell, level.rows * ceilPerCell),
+    roughness: 1,
+  });
   const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), ceilMat);
   ceiling.rotation.x = Math.PI / 2;
   ceiling.position.set(width / 2, WALL_HEIGHT, depth / 2);
@@ -82,7 +128,7 @@ function buildGeometry(scene: THREE.Scene, level: ParsedLevel, bumpMaps: boolean
 
   // Crate stacks
   if (crates.length) {
-    const crateMat = new THREE.MeshStandardMaterial({ map: tex.crate, roughness: 0.9 });
+    const crateMat = new THREE.MeshStandardMaterial({ ...surfaceMaps(tex.crate, bumpMaps), roughness: 0.9 });
     const crateGeo = new THREE.BoxGeometry(1.8, 1.8, 1.8);
     const perCell = 5;
     const crateMesh = new THREE.InstancedMesh(crateGeo, crateMat, crates.length * perCell);
@@ -108,7 +154,7 @@ function buildGeometry(scene: THREE.Scene, level: ParsedLevel, bumpMaps: boolean
 
   // Barrel clusters
   if (barrels.length) {
-    const barrelMat = new THREE.MeshStandardMaterial({ map: tex.barrel, roughness: 0.6, metalness: 0.4 });
+    const barrelMat = new THREE.MeshStandardMaterial({ ...surfaceMaps(tex.barrel, bumpMaps), roughness: 0.8, metalness: 0.4 });
     const barrelGeo = new THREE.CylinderGeometry(0.55, 0.55, 1.5, 16);
     const barrelMesh = new THREE.InstancedMesh(barrelGeo, barrelMat, barrels.length * 4);
     let i = 0;
@@ -199,7 +245,12 @@ function buildExit(scene: THREE.Scene, level: ParsedLevel, cell: Cell): { signMa
   group.rotation.y = Math.atan2(-d.dc, -d.dr);
 
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a2d2a, metalness: 0.7, roughness: 0.4 });
-  const doorMat = new THREE.MeshStandardMaterial({ color: 0x3b4640, metalness: 0.6, roughness: 0.5 });
+  const doorMat = new THREE.MeshStandardMaterial({
+    color: 0x3b4640,
+    ...(tex.plate ? surfaceMaps(tex.plate, true) : {}),
+    metalness: 0.6,
+    roughness: tex.plate?.roughnessMap ? 0.9 : 0.5,
+  });
   const door = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.5, 0.1), doorMat);
   door.position.set(0, 1.25, 0);
   group.add(door);

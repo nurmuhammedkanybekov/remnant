@@ -8,11 +8,12 @@ ten-level campaign. See [`STORY.md`](STORY.md) for the narrative and
 
 - **Free to build, free to host, free to play.** GitHub Pages hosting, no paid
   services. Any backend must fit a free tier.
-- **Generated in code by default.** Textures, models, music and most audio
-  are generated in code. Recordings are used only where synthesis can't
-  sound real — weapons, footsteps, creature voices, doors — and only public-domain
-  (CC0) ones, credited in `public/sfx/CREDITS.md`, each with a synthesized
-  fallback.
+- **Generated in code by default.** Models, music and most audio are
+  generated in code. Recordings are used only where synthesis can't sound
+  real — weapons, footsteps, creature voices, doors — and photo-scanned
+  materials only as the base of the big surfaces, with details painted over
+  them. Only public-domain (CC0) ones, credited in `public/sfx/CREDITS.md`
+  and `public/textures/CREDITS.md`, each with a generated fallback.
 - **Every phase ships.** Each phase ends with a playable build, green CI and
   updated docs.
 
@@ -79,6 +80,8 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] Gamepad support: play, pause and every menu, with prompts that switch
       to pad buttons
 - [x] Graphics quality presets (Low / Medium / High)
+- [x] Photo-scanned CC0 surface materials (normal and roughness mapped) with
+      the facility details painted over them, and per-face wall variation
 
 ## Phase 5 — Accounts and cloud saves (optional)
 
