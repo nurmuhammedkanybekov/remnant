@@ -9,7 +9,7 @@ import type { MusicOutput } from "./soundManager";
  *   pad      — a low cluster drone that drifts out of tune; the bed under everything
  *   texture  — bowed-metal tones and distant booms (calm exploration)
  *   tension  — a heartbeat and a high, trembling semitone cluster (something is looking for you)
- *   chase    — a pounding throb, metal clangs, a grinding bass and string screeches (something has found you)
+ *   chase    — deep drum hits, a grinding bass, metal scrapes and climbing strings (something has found you)
  *
  * All layers follow one clock, so they always fit together however they're
  * mixed. Outside a level the music is silent and the menus are left to the
@@ -171,11 +171,14 @@ export class MusicDirector {
       if (s === 0) this.strings(L.tension, root + 36, t, 16 * STEP);
     }
     if (m.chase > 0.01) {
-      if (s % 2 === 0) this.throb(L.chase, t, s % 4 === 0 ? 1 : 0.6);
-      // Grinding bass: the root against the semitone above it.
-      this.grind(L.chase, root - 12 + (s % 4 === 3 ? 1 : 0), t);
-      if ((s + bar * 3) % 5 === 0) this.clang(L.chase, t, s % 2 === 0 ? 1 : 0.6);
-      if (s === 0 && bar % 2 === 1) this.screech(L.chase, root + 36, t);
+      // Heavy drum hits on the eighths, accented on the beat.
+      if (s % 2 === 0) this.throb(L.chase, t, s % 8 === 0 ? 1 : s % 4 === 0 ? 0.75 : 0.45);
+      // Grinding bass: the root and the semitone above it at once, chopped on every sixteenth. No melody.
+      this.grind(L.chase, root - 12, t, s % 4 === 0 ? 1 : 0.6);
+      // Metal scraping somewhere in the dark, on an uneven pattern.
+      if ((s * 7 + bar * 5) % 11 === 0) this.scrape(L.chase, t);
+      // Strings that climb all bar long: dread rising, never resolving.
+      if (s === 0) this.rise(L.chase, root + 30, t, 16 * STEP);
     }
   }
 
@@ -307,58 +310,56 @@ export class MusicDirector {
     this.wobble(g.gain, 7, 0.012, t, dur + 1.5);
   }
 
-  /** The chase's pulse: a heavy, slightly overdriven low hit. */
+  /** The chase's pulse: a deep drum hit, felt more than heard. */
   private throb(dest: AudioNode, t: number, vol: number): void {
     const g = this.gain(dest);
-    this.env(g, t, 0.38 * vol, 0.003, 0.02, 0.28);
-    const o = this.osc(g, "sine", 95, t, 0.35);
-    o.frequency.setValueAtTime(95, t);
-    o.frequency.exponentialRampToValueAtTime(34, t + 0.22);
-    const lp = this.filter("lowpass", 400);
+    this.env(g, t, 0.36 * vol, 0.004, 0.03, 0.35);
+    const o = this.osc(g, "sine", 62, t, 0.45);
+    o.frequency.setValueAtTime(62, t);
+    o.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+    const lp = this.filter("lowpass", 260);
     const ng = this.gain(g);
-    ng.gain.value = 0.35;
+    ng.gain.value = 0.5;
     lp.connect(ng);
-    this.noise(lp, t, 0.08);
+    this.noise(lp, t, 0.15);
   }
 
-  private grind(dest: AudioNode, note: number, t: number): void {
+  /** Two notes a semitone apart, low and filthy, chopped short. */
+  private grind(dest: AudioNode, note: number, t: number, vol: number): void {
     const g = this.gain(dest);
-    this.env(g, t, 0.09, 0.004, 0.04, 0.1);
-    const lp = this.filter("lowpass", 700, 6);
-    lp.frequency.setValueAtTime(1100, t);
-    lp.frequency.exponentialRampToValueAtTime(180, t + 0.14);
+    this.env(g, t, 0.07 * vol, 0.006, 0.05, 0.12);
+    const lp = this.filter("lowpass", 520, 3);
     lp.connect(g);
-    this.osc(lp, "sawtooth", freq(note), t, 0.2);
-    this.osc(lp, "square", freq(note) * 1.005, t, 0.2);
+    this.osc(lp, "sawtooth", freq(note), t, 0.22);
+    this.osc(lp, "sawtooth", freq(note + 1), t, 0.22);
+    this.osc(lp, "sawtooth", freq(note - 12), t, 0.22);
   }
 
-  /** A hit on something metal: a pipe, a grate, a door. */
-  private clang(dest: AudioNode, t: number, vol: number): void {
+  /** Metal dragged across concrete: narrow bands of noise, no pitch to hum along to. */
+  private scrape(dest: AudioNode, t: number): void {
     const g = this.gain(dest);
-    this.env(g, t, 0.06 * vol, 0.002, 0, 0.5);
-    const base = 180 + Math.random() * 160;
+    this.env(g, t, 0.05, 0.08, 0.15, 0.5);
+    const base = 900 + Math.random() * 900;
     for (const [ratio, amp] of METAL_PARTIALS) {
+      const bp = this.filter("bandpass", base * ratio, 30);
       const pg = this.gain(g);
-      pg.gain.value = amp;
-      this.osc(pg, "square", base * ratio, t, 0.6);
+      pg.gain.value = amp * 2;
+      bp.connect(pg);
+      this.noise(bp, t, 0.8);
     }
-    const bp = this.filter("bandpass", 3200, 3);
-    const ng = this.gain(g);
-    ng.gain.value = 0.8;
-    bp.connect(ng);
-    this.noise(bp, t, 0.08);
   }
 
-  /** A string section screaming downwards. */
-  private screech(dest: AudioNode, note: number, t: number): void {
+  /** A trembling string cluster that creeps upward through the bar. */
+  private rise(dest: AudioNode, note: number, t: number, dur: number): void {
     const g = this.gain(dest);
-    this.env(g, t, 0.035, 0.05, 0.4, 0.9);
-    const bp = this.filter("bandpass", 2400, 1.5);
+    this.env(g, t, 0.028, dur * 0.6, dur * 0.35, 0.4);
+    const bp = this.filter("bandpass", 1300, 0.9);
     bp.connect(g);
-    for (const d of [0, 1, 6]) {
-      const o = this.osc(bp, "sawtooth", freq(note + d), t, 1.5, (Math.random() - 0.5) * 20);
+    for (const d of [0, 1, 2]) {
+      const o = this.osc(bp, "sawtooth", freq(note + d), t, dur + 0.5, (Math.random() - 0.5) * 16);
       o.frequency.setValueAtTime(freq(note + d), t);
-      o.frequency.exponentialRampToValueAtTime(freq(note + d - 4), t + 1.3);
+      o.frequency.linearRampToValueAtTime(freq(note + d + 2), t + dur);
     }
+    this.wobble(g.gain, 9, 0.014, t, dur + 0.5);
   }
 }

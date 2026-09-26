@@ -508,13 +508,18 @@ All synthesized. Chain: voice → (low-pass if a wall is between you) → stereo
 panner → dry bus + convolution reverb (generated impulse) → master →
 compressor.
 
-- **Weapon**: layered gunshot (crack, body, sub boom, shell tinkle), dry-fire
-  click, 5-stage reload matched to the animation, hit-marker thud, wall
-  ricochet.
+- **Weapon**: gunshots built like a shot in a concrete corridor: an
+  overdriven crack, body and chest punch, four early reflections off the
+  walls, a low rumble rolling away and a faint ear ring, then the slide or
+  pump cycling and casings bouncing on the floor. Bullets hitting concrete
+  crack, thud and shed grit, sometimes with a ricochet whine; hits on flesh
+  are a wet thud (with a crunch for headshots). Dry-fire click, 5-stage
+  reload matched to the animation.
 - **Player**: alternating footsteps per gait, flashlight click, hurt grunt,
   heartbeat below 40% health (faster as it drops), death drone.
 - **Enemies** (panned + distance-attenuated + muffled through walls):
-  clicking or wet breathing idles, a wavering shriek on alert, wind-up hiss,
+  clicking or wet breathing idles, a ragged throat-torn scream on alert,
+  wind-up hiss,
   hurt screech, death groan, a choked gurgle for takedowns, a thud and
   skitter when a Crawler drops, a Spitter's rising gurgle, acid sizzle, and
   the Remnant's slam and many-voiced roar. Voices are pitched per creature
@@ -538,12 +543,12 @@ dissonant clusters built from semitones and tritones (D–E♭–A, C♯–D–G
 D–F–G♯, C–C♯–F♯), so nothing ever resolves. Every sound is scheduled ahead
 on the audio clock so all layers stay in time however they are mixed:
 
-| Layer   | What it is                                                                       | Heard when                     |
-| ------- | -------------------------------------------------------------------------------- | ------------------------------ |
-| Pad     | The cluster as a low drone whose voices drift in and out of tune                 | Always, thinning under a chase |
-| Texture | Bowed and struck metal (inharmonic partials, bending flat) and distant booms     | Calm exploration               |
-| Tension | A lub-dub heartbeat on every beat, a high trembling semitone cluster             | Something is suspicious        |
-| Chase   | A pounding low throb, a grinding semitone bass, metal clangs, screeching strings | Something is hunting you       |
+| Layer   | What it is                                                                   | Heard when                     |
+| ------- | ---------------------------------------------------------------------------- | ------------------------------ |
+| Pad     | The cluster as a low drone whose voices drift in and out of tune             | Always, thinning under a chase |
+| Texture | Bowed and struck metal (inharmonic partials, bending flat) and distant booms | Calm exploration               |
+| Tension | A lub-dub heartbeat on every beat, a high trembling semitone cluster         | Something is suspicious        |
+| Chase   | Deep drum hits, a grinding semitone bass, metal scrapes, strings that climb  | Something is hunting you       |
 
 Outside levels (title, menus, results, endings) there's no music, only the
 ambient drone with its distant drips, groans and clanks.
