@@ -1,166 +1,437 @@
-import * as THREE from "three";
+/**
+ * All audio is synthesized at runtime with the Web Audio API — no sound files.
+ *
+ * Signal flow:
+ *   voice → [lowpass if behind a wall] → panner → dry bus ─┐
+ *                                               └→ reverb ─┴→ master → out
+ */
+export interface Spatial {
+  /** -1 (left) .. 1 (right) */
+  pan: number;
+  distance: number;
+  /** true if a wall is between source and listener */
+  muffled: boolean;
+}
 
-/** All sound effects are synthesized at runtime — no external audio assets. */
+const CENTER: Spatial = { pan: 0, distance: 0, muffled: false };
+
 export class SoundManager {
   private ctx: AudioContext | null = null;
-  private master: GainNode | null = null;
-  private noiseBuffer: AudioBuffer | null = null;
-  private ambientNodes: AudioNode[] = [];
+  private master!: GainNode;
+  private dry!: GainNode;
+  private reverbIn!: GainNode;
+  private noiseBuf!: AudioBuffer;
+  private heartbeatTimer = 0;
+  private ambientTimer = 4;
+  private volume = 0.8;
+  private stepFlip = false;
 
-  /** Must be called from within a user-gesture handler (browsers block audio otherwise). */
+  get ready(): boolean {
+    return this.ctx !== null;
+  }
+
+  /** Must be called from a user gesture (browsers block audio otherwise). Safe to call repeatedly. */
   init(): void {
-    if (this.ctx) return;
-    this.ctx = new AudioContext();
-    this.master = this.ctx.createGain();
-    this.master.gain.value = 0.55;
-    this.master.connect(this.ctx.destination);
-    this.noiseBuffer = this.createNoiseBuffer(1);
+    if (this.ctx) {
+      if (this.ctx.state === "suspended") void this.ctx.resume();
+      return;
+    }
+    const ctx = new AudioContext();
+    this.ctx = ctx;
+    this.master = ctx.createGain();
+    this.master.gain.value = this.volume;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -14;
+    comp.ratio.value = 4;
+    this.master.connect(comp).connect(ctx.destination);
+
+    this.dry = ctx.createGain();
+    this.dry.connect(this.master);
+
+    const convolver = ctx.createConvolver();
+    convolver.buffer = this.makeImpulse(2.4, 2.8);
+    this.reverbIn = ctx.createGain();
+    this.reverbIn.gain.value = 1;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.35;
+    this.reverbIn.connect(convolver).connect(wet).connect(this.master);
+
+    this.noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = this.noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
     this.startAmbient();
   }
 
-  private createNoiseBuffer(duration: number): AudioBuffer {
-    const ctx = this.ctx!;
-    const buffer = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-    return buffer;
+  setVolume(v: number): void {
+    this.volume = v;
+    if (this.ctx) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
   }
 
-  private noiseSource(): AudioBufferSourceNode {
+  /** Duck everything (pause menu) without losing the ambience. */
+  setPaused(paused: boolean): void {
+    if (!this.ctx) return;
+    this.master.gain.setTargetAtTime(paused ? this.volume * 0.25 : this.volume, this.ctx.currentTime, 0.1);
+  }
+
+  private makeImpulse(seconds: number, decay: number): AudioBuffer {
+    const ctx = this.ctx!;
+    const len = ctx.sampleRate * seconds;
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return buf;
+  }
+
+  /** Output chain for one voice. Returns the node to connect the voice into. */
+  private out(sp: Spatial, maxDist: number, reverb = 0.4): AudioNode | null {
+    const ctx = this.ctx!;
+    const t = Math.max(0, 1 - sp.distance / maxDist);
+    const att = t * t;
+    if (att < 0.005) return null;
+    const g = ctx.createGain();
+    g.gain.value = att;
+    let node: AudioNode = g;
+    if (sp.muffled) {
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 380;
+      g.connect(lp);
+      node = lp;
+    }
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = Math.max(-1, Math.min(1, sp.pan)) * 0.85;
+    node.connect(pan);
+    pan.connect(this.dry);
+    const send = ctx.createGain();
+    send.gain.value = reverb * (sp.muffled ? 1.5 : 1);
+    pan.connect(send).connect(this.reverbIn);
+    return g;
+  }
+
+  private noise(): AudioBufferSourceNode {
     const src = this.ctx!.createBufferSource();
-    src.buffer = this.noiseBuffer;
+    src.buffer = this.noiseBuf;
     src.loop = true;
     return src;
   }
 
-  private attenuationGain(distance: number, maxDist: number): number {
-    const t = THREE.MathUtils.clamp(1 - distance / maxDist, 0, 1);
-    return t * t;
+  private env(g: GainNode, t: number, peak: number, attack: number, decay: number): void {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
   }
 
+  private tone(
+    dest: AudioNode,
+    type: OscillatorType,
+    f0: number,
+    f1: number,
+    t: number,
+    dur: number,
+    peak: number,
+    attack = 0.005
+  ): OscillatorNode {
+    const ctx = this.ctx!;
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+    const g = ctx.createGain();
+    this.env(g, t, peak, attack, dur);
+    o.connect(g).connect(dest);
+    o.start(t);
+    o.stop(t + attack + dur + 0.05);
+    return o;
+  }
+
+  private burst(
+    dest: AudioNode,
+    filter: BiquadFilterType,
+    freq: number,
+    q: number,
+    t: number,
+    dur: number,
+    peak: number,
+    attack = 0.002
+  ): BiquadFilterNode {
+    const ctx = this.ctx!;
+    const n = this.noise();
+    const f = ctx.createBiquadFilter();
+    f.type = filter;
+    f.frequency.value = freq;
+    f.Q.value = q;
+    const g = ctx.createGain();
+    this.env(g, t, peak, attack, dur);
+    n.connect(f).connect(g).connect(dest);
+    n.start(t, Math.random() * 1.5); // random offset so bursts don't sound identical
+    n.stop(t + attack + dur + 0.05);
+    return f;
+  }
+
+  // ---------------------------------------------------------------- weapon
+
   playGunshot(): void {
-    if (!this.ctx || !this.master) return;
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-
-    const noise = this.noiseSource();
-    const filter = ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.value = 1400;
-    filter.Q.value = 0.6;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.9, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-    noise.connect(filter).connect(gain).connect(this.master);
-    noise.start(now);
-    noise.stop(now + 0.2);
-
-    const click = ctx.createOscillator();
-    click.type = "square";
-    click.frequency.setValueAtTime(140, now);
-    const clickGain = ctx.createGain();
-    clickGain.gain.setValueAtTime(0.5, now);
-    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    click.connect(clickGain).connect(this.master);
-    click.start(now);
-    click.stop(now + 0.05);
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 1.2)!;
+    this.burst(o, "highpass", 1800, 0.7, t, 0.08, 1.0); // crack
+    this.burst(o, "bandpass", 700, 0.8, t, 0.22, 0.9); // body
+    this.tone(o, "sine", 120, 38, t, 0.3, 1.0); // boom
+    this.tone(o, "square", 1800, 600, t, 0.03, 0.12); // mechanical click
+    // Shell casing tinkle
+    const tc = t + 0.35 + Math.random() * 0.1;
+    this.tone(this.out(CENTER, 1, 0.2)!, "sine", 4200, 3900, tc, 0.06, 0.05);
+    this.tone(this.out(CENTER, 1, 0.2)!, "sine", 5100, 4800, tc + 0.09, 0.05, 0.03);
   }
 
   playEmptyClick(): void {
-    if (!this.ctx || !this.master) return;
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-    const click = ctx.createOscillator();
-    click.type = "square";
-    click.frequency.setValueAtTime(400, now);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.25, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-    click.connect(gain).connect(this.master);
-    click.start(now);
-    click.stop(now + 0.04);
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.1)!;
+    this.tone(o, "square", 2400, 1200, t, 0.02, 0.18);
+    this.burst(o, "highpass", 3000, 1, t, 0.03, 0.15);
   }
 
-  playFootstep(sprinting: boolean): void {
-    if (!this.ctx || !this.master) return;
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-    const noise = this.noiseSource();
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 500;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(sprinting ? 0.35 : 0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-    noise.connect(filter).connect(gain).connect(this.master);
-    noise.start(now);
-    noise.stop(now + 0.1);
+  /** Timed to match the viewmodel's reload animation (1.5s). */
+  playReload(duration: number): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.15)!;
+    const click = (at: number, f: number, vol: number) => {
+      this.tone(o, "square", f, f * 0.5, t + at, 0.025, vol);
+      this.burst(o, "bandpass", f * 1.5, 2, t + at, 0.04, vol);
+    };
+    click(duration * 0.18, 900, 0.18); // mag release
+    this.burst(o, "bandpass", 500, 1, t + duration * 0.3, 0.12, 0.08); // mag slides out
+    click(duration * 0.62, 700, 0.25); // mag seated
+    click(duration * 0.8, 1200, 0.2); // slide back
+    click(duration * 0.9, 1500, 0.25); // slide forward
   }
 
-  playPickup(): void {
-    if (!this.ctx || !this.master) return;
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(520, now);
-    osc.frequency.exponentialRampToValueAtTime(1040, now + 0.15);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-    osc.connect(gain).connect(this.master);
-    osc.start(now);
-    osc.stop(now + 0.2);
+  playHitmarker(headshot: boolean): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0)!;
+    this.tone(o, "triangle", headshot ? 1900 : 1300, headshot ? 1700 : 1100, t, 0.05, headshot ? 0.2 : 0.12);
+    this.burst(o, "lowpass", 400, 1, t, 0.08, 0.35); // wet thud
   }
 
-  playPlayerDamage(): void {
-    if (!this.ctx || !this.master) return;
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(140, now);
-    osc.frequency.exponentialRampToValueAtTime(50, now + 0.25);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.5, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    osc.connect(gain).connect(this.master);
-    osc.start(now);
-    osc.stop(now + 0.3);
+  playImpact(sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 40, 0.5);
+    if (!o) return;
+    this.burst(o, "bandpass", 2500 + Math.random() * 1500, 3, t, 0.06, 0.25);
+    this.tone(o, "sine", 3000 + Math.random() * 2000, 1500, t, 0.08, 0.05);
   }
 
-  playEnemyAlert(distance: number): void {
-    if (!this.ctx || !this.master) return;
-    const vol = this.attenuationGain(distance, 14);
-    if (vol <= 0.01) return;
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(90, now);
-    osc.frequency.exponentialRampToValueAtTime(60, now + 0.4);
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 500;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(vol * 0.5, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-    osc.connect(filter).connect(gain).connect(this.master);
-    osc.start(now);
-    osc.stop(now + 0.5);
+  // ---------------------------------------------------------------- player
+
+  playFootstep(gait: "crouch" | "walk" | "sprint" | "still"): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.stepFlip = !this.stepFlip;
+    const vol = gait === "sprint" ? 0.5 : gait === "crouch" ? 0.08 : 0.25;
+    const o = this.out(CENTER, 1, 0.25)!;
+    this.burst(o, "lowpass", this.stepFlip ? 420 : 520, 1, t, 0.09, vol);
+    this.burst(o, "bandpass", this.stepFlip ? 2200 : 2600, 2, t + 0.01, 0.04, vol * 0.25); // grit
   }
+
+  playFlashlight(on: boolean): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.05)!;
+    this.tone(o, "square", on ? 3200 : 2600, 1500, t, 0.015, 0.12);
+    this.burst(o, "highpass", 4000, 1, t, 0.02, 0.12);
+  }
+
+  playPickup(kind: string): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.3)!;
+    if (kind === "ammo") {
+      this.burst(o, "bandpass", 1800, 3, t, 0.05, 0.3);
+      this.burst(o, "bandpass", 2400, 3, t + 0.07, 0.05, 0.25);
+    } else if (kind === "note") {
+      this.burst(o, "bandpass", 3000, 0.8, t, 0.25, 0.12, 0.05); // paper rustle
+    } else if (kind === "keycard") {
+      this.tone(o, "sine", 880, 880, t, 0.12, 0.2);
+      this.tone(o, "sine", 1320, 1320, t + 0.12, 0.25, 0.2);
+    } else {
+      this.tone(o, "sine", 520, 1040, t, 0.15, 0.2);
+    }
+  }
+
+  playPlayerHurt(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.3)!;
+    this.tone(o, "sine", 150, 45, t, 0.3, 0.9);
+    this.burst(o, "bandpass", 900, 1.5, t, 0.25, 0.35, 0.02); // grunt breath
+  }
+
+  playDeath(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 1.5)!;
+    this.tone(o, "sawtooth", 110, 30, t, 2.5, 0.4, 0.05);
+    this.tone(o, "sine", 55, 25, t, 3, 0.6, 0.1);
+  }
+
+  playLevelComplete(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 1)!;
+    [220, 277, 330, 440].forEach((f, i) => this.tone(o, "triangle", f, f, t + i * 0.12, 1.2, 0.12, 0.02));
+  }
+
+  playLocked(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.2)!;
+    this.tone(o, "square", 220, 200, t, 0.12, 0.12);
+    this.tone(o, "square", 180, 160, t + 0.15, 0.18, 0.12);
+  }
+
+  playUi(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.tone(this.out(CENTER, 1, 0.1)!, "sine", 1400, 1200, t, 0.04, 0.06);
+  }
+
+  /** Call every frame; beats faster and louder as health drops below ~40%. */
+  updateHeartbeat(dt: number, healthFrac: number): void {
+    if (!this.ctx || healthFrac > 0.4 || healthFrac <= 0) return;
+    this.heartbeatTimer -= dt;
+    if (this.heartbeatTimer > 0) return;
+    const danger = 1 - healthFrac / 0.4;
+    this.heartbeatTimer = 1.1 - danger * 0.5;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0)!;
+    const v = 0.35 + danger * 0.5;
+    this.tone(o, "sine", 70, 40, t, 0.12, v);
+    this.tone(o, "sine", 65, 38, t + 0.2, 0.12, v * 0.7);
+  }
+
+  // ---------------------------------------------------------------- enemies
+
+  playEnemy(kind: "alert" | "idle" | "windup" | "hurt" | "death", brute: boolean, sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const p = brute ? 0.6 : 1; // pitch multiplier
+    switch (kind) {
+      case "alert": {
+        // A rising, wavering shriek.
+        const o = this.out(sp, 34, 0.9);
+        if (!o) return;
+        const osc = this.tone(o, "sawtooth", 260 * p, 520 * p, t, 0.7, 0.35, 0.05);
+        const lfo = this.ctx.createOscillator();
+        lfo.frequency.value = 17;
+        const lg = this.ctx.createGain();
+        lg.gain.value = 40 * p;
+        lfo.connect(lg).connect(osc.frequency);
+        lfo.start(t);
+        lfo.stop(t + 0.8);
+        this.burst(o, "bandpass", 1600 * p, 2, t, 0.6, 0.25, 0.05);
+        break;
+      }
+      case "idle": {
+        const o = this.out(sp, 18, 0.7);
+        if (!o) return;
+        if (Math.random() < 0.5) {
+          // Clicking — a rapid series of short ticks.
+          const n = 4 + Math.floor(Math.random() * 6);
+          for (let i = 0; i < n; i++) this.burst(o, "bandpass", 2400 * p, 8, t + i * 0.06, 0.02, 0.45);
+        } else {
+          // Wet, low breathing growl.
+          this.burst(o, "lowpass", 300 * p, 3, t, 0.9, 0.5, 0.3);
+          this.tone(o, "sawtooth", 70 * p, 55 * p, t, 0.9, 0.12, 0.3);
+        }
+        break;
+      }
+      case "windup": {
+        const o = this.out(sp, 20, 0.4);
+        if (!o) return;
+        this.burst(o, "highpass", 2000, 1, t, 0.3, 0.4, 0.05); // hiss
+        this.tone(o, "sawtooth", 180 * p, 90 * p, t, 0.35, 0.2);
+        break;
+      }
+      case "hurt": {
+        const o = this.out(sp, 30, 0.5);
+        if (!o) return;
+        this.tone(o, "sawtooth", 420 * p, 200 * p, t, 0.18, 0.3);
+        this.burst(o, "bandpass", 1200 * p, 3, t, 0.12, 0.2);
+        break;
+      }
+      case "death": {
+        const o = this.out(sp, 30, 0.8);
+        if (!o) return;
+        this.tone(o, "sawtooth", 300 * p, 60 * p, t, 1.0, 0.3, 0.02);
+        this.burst(o, "lowpass", 500, 1, t + 0.6, 0.3, 0.4); // body hits floor
+        break;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- ambience
 
   private startAmbient(): void {
-    if (!this.ctx || !this.master) return;
-    const ctx = this.ctx;
-    const noise = this.noiseSource();
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 120;
-    const gain = ctx.createGain();
-    gain.gain.value = 0.05;
-    noise.connect(filter).connect(gain).connect(this.master);
-    noise.start();
-    this.ambientNodes.push(noise, filter, gain);
+    const ctx = this.ctx!;
+    const g = ctx.createGain();
+    g.gain.value = 0.09;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 140;
+    for (const f of [41, 41.6, 62]) {
+      const o = ctx.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.value = f;
+      o.connect(lp);
+      o.start();
+    }
+    const n = this.noise();
+    const nf = ctx.createBiquadFilter();
+    nf.type = "lowpass";
+    nf.frequency.value = 220;
+    const ng = ctx.createGain();
+    ng.gain.value = 0.5;
+    n.connect(nf).connect(ng).connect(lp);
+    n.start();
+    // Slow swell in the drone
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.07;
+    const lfoG = ctx.createGain();
+    lfoG.gain.value = 60;
+    lfo.connect(lfoG).connect(lp.frequency);
+    lfo.start();
+    lp.connect(g).connect(this.master);
+  }
+
+  /** Random distant sounds (drips, metal groans, clanks) — call every frame. */
+  updateAmbient(dt: number): void {
+    if (!this.ctx) return;
+    this.ambientTimer -= dt;
+    if (this.ambientTimer > 0) return;
+    this.ambientTimer = 3 + Math.random() * 9;
+    const t = this.ctx.currentTime;
+    const sp: Spatial = { pan: Math.random() * 2 - 1, distance: 6 + Math.random() * 10, muffled: Math.random() < 0.6 };
+    const o = this.out(sp, 20, 1.6);
+    if (!o) return;
+    const r = Math.random();
+    if (r < 0.4) {
+      // Water drip
+      this.tone(o, "sine", 1800 + Math.random() * 800, 600, t, 0.08, 0.35);
+    } else if (r < 0.7) {
+      // Metal groan
+      this.tone(o, "triangle", 90 + Math.random() * 60, 60, t, 2.2, 0.25, 0.6);
+      this.burst(o, "bandpass", 400, 12, t, 2, 0.12, 0.6);
+    } else {
+      // Clank
+      this.burst(o, "bandpass", 900 + Math.random() * 900, 10, t, 0.4, 0.6);
+      this.tone(o, "sine", 600, 580, t, 0.6, 0.15);
+    }
   }
 }

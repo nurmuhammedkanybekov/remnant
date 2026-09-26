@@ -1,58 +1,55 @@
 import * as THREE from "three";
 import { CELL_SIZE, isSolid, worldToCell, type LevelData } from "./level";
 
-/** Breadth-first search on the level grid. Good enough for small hand-built levels. */
-export function findPath(
-  level: LevelData,
-  fromX: number,
-  fromZ: number,
-  toX: number,
-  toZ: number
-): THREE.Vector2[] {
+/**
+ * Breadth-first search on the 4-connected level grid. Returns cell-centre
+ * waypoints from (but excluding) the start cell to the goal cell.
+ * Uses flat typed arrays + an index-based queue — cheap enough to run for
+ * every chasing enemy several times a second on these map sizes.
+ */
+export function findPath(level: LevelData, fromX: number, fromZ: number, toX: number, toZ: number): THREE.Vector2[] {
   const start = worldToCell(fromX, fromZ);
   const goal = worldToCell(toX, toZ);
-
   if (isSolid(level, goal.col, goal.row)) return [];
+  const { cols, rows } = level;
+  const idx = (c: number, r: number) => r * cols + c;
+  const startI = idx(start.col, start.row);
+  const goalI = idx(goal.col, goal.row);
+  if (startI === goalI) return [];
 
-  const key = (c: number, r: number) => `${c},${r}`;
-  const visited = new Set<string>([key(start.col, start.row)]);
-  const cameFrom = new Map<string, { col: number; row: number }>();
-  const queue: { col: number; row: number }[] = [start];
-  const dirs = [
-    { dc: 1, dr: 0 },
-    { dc: -1, dr: 0 },
-    { dc: 0, dr: 1 },
-    { dc: 0, dr: -1 },
-  ];
+  const cameFrom = new Int32Array(cols * rows).fill(-1);
+  cameFrom[startI] = startI;
+  const queue = new Int32Array(cols * rows);
+  let head = 0;
+  let tail = 0;
+  queue[tail++] = startI;
 
-  let found = false;
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (current.col === goal.col && current.row === goal.row) {
-      found = true;
-      break;
-    }
-    for (const d of dirs) {
-      const nc = current.col + d.dc;
-      const nr = current.row + d.dr;
-      const k = key(nc, nr);
-      if (visited.has(k) || isSolid(level, nc, nr)) continue;
-      visited.add(k);
-      cameFrom.set(k, current);
-      queue.push({ col: nc, row: nr });
+  while (head < tail) {
+    const cur = queue[head++];
+    if (cur === goalI) break;
+    const c = cur % cols;
+    const r = (cur / cols) | 0;
+    const neighbours = [
+      [c + 1, r],
+      [c - 1, r],
+      [c, r + 1],
+      [c, r - 1],
+    ];
+    for (const [nc, nr] of neighbours) {
+      if (isSolid(level, nc, nr)) continue;
+      const ni = idx(nc, nr);
+      if (cameFrom[ni] !== -1) continue;
+      cameFrom[ni] = cur;
+      queue[tail++] = ni;
     }
   }
-
-  if (!found) return [];
+  if (cameFrom[goalI] === -1) return [];
 
   const path: THREE.Vector2[] = [];
-  let cur = goal;
-  while (!(cur.col === start.col && cur.row === start.row)) {
-    path.push(new THREE.Vector2((cur.col + 0.5) * CELL_SIZE, (cur.row + 0.5) * CELL_SIZE));
-    const prev = cameFrom.get(key(cur.col, cur.row));
-    if (!prev) break;
-    cur = prev;
+  for (let cur = goalI; cur !== startI; cur = cameFrom[cur]) {
+    const c = cur % cols;
+    const r = (cur / cols) | 0;
+    path.push(new THREE.Vector2((c + 0.5) * CELL_SIZE, (r + 0.5) * CELL_SIZE));
   }
-  path.reverse();
-  return path;
+  return path.reverse();
 }

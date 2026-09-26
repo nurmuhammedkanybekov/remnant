@@ -14,9 +14,20 @@ export class Input {
     });
     window.addEventListener("keyup", (e) => this.keys.delete(e.code));
 
-    domElement.addEventListener("mousedown", () => {
+    domElement.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
       this.mouseDown = true;
       this.mouseJustPressed = true;
+    });
+    domElement.addEventListener("contextmenu", (e) => e.preventDefault());
+    // Stop Space/Tab from scrolling or moving focus while playing.
+    window.addEventListener("keydown", (e) => {
+      if (this.locked && (e.code === "Space" || e.code === "Tab")) e.preventDefault();
+    });
+    // Losing focus (alt-tab) would otherwise leave keys "stuck" down.
+    window.addEventListener("blur", () => {
+      this.keys.clear();
+      this.mouseDown = false;
     });
     window.addEventListener("mouseup", () => (this.mouseDown = false));
 

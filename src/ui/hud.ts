@@ -1,125 +1,214 @@
+import { injectStyles } from "./styles";
+
+const ICON = {
+  heart: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.8 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>`,
+  run: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="14" cy="4" r="2.2"/><path d="M9 21l2.2-6 2.4 2.2V22h2v-6.2l-2.6-2.6.8-3.6c1.2 1.5 3 2.4 5.2 2.4v-2c-1.7 0-3.2-.9-4-2.2l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5 0-.8.1L6 7.6V12h2V9l1.8-.7L7 21h2z"/></svg>`,
+  torch: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2h10v5l-3 4v11h-4V11L7 7V2zm2 2v2h6V4H9z"/></svg>`,
+  eye: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 10C7 3 12 1 18 1s11 2 16 9c-5 7-10 9-16 9S7 17 2 10z"/><circle cx="18" cy="10" r="4" fill="currentColor"/></svg>`,
+};
+
+export interface HudState {
+  health: number; // 0..1
+  stamina: number; // 0..1
+  battery: number; // 0..1
+  torchOn: boolean;
+  mag: number;
+  magSize: number;
+  reserve: number;
+  reloading: boolean;
+  noise: number; // 0..5 bars
+  threat: number; // 0..1
+  spreadPx: number;
+  hasKeycard: boolean;
+}
+
 export class Hud {
-  private root: HTMLDivElement;
-  private healthFill: HTMLDivElement;
-  private staminaFill: HTMLDivElement;
-  private batteryFill: HTMLDivElement;
-  private ammoText: HTMLDivElement;
-  private objectiveText: HTMLDivElement;
-  private vignette: HTMLDivElement;
-  private noteBox: HTMLDivElement;
-  private noteTimeout: number | null = null;
+  private readonly root: HTMLDivElement;
+  private readonly el: Record<string, HTMLElement> = {};
+  private readonly pips: HTMLElement[] = [];
+  private readonly noiseBars: HTMLElement[] = [];
+  private readonly dmgArcs: HTMLElement[] = [];
+  private dmgArcCursor = 0;
+  private noteTimeout = 0;
+  private promptTimeout = 0;
+  private hitTimeout = 0;
+  private introTimeout = 0;
+  private last: Partial<HudState> = {};
 
   constructor(container: HTMLElement) {
+    injectStyles();
     this.root = document.createElement("div");
-    this.root.style.cssText = `
-      position: absolute; inset: 0; pointer-events: none;
-      color: #d9d9d9; text-shadow: 0 1px 2px rgba(0,0,0,0.9);
-      font-size: 14px; user-select: none;
-    `;
+    this.root.className = "hud";
+    this.root.innerHTML = `
+      <div class="objective"><div class="lvl" data-k="lvl"></div><div class="txt" data-k="obj"></div></div>
+      <div class="aware" data-k="aware">${ICON.eye}<div class="lbl" data-k="awareLbl"></div></div>
+      <div class="xhair" data-k="xhair"><i class="c"></i><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i></div>
+      <div class="hitmark" data-k="hit"></div>
+      <div class="dmgdir" data-k="dmg"></div>
+      <div class="intro" data-k="intro"><div class="a" data-k="introA"></div><div class="b" data-k="introB"></div></div>
+      <div class="prompt" data-k="prompt"></div>
+      <div class="toasts" data-k="toasts"></div>
+      <div class="note" data-k="note"><div class="hdr">RECOVERED NOTE</div><div data-k="noteTxt"></div></div>
+      <div class="vitals">
+        <div class="vrow health">${ICON.heart}<div class="vbar"><b class="lag" data-k="hpLag"></b><b class="fill" data-k="hp"></b></div><div class="vnum" data-k="hpNum"></div></div>
+        <div class="vrow stamina">${ICON.run}<div class="vbar"><b class="fill" data-k="st"></b></div><div class="vnum"></div></div>
+        <div class="vrow battery" data-k="batRow">${ICON.torch}<div class="vbar"><b class="fill" data-k="bat"></b></div><div class="vnum" data-k="batNum"></div></div>
+        <div class="keycard" data-k="key">▣ KEYCARD</div>
+      </div>
+      <div class="noise"><div class="bars" data-k="noiseBars"></div><div class="lbl">NOISE</div></div>
+      <div class="ammo">
+        <div><span class="mag" data-k="mag"></span><span class="res" data-k="res"></span></div>
+        <div class="pips" data-k="pips"></div>
+        <div class="status" data-k="ammoStatus"></div>
+      </div>`;
     container.appendChild(this.root);
+    this.root.querySelectorAll<HTMLElement>("[data-k]").forEach((n) => (this.el[n.dataset.k!] = n));
 
-    this.vignette = div(this.root, `
-      position: absolute; inset: 0; pointer-events: none;
-      box-shadow: inset 0 0 0px 0px rgba(180,0,0,0);
-      transition: box-shadow 0.3s ease;
-    `);
-
-    const crosshair = div(this.root, `
-      position: absolute; left: 50%; top: 50%; width: 6px; height: 6px;
-      margin: -3px 0 0 -3px; border-radius: 50%;
-      background: rgba(255,255,255,0.85);
-    `);
-    void crosshair;
-
-    const bottomLeft = div(this.root, `
-      position: absolute; left: 24px; bottom: 22px; width: 200px;
-    `);
-    label(bottomLeft, "HEALTH");
-    const healthBar = bar(bottomLeft);
-    this.healthFill = fill(healthBar, "#c23c3c");
-    label(bottomLeft, "STAMINA");
-    const staminaBar = bar(bottomLeft);
-    this.staminaFill = fill(staminaBar, "#5aa25a");
-    label(bottomLeft, "FLASHLIGHT");
-    const batteryBar = bar(bottomLeft);
-    this.batteryFill = fill(batteryBar, "#dfd070");
-
-    this.ammoText = div(this.root, `
-      position: absolute; right: 24px; bottom: 22px;
-      font-size: 26px; font-weight: bold; letter-spacing: 1px;
-    `);
-
-    this.objectiveText = div(this.root, `
-      position: absolute; left: 24px; top: 20px; font-size: 13px;
-      max-width: 320px; opacity: 0.85;
-    `);
-
-    this.noteBox = div(this.root, `
-      position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%);
-      max-width: 460px; text-align: center; font-style: italic;
-      background: rgba(0,0,0,0.55); padding: 10px 16px; border-radius: 4px;
-      opacity: 0; transition: opacity 0.4s ease;
-    `);
+    for (let i = 0; i < 5; i++) {
+      const b = document.createElement("i");
+      b.style.height = `${6 + i * 3.5}px`;
+      this.el.noiseBars.appendChild(b);
+      this.noiseBars.push(b);
+    }
+    for (let i = 0; i < 4; i++) {
+      const d = document.createElement("div");
+      this.el.dmg.appendChild(d);
+      this.dmgArcs.push(d);
+    }
   }
 
-  setHealth(pct: number): void {
-    this.healthFill.style.width = `${Math.max(0, pct) * 100}%`;
-    this.vignette.style.boxShadow =
-      pct < 0.3 ? "inset 0 0 140px 40px rgba(180,0,0,0.5)" : "inset 0 0 0px 0px rgba(180,0,0,0)";
+  setVisible(v: boolean): void {
+    this.root.style.display = v ? "block" : "none";
   }
 
-  setStamina(pct: number): void {
-    this.staminaFill.style.width = `${Math.max(0, pct) * 100}%`;
+  setMagSize(n: number): void {
+    this.el.pips.innerHTML = "";
+    this.pips.length = 0;
+    for (let i = 0; i < n; i++) {
+      const p = document.createElement("i");
+      this.el.pips.appendChild(p);
+      this.pips.push(p);
+    }
   }
 
-  setBattery(pct: number): void {
-    this.batteryFill.style.width = `${Math.max(0, pct) * 100}%`;
+  setObjective(level: string, text: string): void {
+    this.el.lvl.textContent = level.toUpperCase();
+    this.el.obj.textContent = text;
   }
 
-  setAmmo(inMag: number, reserve: number, reloading: boolean): void {
-    this.ammoText.textContent = reloading ? "RELOADING…" : `${inMag} / ${reserve}`;
+  /** Only touches the DOM for values that changed — this runs every frame. */
+  update(s: HudState): void {
+    const L = this.last;
+    if (L.health !== s.health) {
+      const pct = `${Math.max(0, s.health) * 100}%`;
+      this.el.hp.style.width = pct;
+      this.el.hpLag.style.width = pct;
+      this.el.hpNum.textContent = `${Math.ceil(s.health * 100)}`;
+    }
+    if (L.stamina !== s.stamina) this.el.st.style.width = `${s.stamina * 100}%`;
+    if (L.battery !== s.battery || L.torchOn !== s.torchOn) {
+      this.el.bat.style.width = `${s.battery * 100}%`;
+      this.el.batNum.textContent = `${Math.round(s.battery * 100)}%`;
+      this.el.batRow.classList.toggle("low", s.battery < 0.2);
+      this.el.batRow.classList.toggle("off", !s.torchOn);
+    }
+    if (L.mag !== s.mag || L.reserve !== s.reserve || L.reloading !== s.reloading) {
+      this.el.mag.textContent = `${s.mag}`;
+      this.el.mag.classList.toggle("empty", s.mag === 0);
+      this.el.res.textContent = `/ ${s.reserve}`;
+      this.pips.forEach((p, i) => p.classList.toggle("spent", i >= s.mag));
+      this.el.ammoStatus.textContent = s.reloading
+        ? "RELOADING"
+        : s.mag === 0 && s.reserve === 0
+          ? "NO AMMO"
+          : s.mag <= 2 && s.reserve > 0
+            ? "[R] RELOAD"
+            : "";
+    }
+    if (L.noise !== s.noise) {
+      this.noiseBars.forEach((b, i) => {
+        b.classList.toggle("on", i < s.noise);
+        b.classList.toggle("loud", s.noise >= 4);
+      });
+    }
+    if (L.threat !== s.threat) {
+      const a = this.el.aware;
+      a.style.opacity = s.threat > 0.05 ? `${Math.min(1, 0.3 + s.threat)}` : "0";
+      a.classList.toggle("hunted", s.threat >= 1);
+      a.classList.toggle("sus", s.threat > 0 && s.threat < 1);
+      this.el.awareLbl.textContent = s.threat >= 1 ? "HUNTED" : s.threat > 0.05 ? "SUSPICIOUS" : "";
+    }
+    if (L.spreadPx !== s.spreadPx) {
+      const g = Math.round(4 + s.spreadPx);
+      const [, t, b, l, r] = Array.from(this.el.xhair.children) as HTMLElement[];
+      t.style.top = `${-g - 7}px`;
+      b.style.top = `${g}px`;
+      l.style.left = `${-g - 7}px`;
+      r.style.left = `${g}px`;
+    }
+    if (L.hasKeycard !== s.hasKeycard) this.el.key.classList.toggle("show", s.hasKeycard);
+    this.last = { ...s };
   }
 
-  setObjective(text: string): void {
-    this.objectiveText.textContent = text;
+  hitMarker(headshot: boolean, kill: boolean): void {
+    const h = this.el.hit;
+    h.className = `hitmark${headshot ? " head" : ""}${kill ? " kill" : ""}`;
+    h.style.transition = "none";
+    h.style.opacity = "1";
+    window.clearTimeout(this.hitTimeout);
+    this.hitTimeout = window.setTimeout(() => {
+      h.style.transition = "";
+      h.style.opacity = "0";
+    }, kill ? 220 : 90);
   }
 
-  flashDamage(): void {
-    this.vignette.style.boxShadow = "inset 0 0 200px 60px rgba(200,0,0,0.65)";
-    window.setTimeout(() => this.vignette.style.boxShadow = "inset 0 0 0px 0px rgba(180,0,0,0)", 200);
+  /** angle: radians, 0 = straight ahead, positive = to the right. */
+  damageFrom(angle: number): void {
+    const d = this.dmgArcs[this.dmgArcCursor];
+    this.dmgArcCursor = (this.dmgArcCursor + 1) % this.dmgArcs.length;
+    d.style.transform = `rotate(${angle}rad)`;
+    d.style.transition = "none";
+    d.style.opacity = "1";
+    void d.offsetWidth;
+    d.style.transition = "";
+    d.style.opacity = "0";
+  }
+
+  toast(text: string, color = "var(--ui-amber)"): void {
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = text;
+    t.style.borderRightColor = color;
+    this.el.toasts.appendChild(t);
+    window.setTimeout(() => t.remove(), 2700);
+  }
+
+  prompt(text: string, seconds = 2): void {
+    this.el.prompt.textContent = text;
+    this.el.prompt.classList.add("show");
+    window.clearTimeout(this.promptTimeout);
+    this.promptTimeout = window.setTimeout(() => this.el.prompt.classList.remove("show"), seconds * 1000);
   }
 
   showNote(text: string): void {
-    if (this.noteTimeout) window.clearTimeout(this.noteTimeout);
-    this.noteBox.textContent = text;
-    this.noteBox.style.opacity = "1";
-    this.noteTimeout = window.setTimeout(() => (this.noteBox.style.opacity = "0"), 5500);
+    this.el.noteTxt.textContent = text;
+    this.el.note.classList.add("show");
+    window.clearTimeout(this.noteTimeout);
+    this.noteTimeout = window.setTimeout(() => this.el.note.classList.remove("show"), 7000);
   }
 
-  setVisible(visible: boolean): void {
-    this.root.style.display = visible ? "block" : "none";
+  hideTransient(): void {
+    this.el.note.classList.remove("show");
+    this.el.intro.classList.remove("show");
+    this.el.prompt.classList.remove("show");
+    this.el.toasts.innerHTML = "";
   }
-}
 
-function div(parent: HTMLElement, css: string): HTMLDivElement {
-  const el = document.createElement("div");
-  el.style.cssText = css;
-  parent.appendChild(el);
-  return el;
-}
-
-function label(parent: HTMLElement, text: string): void {
-  const el = div(parent, "font-size: 10px; letter-spacing: 2px; opacity: 0.7; margin-top: 6px;");
-  el.textContent = text;
-}
-
-function bar(parent: HTMLElement): HTMLDivElement {
-  return div(parent, `
-    width: 100%; height: 8px; background: rgba(255,255,255,0.12);
-    border-radius: 4px; overflow: hidden; margin-top: 2px;
-  `);
-}
-
-function fill(parent: HTMLElement, color: string): HTMLDivElement {
-  return div(parent, `width: 100%; height: 100%; background: ${color}; transition: width 0.15s ease;`);
+  intro(a: string, b: string): void {
+    this.el.introA.textContent = a.toUpperCase();
+    this.el.introB.textContent = b.toUpperCase();
+    this.el.intro.classList.add("show");
+    window.clearTimeout(this.introTimeout);
+    this.introTimeout = window.setTimeout(() => this.el.intro.classList.remove("show"), 3200);
+  }
 }

@@ -2,6 +2,7 @@
   "name": "remnant",
   "private": true,
   "version": "0.1.0",
+  "description": "First-person survival horror shooter in the browser — TypeScript + Three.js, zero asset files.",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,9 +1,11 @@
 import * as THREE from "three";
 
-const MAX_BATTERY = 100;
-const DRAIN_PER_SEC = 3.2;
-const RECHARGE_PER_SEC = 1.4;
+export const MAX_BATTERY = 100;
+const DRAIN_PER_SEC = 1.7; // ~60s of light from full
+const RECHARGE_PER_SEC = 0.8; // passive trickle while off...
+const RECHARGE_CAP = 25; // ...but only up to this — real charge comes from batteries
 const LOW_BATTERY_THRESHOLD = 20;
+const FULL_INTENSITY = 22;
 
 export class Flashlight {
   readonly light: THREE.SpotLight;
@@ -11,15 +13,24 @@ export class Flashlight {
   on = true;
   battery = MAX_BATTERY;
   private flickerTimer = 0;
+  private flickerValue = 1;
+  private sway = new THREE.Vector2();
+  onToggle: ((on: boolean) => void) | null = null;
 
   constructor(camera: THREE.Camera) {
-    this.light = new THREE.SpotLight(0xdfe8ff, 3.2, 14, Math.PI / 7, 0.5, 1.4);
-    this.light.position.set(0, 0, 0);
+    this.light = new THREE.SpotLight(0xe8eeff, FULL_INTENSITY, 26, Math.PI / 6.5, 0.6, 0.9);
+    // Held slightly low and to the right, like a real torch.
+    this.light.position.set(0.22, -0.18, 0.05);
     this.target = new THREE.Object3D();
-    this.target.position.set(0, 0, -1);
+    this.target.position.set(0, 0, -6);
     camera.add(this.light);
     camera.add(this.target);
     this.light.target = this.target;
+  }
+
+  /** 0..1 — how lit the scene in front of the player is (for dust visibility etc). */
+  get level(): number {
+    return this.light.intensity / FULL_INTENSITY;
   }
 
   addBattery(amount: number): void {
@@ -27,28 +38,44 @@ export class Flashlight {
   }
 
   toggle(): void {
-    if (this.battery > 0) this.on = !this.on;
+    if (!this.on && this.battery <= 0.5) {
+      this.onToggle?.(false);
+      return;
+    }
+    this.on = !this.on;
+    this.onToggle?.(this.on);
   }
 
-  update(dt: number): void {
-    if (this.on && this.battery > 0) {
+  /** lookDX/lookDY are this frame's mouse deltas — the beam lags slightly behind the view. */
+  update(dt: number, lookDX: number, lookDY: number): void {
+    if (this.on) {
       this.battery = Math.max(0, this.battery - DRAIN_PER_SEC * dt);
-      if (this.battery === 0) this.on = false;
-    } else if (!this.on) {
-      this.battery = Math.min(MAX_BATTERY, this.battery + RECHARGE_PER_SEC * dt * 0.4);
+      if (this.battery === 0) {
+        this.on = false;
+        this.onToggle?.(false);
+      }
+    } else if (this.battery < RECHARGE_CAP) {
+      this.battery = Math.min(RECHARGE_CAP, this.battery + RECHARGE_PER_SEC * dt);
     }
+
+    // Beam sway: drift opposite to mouse motion, spring back to centre.
+    this.sway.x += -lookDX * 0.0025;
+    this.sway.y += lookDY * 0.0025;
+    this.sway.multiplyScalar(Math.exp(-dt * 7));
+    this.sway.clampLength(0, 0.9);
+    this.target.position.set(this.sway.x, this.sway.y, -6);
 
     let intensity = 0;
     if (this.on) {
-      intensity = 3.2;
+      intensity = FULL_INTENSITY;
       if (this.battery < LOW_BATTERY_THRESHOLD) {
         this.flickerTimer -= dt;
         if (this.flickerTimer <= 0) {
-          this.flickerTimer = 0.05 + Math.random() * 0.15;
-          intensity = Math.random() < 0.35 ? 0.4 : 3.2;
-        } else {
-          intensity = this.light.intensity;
+          this.flickerTimer = 0.04 + Math.random() * 0.2;
+          const severity = 1 - this.battery / LOW_BATTERY_THRESHOLD;
+          this.flickerValue = Math.random() < 0.15 + severity * 0.35 ? 0.05 + Math.random() * 0.3 : 1;
         }
+        intensity *= this.flickerValue * (0.55 + 0.45 * (this.battery / LOW_BATTERY_THRESHOLD));
       }
     }
     this.light.intensity = intensity;
