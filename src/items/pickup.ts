@@ -50,6 +50,13 @@ export class Pickup {
     this.scene.remove(this.group);
   }
 
+  /** Puts a collected pickup back (the boss arena's supplies restock). */
+  restore(): void {
+    if (!this.collected) return;
+    this.collected = false;
+    this.scene.add(this.group);
+  }
+
   distanceTo(x: number, z: number): number {
     return Math.hypot(this.group.position.x - x, this.group.position.z - z);
   }

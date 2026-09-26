@@ -236,9 +236,10 @@ export class Hud {
     this.last = { ...s };
   }
 
-  hitMarker(headshot: boolean, kill: boolean): void {
+  /** `armoured`: the hit was mostly soaked (the Remnant's hide) — a small, dull marker. */
+  hitMarker(headshot: boolean, kill: boolean, armoured = false): void {
     const h = this.el.hit;
-    h.className = `hitmark${headshot ? " head" : ""}${kill ? " kill" : ""}`;
+    h.className = `hitmark${headshot ? " head" : ""}${kill ? " kill" : ""}${armoured ? " armoured" : ""}`;
     h.style.transition = "none";
     h.style.opacity = "1";
     window.clearTimeout(this.hitTimeout);
