@@ -15,11 +15,20 @@
  */
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? "playwright");
 const signal = process.env.SIGNAL_URL ?? "ws://127.0.0.1:9000/peerjs";
+// SIGNAL_URL="" uses the game's real matchmaking (Metered Realtime).
 // COOP_QUERY adds URL options, e.g. "&turn=turn:127.0.0.1:3478&turnUser=u&turnPass=p&relayOnly" to play through a relay.
-const URL = `${process.env.GAME_URL ?? "http://localhost:5173/"}?debug&signal=${encodeURIComponent(signal)}${process.env.COOP_QUERY ?? ""}`;
+const URL = `${process.env.GAME_URL ?? "http://localhost:5173/"}?debug${signal ? `&signal=${encodeURIComponent(signal)}` : ""}${process.env.COOP_QUERY ?? ""}`;
+// BROWSER_ARGS: extra Chromium flags (e.g. a proxy), space-separated.
+const extraArgs = (process.env.BROWSER_ARGS ?? "").split(" ").filter(Boolean);
 const launch = () =>
   chromium.launch({
-    args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--autoplay-policy=no-user-gesture-required"],
+    args: [
+      ...extraArgs,
+      "--use-gl=angle",
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader",
+      "--autoplay-policy=no-user-gesture-required",
+    ],
   });
 const [bh, bg] = await Promise.all([launch(), launch()]);
 const errors = [];

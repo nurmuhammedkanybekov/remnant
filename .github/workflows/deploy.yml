@@ -39,6 +39,8 @@ jobs:
           VITE_TURN_URLS: ${{ vars.TURN_URLS || secrets.TURN_URLS }}
           VITE_TURN_USERNAME: ${{ vars.TURN_USERNAME || secrets.TURN_USERNAME }}
           VITE_TURN_CREDENTIAL: ${{ vars.TURN_CREDENTIAL || secrets.TURN_CREDENTIAL }}
+          # Optional: your own Metered Realtime publishable key for matchmaking (the game ships with one).
+          VITE_METERED_REALTIME_KEY: ${{ vars.METERED_REALTIME_KEY || secrets.METERED_REALTIME_KEY }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

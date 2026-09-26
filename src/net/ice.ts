@@ -52,7 +52,21 @@ export function iceConfig(env: Record<string, string | undefined> = import.meta.
 
 /** Is any relay set up? (Changes what we tell players whose connection fails.) */
 export function hasRelay(cfg = iceConfig()): boolean {
-  return (cfg.meteredApp !== "" && cfg.meteredKey !== "") || cfg.turnUrls.length > 0;
+  return (cfg.meteredApp !== "" && cfg.meteredKey !== "") || cfg.turnUrls.length > 0 || extraServers.length > 0;
+}
+
+/**
+ * Relay servers handed out by the matchmaking service when a game connects
+ * (Metered Realtime includes TURN credentials in its welcome). Used on top of
+ * whatever is configured, so co-op gets a relay even with no TURN key set.
+ */
+let extraServers: RTCIceServer[] = [];
+
+export function addRelayServers(list: RTCIceServer[]): void {
+  const relays = list.filter((s) => [s.urls].flat().some((u) => /^turns?:/.test(u)));
+  if (relays.length === 0) return;
+  extraServers = relays;
+  if (state !== "ready") state = "ready";
 }
 
 /**
@@ -77,9 +91,11 @@ export function lastRelayState(): RelayState {
 let cached: Promise<RTCIceServer[]> | null = null;
 
 /** The ICE servers for a new connection. Never throws: a relay that can't be reached is just left out. */
-export function iceServers(cfg = iceConfig()): Promise<RTCIceServer[]> {
+export async function iceServers(cfg = iceConfig()): Promise<RTCIceServer[]> {
   cached ??= build(cfg);
-  return cached;
+  const servers = await cached;
+  if (extraServers.length && state !== "ready") state = "ready";
+  return [...servers, ...extraServers];
 }
 
 async function build(cfg: IceConfig): Promise<RTCIceServer[]> {
@@ -123,4 +139,5 @@ async function build(cfg: IceConfig): Promise<RTCIceServer[]> {
 /** Forget cached credentials (they expire). */
 export function resetIceServers(): void {
   cached = null;
+  extraServers = [];
 }
