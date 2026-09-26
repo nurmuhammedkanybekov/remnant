@@ -12,7 +12,7 @@ export interface DifficultyDef {
   enemyPerception: number;
   /** Scales how fast creatures run once they're hunting you. */
   enemySpeed: number;
-  /** Extra creatures on each level, as a fraction of its own (0.6 = 60% more). See `world/reinforcements.ts`. */
+  /** Extra creatures on each level, as a fraction of its own (0.8 = 80% more). See `world/reinforcements.ts`. */
   extraEnemies: number;
   /** Scales ammo, medkit and battery pickups. */
   pickupMultiplier: number;
@@ -29,7 +29,7 @@ export interface DifficultyDef {
   permadeath: boolean;
 }
 
-export type DifficultyId = "story" | "normal" | "nightmare" | "ironman";
+export type DifficultyId = "story" | "normal" | "nightmare" | "ironman" | "aizi";
 
 export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
   story: {
@@ -57,7 +57,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     enemyDamage: 1.25,
     enemyPerception: 1.1,
     enemySpeed: 1.1,
-    extraEnemies: 0.6,
+    extraEnemies: 0.8,
     pickupMultiplier: 1,
     batteryDrain: 1,
     startingReserve: 16,
@@ -74,7 +74,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     enemyDamage: 1.75,
     enemyPerception: 1.3,
     enemySpeed: 1.2,
-    extraEnemies: 1,
+    extraEnemies: 1.3,
     pickupMultiplier: 0.75,
     batteryDrain: 1.3,
     startingReserve: 8,
@@ -91,7 +91,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     enemyDamage: 1.25,
     enemyPerception: 1.1,
     enemySpeed: 1.1,
-    extraEnemies: 0.6,
+    extraEnemies: 0.8,
     pickupMultiplier: 1,
     batteryDrain: 1,
     startingReserve: 16,
@@ -100,9 +100,26 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     carryBatteryFloor: 30,
     permadeath: true,
   },
+  aizi: {
+    id: "aizi",
+    name: "Aizi",
+    description: "Beyond Nightmare, one life. The station is full, it never stops listening, and nothing is spared.",
+    enemyHealth: 1.6,
+    enemyDamage: 2.2,
+    enemyPerception: 1.5,
+    enemySpeed: 1.3,
+    extraEnemies: 1.8,
+    pickupMultiplier: 0.6,
+    batteryDrain: 1.5,
+    startingReserve: 6,
+    startingMedkits: 0,
+    carryHealthFloor: 15,
+    carryBatteryFloor: 15,
+    permadeath: true,
+  },
 };
 
-export const DIFFICULTY_ORDER: DifficultyId[] = ["story", "normal", "nightmare", "ironman"];
+export const DIFFICULTY_ORDER: DifficultyId[] = ["story", "normal", "nightmare", "ironman", "aizi"];
 
 export function isDifficultyId(v: unknown): v is DifficultyId {
   return typeof v === "string" && v in DIFFICULTIES;

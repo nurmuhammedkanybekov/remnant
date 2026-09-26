@@ -31,7 +31,8 @@ import { reinforcements } from "../world/reinforcements";
 import type { CheckpointState } from "./checkpoint";
 import type { Loadout, WeaponAmmo } from "./loadout";
 import { RadioChannel } from "./radio";
-import type { ScriptAction } from "./script";
+import type { RadioLine, ScriptAction } from "./script";
+import type { CharacterLook } from "../content/characters";
 import { RemotePlayer } from "./remotePlayer";
 import { freshStats, type RunStats } from "./stats";
 
@@ -91,6 +92,10 @@ export interface SessionServices {
   quality: () => QualityPreset;
   /** 1 normally; lower with "reduced camera shake". */
   motionScale: () => number;
+  /** The player's chosen look, sent to the partner. */
+  look?: () => CharacterLook;
+  /** A note was picked up (its key goes in the journal). */
+  noteRead?: (key: string) => void;
 }
 
 /**
@@ -221,7 +226,7 @@ export class LevelSession {
 
     this.pickups = [
       ...sp.items.map((i) => new Pickup(scene, i.type, i.pos)),
-      ...sp.notes.map((n) => new Pickup(scene, "note", n.pos, n.text)),
+      ...sp.notes.map((n) => new Pickup(scene, "note", n.pos, n.text, n.key)),
     ];
 
     // ---- interactables
@@ -319,6 +324,15 @@ export class LevelSession {
   get weapon(): Weapon {
     return this.weapons.get(this.currentWeapon)!;
   }
+
+  /** For the inventory: the current objective, the radio heard on this level, and the notes found on it. */
+  get objectiveText(): string {
+    return this.objective;
+  }
+  get radioLog(): readonly RadioLine[] {
+    return this.radio.log;
+  }
+  readonly notesFound = new Set<string>();
 
   /** What the player is carrying right now. */
   get loadout(): Loadout {
@@ -1028,6 +1042,11 @@ export class LevelSession {
           break;
         case "note":
           if (p.noteText) hud.showNote(p.noteText);
+          if (p.noteKey) {
+            this.notesFound.add(p.noteKey);
+            this.services.noteRead?.(p.noteKey);
+          }
+          hud.prompt(`NOTE ADDED TO THE JOURNAL — ${this.services.keyFor("inventory")} TO READ IT AGAIN`, 3);
           break;
       }
       this.collect(p);
@@ -1187,6 +1206,7 @@ export class LevelSession {
       hp: r2(p.health.fraction),
       down: this.downed || p.health.isDead,
       bleed: Math.ceil(this.bleed),
+      look: this.services.look?.(),
     };
     this.coop?.send(state, true);
   }

@@ -13,6 +13,8 @@ export class RadioChannel {
   private readonly queue: { line: RadioLine; from?: Spatial }[] = [];
   private current: RadioLine | null = null;
   private remaining = 0;
+  /** Every line heard on this level, oldest first (the inventory's radio log). */
+  readonly log: RadioLine[] = [];
 
   constructor(
     private readonly hud: Hud,
@@ -49,6 +51,8 @@ export class RadioChannel {
     this.current = line;
     this.remaining = lineDuration(line.text);
     this.hud.subtitle(line);
+    if (this.log.length >= 60) this.log.shift();
+    this.log.push(line);
     if (line.speaker !== "nur") this.sound.playRadioVoice(this.remaining, line.speaker === "unknown", from);
   }
 

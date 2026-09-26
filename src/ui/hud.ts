@@ -8,7 +8,7 @@ const ICON = {
   eye: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 10C7 3 12 1 18 1s11 2 16 9c-5 7-10 9-16 9S7 17 2 10z"/><circle cx="18" cy="10" r="4" fill="currentColor"/></svg>`,
 };
 
-const SPEAKER_NAMES: Record<RadioLine["speaker"], string> = {
+export const SPEAKER_NAMES: Record<RadioLine["speaker"], string> = {
   operator: "OPERATOR — RADIO",
   nur: "NUR",
   unknown: "??? — RADIO",

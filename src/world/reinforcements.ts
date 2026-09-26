@@ -10,12 +10,14 @@ const MIN_SPACING = 1.5;
 /** ...or this close to the boss. */
 const BOSS_CLEARANCE = 4;
 /** No level gets more than this many extras, however many it started with. */
-const MAX_EXTRAS = 10;
+const MAX_EXTRAS = 14;
+/** Small levels are treated as if they had at least this many creatures, so they still fill up. */
+const MIN_BASE = 4;
 
 /**
  * Extra creatures on top of a level's hand-placed ones, for the harder
  * difficulties and co-op. `amount` is a fraction of the level's own count
- * (0.6 = 60% more).
+ * (0.6 = 60% more), counting a small level as `MIN_BASE`.
  *
  * Deterministic for a given level and amount — both co-op players get the
  * same creatures in the same places, and checkpoint indices stay valid.
@@ -26,7 +28,7 @@ const MAX_EXTRAS = 10;
 export function reinforcements(level: ParsedLevel, amount: number): EnemySpawn[] {
   const base = level.spawns.enemies.filter((e) => enemyDef(e.kind).behaviour !== "boss");
   if (amount <= 0 || base.length === 0) return [];
-  const count = Math.min(MAX_EXTRAS, Math.round(base.length * amount));
+  const count = Math.min(MAX_EXTRAS, Math.round(Math.max(base.length, MIN_BASE) * amount));
   if (count === 0) return [];
 
   const rand = mulberry32(hash(`${level.def.id}:${amount}`));

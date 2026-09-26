@@ -39,13 +39,15 @@ export interface Progress {
   bestTimes: Record<string, number>;
   /** Endings the player has seen. */
   endings: EndingId[];
+  /** Notes ever picked up ("infirmary:1"), in the order found: the journal. */
+  notes: string[];
 }
 
 export const SAVE_VERSION = 3;
 const KEY = "remnant.save";
 
 export function emptySave(): SaveData {
-  return { version: SAVE_VERSION, campaign: null, progress: { unlockedLevel: 0, completed: [], bestTimes: {}, endings: [] } };
+  return { version: SAVE_VERSION, campaign: null, progress: { unlockedLevel: 0, completed: [], bestTimes: {}, endings: [], notes: [] } };
 }
 
 const num = (v: unknown, fallback = 0) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
@@ -67,6 +69,10 @@ export function parseSave(raw: unknown, levelCount: number): SaveData {
     if (Array.isArray(p.completed)) save.progress.completed = [...new Set(p.completed.filter(isDifficultyId))];
     if (Array.isArray(p.endings))
       save.progress.endings = [...new Set(p.endings.filter((e): e is EndingId => e === "seal" || e === "leave"))];
+    if (Array.isArray(p.notes))
+      save.progress.notes = [
+        ...new Set(p.notes.filter((n): n is string => typeof n === "string" && n.length < 80 && n.includes(":"))),
+      ].slice(0, 500);
     const bt = obj(p.bestTimes);
     if (bt) {
       for (const [id, t] of Object.entries(bt)) if (typeof t === "number" && t > 0) save.progress.bestTimes[id] = t;
@@ -179,6 +185,13 @@ export class SaveStore {
     this.data.progress.bestTimes[levelId] = seconds;
     this.write();
     return true;
+  }
+
+  /** Adds a note to the journal. */
+  noteRead(key: string): void {
+    if (this.data.progress.notes.includes(key)) return;
+    this.data.progress.notes.push(key);
+    this.write();
   }
 
   completeCampaign(difficulty: DifficultyId, ending: EndingId): void {

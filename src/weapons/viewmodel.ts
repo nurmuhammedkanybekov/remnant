@@ -30,6 +30,8 @@ const MELEE_TIME = 0.38;
 export class Viewmodel {
   private readonly root = new THREE.Group(); // follows the camera
   private readonly rig = new THREE.Group(); // sway / bob / recoil offsets
+  /** Shared by every hand model; tinted to the chosen look. */
+  private readonly skin = new THREE.MeshStandardMaterial({ color: 0xd9b397, roughness: 0.75 });
   private readonly models: Record<WeaponId, GunModel>;
   private readonly injector: THREE.Group;
   private readonly flash: THREE.Sprite;
@@ -59,6 +61,7 @@ export class Viewmodel {
       darkMetal: new THREE.MeshStandardMaterial({ color: 0x26282c, metalness: 0.6, roughness: 0.5 }),
       polymer: new THREE.MeshStandardMaterial({ color: 0x2c2d30, metalness: 0.1, roughness: 0.7 }),
       glove: new THREE.MeshStandardMaterial({ color: 0x4a3e30, roughness: 0.9 }),
+      skin: this.skin,
       sleeve: new THREE.MeshStandardMaterial({ color: 0x23261f, roughness: 1 }),
       wood: new THREE.MeshStandardMaterial({ color: 0x4a3222, roughness: 0.75 }),
       yellow: new THREE.MeshStandardMaterial({ color: 0xe8b420, roughness: 0.5, metalness: 0.1, emissive: 0x2a1c00 }),
@@ -103,6 +106,10 @@ export class Viewmodel {
     this.root.add(this.keyLight);
     this.keyLight.target.position.set(0, 0, -1);
     this.root.add(this.keyLight.target);
+  }
+  /** Skin tone of the hands (the player's chosen look). */
+  setSkin(color: number): void {
+    this.skin.color.setHex(color);
   }
 
   private attachFlash(): void {
@@ -239,7 +246,10 @@ export class Viewmodel {
   }
 }
 
-type Mats = Record<"metal" | "darkMetal" | "polymer" | "glove" | "sleeve" | "wood" | "yellow" | "rubber", THREE.MeshStandardMaterial>;
+type Mats = Record<
+  "metal" | "darkMetal" | "polymer" | "glove" | "skin" | "sleeve" | "wood" | "yellow" | "rubber",
+  THREE.MeshStandardMaterial
+>;
 
 function box(w: number, h: number, d: number, mat: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -254,11 +264,21 @@ function cyl(r: number, len: number, mat: THREE.Material, x = 0, y = 0, z = 0, s
   return m;
 }
 
-/** Gloved hand on a grip + sleeve, shared by every weapon. */
+/** Fingerless-gloved hand on a grip + sleeve, shared by every weapon. */
 function hand(g: THREE.Group, mats: Mats, gripY: number, gripZ: number, gripTilt: number): void {
   const h = box(0.06, 0.07, 0.07, mats.glove, 0.004, gripY - 0.01, gripZ + 0.01);
   h.rotation.x = gripTilt;
   g.add(h);
+  // Bare fingers wrapped round the front of the grip, and the wrist between glove and cuff.
+  for (let i = 0; i < 3; i++) {
+    const f = box(0.064, 0.016, 0.02, mats.skin, 0.003, gripY + 0.012 - i * 0.02, gripZ - 0.03);
+    f.rotation.x = gripTilt;
+    g.add(f);
+  }
+  const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.032, 0.05, 12), mats.skin);
+  wrist.position.set(0.018, gripY - 0.045, gripZ + 0.05);
+  wrist.rotation.set(-0.55, 0, 0.45);
+  g.add(wrist);
   const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.046, 0.26, 14), mats.sleeve);
   forearm.position.set(0.04, gripY - 0.11, gripZ + 0.1);
   forearm.rotation.set(-0.55, 0, 0.45);

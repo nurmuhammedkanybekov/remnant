@@ -26,6 +26,8 @@ export interface PlayerCommand {
   interactHeld: boolean;
   melee: boolean;
   heal: boolean;
+  /** Open the inventory (handled by the game, not the simulation). */
+  inventory: boolean;
   /** -1 previous, +1 next, 0 none. */
   cycleWeapon: number;
   /** Weapon slot picked with a number key (1-based), or 0. */
@@ -47,6 +49,7 @@ export function emptyCommand(): PlayerCommand {
     interactHeld: false,
     melee: false,
     heal: false,
+    inventory: false,
     cycleWeapon: 0,
     selectSlot: 0,
   };
@@ -99,6 +102,7 @@ export function buildCommand(input: InputSource, bindings: Bindings, look: LookS
     interactHeld: held("interact"),
     melee: pressed("melee"),
     heal: pressed("heal"),
+    inventory: pressed("inventory"),
     cycleWeapon: (pressed("nextWeapon") ? 1 : 0) - (pressed("prevWeapon") ? 1 : 0),
     selectSlot: pressed("weapon1") ? 1 : pressed("weapon2") ? 2 : pressed("weapon3") ? 3 : 0,
   };

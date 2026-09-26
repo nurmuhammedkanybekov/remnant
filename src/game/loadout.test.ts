@@ -42,6 +42,13 @@ describe("loadout", () => {
     expect(story.enemyDamage).toBeLessThan(normal.enemyDamage);
     expect(normal.enemyDamage).toBeLessThan(nightmare.enemyDamage);
     expect(DIFFICULTIES.ironman.permadeath).toBe(true);
+    // Aizi is the hardest: tougher than Nightmare on every axis, and one life.
+    const aizi = DIFFICULTIES.aizi;
+    expect(DIFFICULTY_ORDER[DIFFICULTY_ORDER.length - 1]).toBe("aizi");
+    expect(aizi.permadeath).toBe(true);
+    for (const k of ["enemyHealth", "enemyDamage", "enemyPerception", "enemySpeed", "extraEnemies", "batteryDrain"] as const)
+      expect(aizi[k]).toBeGreaterThan(nightmare[k]);
+    for (const k of ["pickupMultiplier", "startingReserve", "carryHealthFloor"] as const) expect(aizi[k]).toBeLessThan(nightmare[k]);
   });
 });
 
