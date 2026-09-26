@@ -81,7 +81,7 @@ src/
 ├── items/pickup.ts            Pickup meshes and animation
 ├── fx/                        Procedural canvas textures, particles
 ├── audio/soundManager.ts      Synth SFX, stereo panning, wall muffling, reverb, ambience
-├── audio/music.ts             Adaptive music: layers, intensity, the theme
+├── audio/music.ts             Adaptive in-level music: layers and intensity
 └── ui/                        HUD, menus, styles
 ```
 
@@ -125,7 +125,7 @@ playing ──health 0──► dead ──Retry──► playing (same level, s
 - A **loading screen** is plain HTML, so it shows before any script runs;
   if WebGL can't start it says so instead of leaving a black page. Then a
   **title screen** waits for a key or button (browsers only allow audio
-  after one) and the theme starts.
+  after one) and the ambient drone starts.
 - The **main menu** renders a slowly turning view of the Maintenance Wing
   behind it, with a depth gauge of the shaft (every sublevel, lit up as far
   as you've climbed) and an intercepted radio fragment along the bottom.
@@ -543,7 +543,9 @@ are mixed:
 | Bells   | Sparse music-box notes from the chord                  | Calm exploration               |
 | Tension | Low pulse on the eighths, a trembling semitone cluster | Something is suspicious        |
 | Chase   | Kick, snare, hats, a filtered 16th bass, chord stabs   | Something is hunting you       |
-| Melody  | The main theme, with a soft echo                       | Menu, results and endings      |
+
+Outside levels (title, menus, results, endings) there's no music, only the
+ambient drone with its distant drips, groans and clanks.
 
 The session's **threat** (the HUD eye: ~0.6 when a creature is suspicious or
 searching, 1 when hunted or the Remnant is awake) drives an intensity that

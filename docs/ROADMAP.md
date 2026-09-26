@@ -67,7 +67,8 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 
 - [x] Adaptive music: calm / tension / chase layers driven by threat level,
       one synthesized piece on a shared clock
-- [x] Main theme for the menu and result screens
+- [x] Menu music (a melodic theme was tried, then dropped: the menus keep
+      the darker ambient drone)
 - [x] Redesigned main menu (depth gauge, intercepted radio), level
       transition cards, loading screen and title screen
 - [x] HUD pass (weapon-aware key hints, crosshair fades when you can't

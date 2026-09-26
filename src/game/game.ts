@@ -136,14 +136,14 @@ export class Game {
     this.state = "title";
     this.screens.title(this.input.usingPad ? "PRESS A" : "PRESS ANY KEY", () => {
       this.sound.init();
-      this.music.setMode("menu");
+      this.music.setMode("silent");
       this.showMainMenu();
     });
   }
 
   private showMainMenu(): void {
     this.state = "menu";
-    this.music.setMode("menu");
+    this.music.setMode("silent");
     this.hud.setVisible(false);
     this.hud.hideTransient();
     this.viewmodel.setVisible(false);
@@ -412,7 +412,7 @@ export class Game {
     this.hud.setVisible(false);
     addStats(run.stats, session.stats);
     const newBest = this.save.recordLevelTime(session.def.id, session.stats.time);
-    this.music.setMode("menu");
+    this.music.setMode("silent");
 
     if (run.levelIndex >= LEVELS.length - 1) {
       this.state = "victory";

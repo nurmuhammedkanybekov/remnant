@@ -147,7 +147,7 @@ Nine kinds of creature, each built to break a habit the last one taught you:
 - **Adaptive music**, synthesized too: one piece in layers (a slow pad,
   music-box notes, a tense pulse and clashing strings, then drums and a
   driving bass) that fade in and out with how much danger you're in. The
-  menu plays the main theme over the same chords.
+  menus keep only the ambient drone.
 
 ### Campaign
 

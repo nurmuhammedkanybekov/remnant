@@ -30,12 +30,6 @@ describe("music mix", () => {
     expect(Object.values(mixFor("silent", 1)).every((v) => v === 0)).toBe(true);
   });
 
-  it("plays the theme on the menu", () => {
-    const m = mixFor("menu", 0);
-    expect(m.melody).toBe(1);
-    expect(m.chase).toBe(0);
-  });
-
   it("moves from calm to tension to chase as danger grows", () => {
     const calm = mixFor("game", 0);
     const tense = mixFor("game", 0.6);
@@ -47,6 +41,5 @@ describe("music mix", () => {
     expect(tense.bells).toBeLessThan(calm.bells);
     expect(chase.chase).toBe(1);
     expect(chase.bells).toBe(0);
-    expect(chase.melody).toBe(0);
   });
 });
