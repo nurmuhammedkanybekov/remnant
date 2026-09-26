@@ -126,6 +126,13 @@ check("guest uses intercom → host", icUsed === true, `guest=${icGuest}`);
 const objs = await Promise.all([host, guest].map((p) => p.evaluate(() => window.game.session.objective)));
 check("objective updates for both", objs[0] === objs[1] && objs[0] === "Reach the stairwell.", JSON.stringify(objs));
 
+// 1b. Each sees the other in their chosen look.
+await guest.evaluate(() => (window.game.settings.look = "woman"));
+await host.evaluate(() => (window.game.settings.look = "dark"));
+await sleep(1500);
+const looks = await Promise.all([host, guest].map((p) => p.evaluate(() => window.game.session.remote?.look)));
+check("partner looks travel both ways", looks[0] === "woman" && looks[1] === "dark", JSON.stringify(looks));
+
 // 2. The guest opens a door.
 await put(guest, 4, 2, -Math.PI / 2, 0, 1.5);
 await sim(guest, 0.1, ["KeyE"]);
