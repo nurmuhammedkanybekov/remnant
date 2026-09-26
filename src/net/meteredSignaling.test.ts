@@ -94,6 +94,9 @@ describe("co-op matchmaking over Metered Realtime", () => {
   it("ships with a key, which a build or URL setting can replace or switch off", () => {
     expect(realtimeKey({}, "")).toMatch(/^pk_live_/);
     expect(realtimeKey({ VITE_METERED_REALTIME_KEY: "pk_live_mine" }, "")).toBe("pk_live_mine");
+    // An unset GitHub variable reaches the build as "", which must still mean the default.
+    expect(realtimeKey({ VITE_METERED_REALTIME_KEY: "" }, "")).toMatch(/^pk_live_/);
+    expect(realtimeKey({ VITE_METERED_REALTIME_KEY: "  " }, "")).toMatch(/^pk_live_/);
     expect(realtimeKey({}, "?realtimeKey=off")).toBeNull();
   });
 });
