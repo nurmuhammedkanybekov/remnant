@@ -17,6 +17,13 @@ export type Role = "host" | "guest";
 
 /** Give up on a connection that hasn't opened by then (a relay takes a little longer to set up). */
 const CONNECT_TIMEOUT_MS = 30000;
+/**
+ * Guest: resend the offer this often until the host answers (a message can be
+ * lost while either side's matchmaking connection blips), and give up — wrong
+ * code, or the host's game is gone — after the timeout.
+ */
+const ANSWER_RETRY_MS = 3000;
+const ANSWER_TIMEOUT_MS = 20000;
 /** No message at all for this long means the other side is gone. */
 const SILENCE_TIMEOUT_MS = 8000;
 const PING_MS = 1000;
@@ -39,7 +46,10 @@ export function describeClose(reason: string): string {
 /** Why a link ended, in words for the player. */
 export const CLOSE_REASONS: Record<string, string> = {
   "id-taken": "That room code is already in use. Try hosting again.",
-  "no-room": "No game with that code. Check it with the host.",
+  "no-room":
+    "No game with that code. Check it with the host — it's the five characters on their screen, and it's new every time they host.",
+  "no-answer":
+    "Nobody answered in that room. Check the code with the host — it's the five characters on their screen, and it's new every time they host.",
   full: "That game already has two players.",
   unreachable: "Couldn't reach the matchmaking server. Check your connection.",
   server: "The matchmaking server refused the connection. Try again in a moment.",
@@ -65,6 +75,15 @@ export class PeerLink {
   onClose: ((reason: string) => void) | null = null;
   /** Host: someone tried to join but the connection couldn't be made. The room stays open for another try. */
   onJoinFailed: (() => void) | null = null;
+  /** Host: a partner has knocked and the connection is being set up. */
+  onJoining: (() => void) | null = null;
+  /** Each step of connecting, in words — shown in the lobby, and after a failure, so problems can be pinned down. */
+  onStatus: ((step: string) => void) | null = null;
+  /** The last step reached (see `onStatus`). */
+  lastStep = "starting";
+  private answered = false;
+  /** Host: the answer sent to the current guest, to repeat if they knock again. */
+  private lastAnswer: { sdp: RTCSessionDescriptionInit } | null = null;
 
   private readonly signaling: Signaling | MeteredSignaling;
   private pc: RTCPeerConnection | null = null;
@@ -92,10 +111,12 @@ export class PeerLink {
         ? new MeteredSignaling(id, roomPeerId(code), key, role === "guest")
         : new Signaling(id, signalUrl ?? DEFAULT_SIGNAL_URL);
     this.signaling.onOpen = () => {
+      this.status(role === "host" ? "room open, waiting" : "room found");
       // A guest calls the host once; after a reconnection mid-handshake the call already under way carries on.
       if (role === "guest" && !this.remoteId) void this.call();
     };
     this.signaling.onMessage = (m) => void this.onSignal(m);
+    if (this.signaling instanceof MeteredSignaling) this.signaling.onNote = (note) => this.status(note);
     this.signaling.onError = (reason) => {
       // Once connected directly, the mailbox going away doesn't matter.
       if (!this.isOpen) this.close(reason);
@@ -178,10 +199,10 @@ export class PeerLink {
       return pc;
     }
     this.pc = pc;
-    pc.onicecandidate = (e) => {
-      if (e.candidate) this.signaling.send(remoteId, "CANDIDATE", { candidate: e.candidate.toJSON() });
-    };
+    // No trickling: candidates go out inside the offer/answer (see `gathered`), so connecting
+    // takes two messages rather than dozens — matchmaking services rate-limit bursts.
     pc.onconnectionstatechange = () => {
+      this.status(`connection ${pc.connectionState}`);
       if (pc.connectionState !== "failed") return;
       if (this.isOpen) this.close("lost");
       else if (this.role === "host") this.dropPending();
@@ -239,7 +260,20 @@ export class PeerLink {
     this.adopt(pc.createDataChannel("fast", { ordered: false, maxRetransmits: 0 }));
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    this.signaling.send(this.remoteId!, "OFFER", { sdp: pc.localDescription!.toJSON() } satisfies Offer);
+    this.status("gathering network routes");
+    await gathered(pc);
+    if (this.closed) return;
+    this.status(`asking the host (${describeCandidates(pc.localDescription?.sdp)})`);
+    const send = () => this.signaling.send(this.remoteId!, "OFFER", { sdp: pc.localDescription!.toJSON() } satisfies Offer);
+    send();
+    // No answer yet: keep knocking, then conclude nobody is hosting this code.
+    const retry = window.setInterval(() => {
+      if (this.answered || this.closed) return window.clearInterval(retry);
+      this.status(`asking the host again (${describeCandidates(pc.localDescription?.sdp)})`);
+      send();
+    }, ANSWER_RETRY_MS);
+    this.timers.push(retry);
+    this.timers.push(window.setTimeout(() => !this.answered && !this.isOpen && this.close("no-answer"), ANSWER_TIMEOUT_MS));
   }
 
   private async onSignal(m: SignalMessage): Promise<void> {
@@ -248,22 +282,35 @@ export class PeerLink {
       case "OFFER": {
         if (this.role !== "host" || !m.src) return;
         if (this.remoteId) {
+          // The same guest knocking again: our answer went missing, so send it again.
+          if (m.src === this.remoteId) {
+            if (this.lastAnswer) this.signaling.send(m.src, "ANSWER", this.lastAnswer);
+            return;
+          }
           // Someone else is already in (or on their way in): turn the newcomer away.
-          if (m.src !== this.remoteId) this.signaling.send(m.src, "ANSWER", { full: true });
+          this.signaling.send(m.src, "ANSWER", { full: true });
           return;
         }
+        this.onJoining?.();
         const pc = await this.newConnection(m.src);
         if (this.closed) return;
         await pc.setRemoteDescription((payload as unknown as Offer).sdp);
         await this.flushCandidates();
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        this.signaling.send(m.src, "ANSWER", { sdp: pc.localDescription!.toJSON() });
+        this.status("gathering network routes");
+        await gathered(pc);
+        if (this.closed) return;
+        this.status(`answering (${describeCandidates(pc.localDescription?.sdp)})`);
+        this.lastAnswer = { sdp: pc.localDescription!.toJSON() };
+        this.signaling.send(m.src, "ANSWER", this.lastAnswer);
         break;
       }
       case "ANSWER": {
-        if (this.role !== "guest" || !this.pc) return;
+        if (this.role !== "guest" || !this.pc || this.answered) return;
         if (payload.full) return this.close("full");
+        this.answered = true;
+        this.status(`host answered (${describeCandidates((payload.sdp as RTCSessionDescriptionInit | undefined)?.sdp)}), connecting`);
         await this.pc.setRemoteDescription(payload.sdp as RTCSessionDescriptionInit);
         await this.flushCandidates();
         break;
@@ -282,6 +329,11 @@ export class PeerLink {
     }
   }
 
+  private status(step: string): void {
+    this.lastStep = step;
+    this.onStatus?.(step);
+  }
+
   /** Host: forget a half-made connection so the next guest can try. */
   private dropPending(): void {
     if (this.isOpen || this.closed) return;
@@ -289,6 +341,7 @@ export class PeerLink {
     this.pc = null;
     this.reliable = this.fast = null;
     this.remoteId = null;
+    this.lastAnswer = null;
     this.pendingCandidates = [];
     this.onJoinFailed?.();
   }
@@ -298,4 +351,29 @@ export class PeerLink {
     this.pendingCandidates = [];
     for (const c of list) await this.pc?.addIceCandidate(c).catch(() => undefined);
   }
+}
+
+/** Wait (briefly) until the connection has found its network routes, so they all go out in one message. */
+function gathered(pc: RTCPeerConnection, maxMs = 4000): Promise<void> {
+  if (pc.iceGatheringState === "complete") return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      pc.removeEventListener("icegatheringstatechange", check);
+      resolve();
+    };
+    const check = () => pc.iceGatheringState === "complete" && done();
+    const timer = setTimeout(done, maxMs);
+    pc.addEventListener("icegatheringstatechange", check);
+  });
+}
+
+/** "2 local, 1 public, 4 relay" — the kinds of route an SDP offers, for diagnostics. */
+export function describeCandidates(sdp: string | undefined): string {
+  const counts = { host: 0, srflx: 0, relay: 0 };
+  for (const m of (sdp ?? "").matchAll(/a=candidate:.* typ (host|srflx|prflx|relay)/g)) {
+    const t = m[1] === "prflx" ? "srflx" : (m[1] as keyof typeof counts);
+    counts[t]++;
+  }
+  return `${counts.host} local, ${counts.srflx} public, ${counts.relay} relay`;
 }
