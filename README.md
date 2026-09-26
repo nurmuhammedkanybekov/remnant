@@ -8,6 +8,9 @@ pistol with barely any ammo and a flashlight with a dying battery, and the
 things down here hunt by sound. You can fight, but sneaking is usually
 smarter.
 
+### ▶ [Play it in your browser](https://nurmuhammedkanybekov.github.io/remnant/)
+*(Desktop with mouse and keyboard; headphones recommended)*
+
 ![Main menu](docs/screenshots/menu.jpg)
 
 | | |

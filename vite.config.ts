@@ -1,6 +1,9 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  // Relative asset paths, so the built game works from any URL —
+  // including GitHub Pages' https://<user>.github.io/remnant/ subfolder.
+  base: "./",
   server: {
     port: 5173,
   },
