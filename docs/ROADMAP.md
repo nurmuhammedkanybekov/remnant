@@ -35,17 +35,23 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] Unit tests (Vitest) + CI on every push and pull request
 - [x] Prettier formatting, EditorConfig
 
-## Phase 2 — Campaign
+## Phase 2 — Campaign ✅
 
-- [ ] Level format v2: named regions, doors, switches, scripted triggers
-- [ ] Interact key and interactable objects (doors, generators, radios)
-- [ ] Radio dialogue system with subtitles (the Operator)
-- [ ] Levels 1–10 as described in `STORY.md` (existing two levels become 2 and 3)
-- [ ] Automated level lint: every level is solvable (spawn → keycard → exit)
-- [ ] Mid-level checkpoints
-- [ ] Both endings
+- [x] Level format v2: doors, security doors, generators, intercoms, water,
+      checkpoints and invisible script triggers
+- [x] Interact key and interactable objects
+- [x] Radio dialogue system with subtitles and a synthesized radio voice
+- [x] Levels 1–10 as described in `STORY.md` (the original two levels are now 2 and 3)
+- [x] Lock-aware level lint: every level is solvable (spawn → keycard → security door → exit)
+- [x] Mid-level checkpoints
+- [x] Prologue and both endings
+- [x] Per-level visual themes
+- [x] Save format v2, with migration of v1 saves
 
 ## Phase 3 — Creatures and combat
+
+Levels 4–9 currently use Husks and Brutes as stand-ins for the creatures
+`STORY.md` introduces there; this phase replaces them.
 
 - [ ] Listener, Watcher, Crawler, Spitter, Swarm, Mimic
 - [ ] Boss: the Remnant (multi-phase)
