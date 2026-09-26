@@ -4,12 +4,12 @@
 
 **A first-person survival horror shooter that runs in the browser.**
 <br>
-Built from scratch with TypeScript and Three.js. Every texture, model and piece of music is generated in code; key sound effects use real (CC0) recordings.
+Built from scratch with TypeScript and Three.js. Every model and piece of music is generated in code; key sound effects and surface materials use real (CC0) recordings and photo scans.
 
 [![Build & Deploy](https://github.com/nurmuhammedkanybekov/remnant/actions/workflows/deploy.yml/badge.svg)](https://github.com/nurmuhammedkanybekov/remnant/actions/workflows/deploy.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![Three.js](https://img.shields.io/badge/Three.js-r166-black?logo=threedotjs)
-![Assets](https://img.shields.io/badge/art%20%26%20music-generated%20in%20code-d8432f)
+![Assets](https://img.shields.io/badge/models%20%26%20music-generated%20in%20code-d8432f)
 
 ### ▶ [Play it in your browser](https://nurmuhammedkanybekov.github.io/remnant/)
 
@@ -57,12 +57,16 @@ _Desktop with mouse and keyboard. Headphones strongly recommended._
 I wanted a project that pushed me outside my usual backend work: real-time
 rendering, game AI, audio and performance all in one codebase. I also set
 myself one constraint to make it interesting: **generate everything in
-code.** Every texture is painted onto a canvas when the game starts, every
-creature is built from primitives, and the music and most sounds are
-synthesized with the Web Audio API. The exception is sound effects that
-never sound real without a real recording (weapons, footsteps, creature
-voices, the doors): those use public-domain (CC0) recordings, credited in
-[`public/sfx/CREDITS.md`](public/sfx/CREDITS.md). The whole game is
+code.** Every creature is built from primitives, textures are painted onto
+a canvas when the game starts, and the music and most sounds are
+synthesized with the Web Audio API. The exceptions are the things that
+never look or sound real without a real source: sound effects for weapons,
+footsteps, creature voices and doors use public-domain (CC0) recordings,
+credited in [`public/sfx/CREDITS.md`](public/sfx/CREDITS.md), and the big
+surfaces (concrete, steel, wood, ceiling tiles) start from CC0 photo scans,
+credited in [`public/textures/CREDITS.md`](public/textures/CREDITS.md), with
+the facility's details painted over them in code. Both fall back to fully
+generated versions if the files can't load. The whole game is
 TypeScript plus one runtime dependency, `three`.
 
 ---
@@ -129,8 +133,11 @@ Nine kinds of creature, each built to break a habit the last one taught you:
 
 ### Graphics
 
-- Procedural canvas textures (concrete panels, tiles, crates, signs…) with
-  bump mapping.
+- Photo-scanned CC0 materials (concrete, steel plate, hazard paint, wood,
+  ceiling tiles) with normal and roughness maps, and the facility's own
+  details painted over them on a canvas: panel seams, rivets, kick-plates,
+  water damage, blood. Each wall face picks one of four variants so stains
+  don't line up. Fully painted fallbacks if the photos can't load.
 - Physically based lighting, ACES tone mapping, and flickering, dying and
   emergency ceiling lamps.
 - A custom post-processing shader: film grain, vignette, damage-driven

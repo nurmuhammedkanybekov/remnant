@@ -1,10 +1,12 @@
+import { loadPhotos } from "./fx/textures";
 import { Game } from "./game/game";
 
 const app = document.getElementById("app");
 if (!app) throw new Error("Missing #app container");
 
-// Let the loading screen paint before the (synchronous) texture painting and level building.
-requestAnimationFrame(() =>
+// Load the photo materials behind the loading screen, then let it paint before
+// the (synchronous) texture painting and level building.
+void loadPhotos().then(() =>
   setTimeout(() => {
     try {
       new Game(app);

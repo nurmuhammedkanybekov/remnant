@@ -12,7 +12,7 @@ export interface QualityPreset {
   pixelRatioCap: number;
   /** Real-time lights shared between the nearest lamps (see `LampSystem`). */
   lampLights: number;
-  /** Bump-mapped walls and floors. */
+  /** Normal-mapped (or bump-mapped) walls, floors and props. */
   bumpMaps: boolean;
   /** Dust motes floating in the flashlight beam. */
   dustMotes: number;

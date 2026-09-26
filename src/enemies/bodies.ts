@@ -56,6 +56,8 @@ function fleshMaterial(tint: number, veins: number): THREE.MeshStandardMaterial 
   return new THREE.MeshStandardMaterial({
     color: tint,
     map: tex.flesh,
+    normalMap: tex.skin,
+    normalScale: new THREE.Vector2(0.7, 0.7),
     roughness: 0.62,
     metalness: 0.05,
     emissive: veins,

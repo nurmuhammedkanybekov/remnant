@@ -12,14 +12,14 @@ the known gaps.
 
 ## 1. Quick facts
 
-|              |                                                                                                                                                                                                                                                                                                                                             |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Engine       | Three.js r166 (WebGL) + its `EffectComposer` post-processing                                                                                                                                                                                                                                                                                |
-| Language     | TypeScript (strict)                                                                                                                                                                                                                                                                                                                         |
-| Build        | Vite 5                                                                                                                                                                                                                                                                                                                                      |
-| Runtime deps | `three` only                                                                                                                                                                                                                                                                                                                                |
-| Assets       | Textures are painted onto `<canvas>` at startup and music and most audio are synthesized with the Web Audio API. Weapon, footstep, creature, door and a few other sounds are CC0 recordings in `public/sfx/` (~1 MB, credited in `CREDITS.md`), each with a synthesized fallback. (UI fonts load from Google Fonts, with system fallbacks.) |
-| Levels       | 10 hand-authored grid maps with scripted story beats (see `STORY.md`)                                                                                                                                                                                                                                                                       |
+|              |                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine       | Three.js r166 (WebGL) + its `EffectComposer` post-processing                                                                                                                                                                                                                                                                                                                                                                                |
+| Language     | TypeScript (strict)                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Build        | Vite 5                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Runtime deps | `three` only                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Assets       | Textures are painted onto `<canvas>` at startup, the large surfaces over CC0 photo scans in `public/textures/` (~1.6 MB, credited in `CREDITS.md`); music and most audio are synthesized with the Web Audio API. Weapon, footstep, creature, door and a few other sounds are CC0 recordings in `public/sfx/` (~1 MB, credited in `CREDITS.md`), each with a synthesized fallback. (UI fonts load from Google Fonts, with system fallbacks.) |
+| Levels       | 10 hand-authored grid maps with scripted story beats (see `STORY.md`)                                                                                                                                                                                                                                                                                                                                                                       |
 
 ```bash
 npm install
@@ -190,10 +190,19 @@ Per playing frame, `Game` builds a `PlayerCommand` and calls
 - **Light budget is fixed** so shaders never recompile mid-level: 1 hemisphere
   fill, 6 pooled lamp lights, 1 exit light, the flashlight, and a muzzle-flash
   light that is always present (intensity 0 when idle).
-- **Textures** are generated once on a canvas: panelled concrete with hazard
-  kick-plate and water streaks, floor tiles, ceiling panels, crates, barrels,
-  medkit, paper, EXIT sign, glow/flash sprites, bullet holes. Walls also use
-  the texture as a bump map.
+- **Textures** are built once on a canvas (`fx/textures.ts`). The surfaces
+  — walls, floor, ceiling, crates, barrels, door plate and hazard paint —
+  start from CC0 photo-scanned materials in `public/textures/` (colour,
+  normal and roughness maps, loaded behind the boot screen by `loadPhotos`),
+  and the game paints its own details over them: panel seams and rivets
+  (also carved into the normal map), a steel kick-plate and hazard stripe,
+  water streaks, blood, floor tile joints, the ceiling's T-bar grid, crate
+  frames. Creatures get a wrinkled-hide normal map. If a photo fails to
+  load, that surface is painted from scratch as before and uses its colour
+  as a bump map. Normal maps are off on the Low preset. Wall faces pick
+  one of four mirrored/shifted variants in the vertex shader (hash of cell
+  and face) so the same stain never lines up along a corridor. Also painted:
+  medkit, paper, EXIT sign, glow/flash sprites, bullet holes, vein glow.
 - Walls, crates and barrels are `InstancedMesh`es (one draw call each).
 - Fog: `FogExp2(0x050607, 0.06)`.
 
