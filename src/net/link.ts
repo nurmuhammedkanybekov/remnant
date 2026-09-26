@@ -1,4 +1,4 @@
-import { hasRelay, iceConfig, iceServers } from "./ice";
+import { iceConfig, iceServers, lastRelayState } from "./ice";
 import { roomPeerId } from "./protocol";
 import { steadyInterval } from "./timer";
 import { DEFAULT_SIGNAL_URL, Signaling, type SignalMessage } from "./signaling";
@@ -20,6 +20,21 @@ const CONNECT_TIMEOUT_MS = 30000;
 const SILENCE_TIMEOUT_MS = 8000;
 const PING_MS = 1000;
 
+/** Why a link ended, in words for the player — for a failed connection, taking the relay's state into account. */
+export function describeClose(reason: string): string {
+  if (reason === "timeout") {
+    switch (lastRelayState()) {
+      case "ready":
+        return "Couldn't connect to the other player, even through the relay. Check both internet connections and try again.";
+      case "rejected":
+        return "Couldn't connect directly, and the relay refused its key. The relay needs the API key shown next to a TURN credential in the Metered dashboard (see the README).";
+      case "unreachable":
+        return "Couldn't connect directly, and the relay couldn't be reached. Try again in a minute.";
+    }
+  }
+  return CLOSE_REASONS[reason] ?? CLOSE_REASONS.lost;
+}
+
 /** Why a link ended, in words for the player. */
 export const CLOSE_REASONS: Record<string, string> = {
   "id-taken": "That room code is already in use. Try hosting again.",
@@ -29,9 +44,8 @@ export const CLOSE_REASONS: Record<string, string> = {
   server: "The matchmaking server refused the connection. Try again in a moment.",
   closed:
     "Lost the connection to the matchmaking server and couldn't get it back. Check your internet connection and try again — if it keeps happening, the free server may be busy; wait a minute.",
-  timeout: hasRelay()
-    ? "Couldn't connect to the other player, even through the relay. Check both connections and try again."
-    : "Couldn't connect to the other player. Some networks (school, office, some mobile data) block direct connections between browsers — try another network, or turn on the free relay (see the README).",
+  timeout:
+    "Couldn't connect to the other player. Some networks (school, office, some mobile data) block direct connections between browsers — try another network, or turn on the free relay (see the README).",
   unsupported: "This browser can't make direct connections (WebRTC). Try an up-to-date Chrome, Edge or Firefox.",
   version: "The other player is running a different version of REMNANT. Both refresh the page and try again.",
   left: "The other player left the game.",

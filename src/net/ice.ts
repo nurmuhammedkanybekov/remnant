@@ -55,6 +55,25 @@ export function hasRelay(cfg = iceConfig()): boolean {
   return (cfg.meteredApp !== "" && cfg.meteredKey !== "") || cfg.turnUrls.length > 0;
 }
 
+/**
+ * What happened when the relay was last set up:
+ * off (none configured), ready, rejected (the relay said the key or login is
+ * wrong), unreachable (couldn't ask it).
+ */
+export type RelayState = "off" | "ready" | "rejected" | "unreachable";
+let state: RelayState = "off";
+
+/** The relay's state after the latest `iceServers()` (checks it if it hasn't been yet). */
+export async function relayState(cfg = iceConfig()): Promise<RelayState> {
+  await iceServers(cfg);
+  return state;
+}
+
+/** The last known relay state, without checking. */
+export function lastRelayState(): RelayState {
+  return state;
+}
+
 let cached: Promise<RTCIceServer[]> | null = null;
 
 /** The ICE servers for a new connection. Never throws: a relay that can't be reached is just left out. */
@@ -65,7 +84,11 @@ export function iceServers(cfg = iceConfig()): Promise<RTCIceServer[]> {
 
 async function build(cfg: IceConfig): Promise<RTCIceServer[]> {
   const servers: RTCIceServer[] = [STUN];
-  if (cfg.turnUrls.length) servers.push({ urls: cfg.turnUrls, username: cfg.turnUser, credential: cfg.turnPass });
+  state = "off";
+  if (cfg.turnUrls.length) {
+    servers.push({ urls: cfg.turnUrls, username: cfg.turnUser, credential: cfg.turnPass });
+    state = "ready";
+  }
   if (cfg.meteredApp && cfg.meteredKey) {
     const host = cfg.meteredApp.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
     try {
@@ -77,10 +100,19 @@ async function build(cfg: IceConfig): Promise<RTCIceServer[]> {
       clearTimeout(timer);
       if (res.ok) {
         const list = (await res.json()) as unknown;
-        if (Array.isArray(list)) servers.push(...list.filter((s): s is RTCIceServer => typeof s === "object" && s !== null && "urls" in s));
-      } else console.warn(`TURN credentials request failed (${res.status}); connecting without a relay.`);
+        const relays = Array.isArray(list) ? list.filter((s): s is RTCIceServer => typeof s === "object" && s !== null && "urls" in s) : [];
+        servers.push(...relays);
+        if (relays.length) state = "ready";
+        else if (state === "off") state = "rejected";
+      } else {
+        // 401/403: the key is wrong (a different kind of Metered key, or a typo).
+        console.warn(`TURN credentials request failed (${res.status}); connecting without a relay.`);
+        if (state === "off") state = res.status === 401 || res.status === 403 ? "rejected" : "unreachable";
+        if (state === "unreachable") cached = null;
+      }
     } catch {
       console.warn("TURN credentials unavailable; connecting without a relay.");
+      if (state === "off") state = "unreachable";
       // Try again next game rather than caching the failure.
       cached = null;
     }
