@@ -69,8 +69,13 @@ src/
 │   ├── playerController.ts    Movement, crouch/sprint, stamina, head-bob, recoil, camera shake
 │   ├── flashlight.ts          Spotlight, battery, beam sway, low-battery flicker
 │   └── health.ts              HP, mercy frames, damage source
-├── weapons/                   Weapon state machine and first-person viewmodel
-├── enemies/                   AI state machine, creature rig, enemy manager
+├── weapons/                   Weapon state machine and first-person viewmodels
+├── enemies/
+│   ├── enemy.ts               The shared AI state machine and creature traits
+│   ├── boss.ts                The Remnant
+│   ├── bodies.ts              Per-type rigs: humanoid variants, rat, the Remnant's mass
+│   ├── projectiles.ts         Lobbed acid
+│   └── enemyManager.ts        Spawning (incl. mid-level), noise, hit tests, threat
 ├── items/pickup.ts            Pickup meshes and animation
 ├── fx/                        Procedural canvas textures, particles
 ├── audio/soundManager.ts      Synth SFX, stereo panning, wall muffling, reverb, ambience
@@ -123,13 +128,18 @@ playing ──health 0──► dead ──Retry──► playing (same level, s
   doors, generators, intercoms and triggers are already done
   (`game/checkpoint.ts`); on death the player can retry from it or restart
   the level. "Continue" resumes at the start of the saved
-  level with the loadout you entered it with. Reaching a level unlocks it in
+  level with the loadout you entered it with (from a checkpoint, the
+  loadout you had when you reached it). Reaching a level unlocks it in
   **Chapters**. Best clear time per level is recorded. The save is one
   versioned JSON document; anything malformed is repaired field by field
   rather than discarded, and older versions are migrated (v1 → v2 shifted
-  level indices when the campaign grew from two levels to ten).
-- **Carry-over**: health, battery and ammo carry into the next level, topped
-  up to the difficulty's floors so a bad run isn't unwinnable.
+  level indices when the campaign grew from two levels to ten; v2 → v3 moved
+  the single pistol into a multi-weapon loadout and dropped mid-level
+  checkpoints, whose indices no longer matched the redesigned levels).
+- **Carry-over**: health, battery, weapons, ammo and medkits carry into the
+  next level, with health and battery topped up to the difficulty's floors so
+  a bad run isn't unwinnable. Starting from a later chapter hands you the
+  weapons you would have found on the way.
 - If pointer lock is refused (browsers block re-locking right after Esc), the
   HUD shows "CLICK TO RESUME" and clicking the view re-locks.
 
@@ -147,6 +157,7 @@ Per playing frame, `Game` builds a `PlayerCommand` and calls
 | Pickup amounts                        | ×1.5    | ×1      | ×0.75     | ×1      |
 | Flashlight drain                      | ×0.6    | ×1      | ×1.3      | ×1      |
 | Starting reserve ammo                 | 32      | 16      | 8         | 16      |
+| Starting medkits                      | 2       | 1       | 0         | 1       |
 | Health / battery floor between levels | 70 / 50 | 40 / 30 | 25 / 20   | 40 / 30 |
 | Lives                                 | ∞       | ∞       | ∞         | **1**   |
 
@@ -192,7 +203,13 @@ One character = one 4×4 world-unit cell. Wall height 3.2.
 | `#`     | wall                                       | `.`     | floor                               |
 | `S`     | player spawn                               | `X`     | exit                                |
 | `E`     | husk                                       | `H`     | brute                               |
-| `A`     | ammo                                       | `M`     | medkit                              |
+| `U`     | listener                                   | `W`     | watcher                             |
+| `V`     | crawler                                    | `P`     | spitter                             |
+| `%`     | swarm (a pack of rats)                     | `Q`     | mimic                               |
+| `@`     | the Remnant (boss, one per level)          |         |                                     |
+| `A`     | pistol ammo                                | `M`     | medkit                              |
+| `T`     | shotgun shells                             | `J`     | rivets                              |
+| `!`     | shotgun                                    | `^`     | rivet gun                           |
 | `B`     | battery                                    | `K`     | keycard                             |
 | `L`     | ceiling lamp                               | `R`     | red emergency lamp                  |
 | `C`     | crate stack (solid)                        | `O`     | barrels (solid)                     |
@@ -203,7 +220,8 @@ One character = one 4×4 world-unit cell. Wall height 3.2.
 | `a`–`z` | invisible trigger, runs `triggers[letter]` |         |                                     |
 
 A level is a `LevelDef`: map, notes, spawn facing, and optionally
-`triggers`, `intercoms`, `events` (`start`, `keycard`, `power`), a `theme`
+`triggers`, `intercoms`, `events` (`start`, `keycard`, `power`,
+`bossPhase2`, `bossPhase3`, `bossDefeated`), a `theme`
 and the `finale` flag. Enemy glyphs come from `content/enemies.ts`. The
 parser rejects unknown characters, missing or duplicate spawns/exits, notes
 or triggers without text, and intercom counts that don't match their
@@ -211,23 +229,24 @@ scripts, with an error naming the level and cell.
 
 **Locks.** If a level has security doors, the keycard opens them; otherwise
 it unlocks the exit. If a level has generators, the exit has no power until
-every one is running.
+every one is running. If a level has a boss, the exit stays sealed until
+it's dead.
 
 **Themes** (`world/theme.ts`) set fog colour and density, fill light, wall
 and floor tint and lamp colour per level.
 
-| #   | Level                         | Enemies           | What's new                                |
-| --- | ----------------------------- | ----------------- | ----------------------------------------- |
-| 1   | Sublevel 10 — Infirmary       | 2 husks           | Tutorial, intercom, doors, hints          |
-| 2   | Sublevel 9 — Maintenance Wing | 3 husks           | Stealth                                   |
-| 3   | Sublevel 8 — Cold Storage     | 2 husks, brute    | Keycard-locked exit, first Brute          |
-| 4   | Sublevel 7 — Pumping Station  | 3 husks, brute    | Water, security doors                     |
-| 5   | Sublevel 6 — Containment Labs | 4 husks, brute    | Doors everywhere                          |
-| 6   | Sublevel 5 — Ventilation      | 5 husks           | Duct maze, the radio lies                 |
-| 7   | Sublevel 4 — Power Plant      | 3 husks, brute    | Three generators power the exit           |
-| 8   | Sublevel 3 — Armory           | 5 husks, 2 brutes | Big open hall, supplies                   |
-| 9   | Sublevel 2 — The Hive         | 3 husks, 3 brutes | The Operator reveals itself               |
-| 10  | Surface — Lift Shaft          | 2 husks, brute    | The choice: leave, or trigger the charges |
+| #   | Level                         | Creatures                                              | What's new                                      |
+| --- | ----------------------------- | ------------------------------------------------------ | ----------------------------------------------- |
+| 1   | Sublevel 10 — Infirmary       | 2 husks                                                | Tutorial, intercom, doors, hints                |
+| 2   | Sublevel 9 — Maintenance Wing | 3 husks                                                | Stealth                                         |
+| 3   | Sublevel 8 — Cold Storage     | 2 husks, brute                                         | Keycard-locked exit, first Brute                |
+| 4   | Sublevel 7 — Pumping Station  | 2 listeners, husk, brute                               | Water, security doors, first Listener           |
+| 5   | Sublevel 6 — Containment Labs | 2 watchers, 2 husks, brute                             | Doors everywhere, first Watcher                 |
+| 6   | Sublevel 5 — Ventilation      | 2 crawlers, mimic, 2 husks                             | Duct maze, takedowns, rivet gun, the radio lies |
+| 7   | Sublevel 4 — Power Plant      | 2 spitters, husk, brute                                | Three generators power the exit                 |
+| 8   | Sublevel 3 — Armory           | 3 swarms (18 rats), 2 husks, 2 brutes                  | Shotgun, big open hall                          |
+| 9   | Sublevel 2 — The Hive         | listener, watcher, crawler, spitter, 2 brutes, Remnant | Everything so far, then the boss arena          |
+| 10  | Surface — Lift Shaft          | husk, crawler, brute                                   | The choice: leave, or trigger the charges       |
 
 The exit is a door + EXIT sign mounted on the wall next to the `X` cell. Its
 sign and light turn red while locked.
@@ -272,6 +291,8 @@ line at a time on the simulation clock, so pausing pauses the conversation.
 | Stamina                      | 100, drain 20/s, regen 16/s (×1.3 when still or crouched). Emptying it locks sprint until 25. |
 | Crouch                       | Hold C (or Ctrl): eye height 1.05, near-silent                                                |
 | Health                       | 100, no regen, 0.35 s mercy window between hits                                               |
+| Medkits                      | Carried, up to 3. Use (H) takes 1.3 s — weapon lowered — and heals 45                         |
+| Melee (V / right click)      | 0.55 s cooldown. Takedown from behind, or 20 damage + shove                                   |
 | Feel                         | head-bob, strafe lean, recoil pitch kick, trauma-based camera shake                           |
 
 **Noise.** Each gait has a hearing radius: still 0, crouch 1.6, walk 5.5,
@@ -285,26 +306,48 @@ With it on, enemies can see you from 15 units instead of 6.
 
 ---
 
-## 7. Weapon
+## 7. Weapons
 
-| Stat                                      | Value                                                                   |
-| ----------------------------------------- | ----------------------------------------------------------------------- |
-| Damage                                    | 26 (×2.5 headshot)                                                      |
-| Fire cooldown                             | 0.24 s, semi-auto                                                       |
-| Magazine / reserve max / starting reserve | 8 / 48 / 16                                                             |
-| Reload                                    | 1.5 s (auto-reload on dry trigger pull)                                 |
-| Range                                     | 40                                                                      |
-| Spread                                    | 0.006 rad base, grows with movement and rapid fire (crosshair shows it) |
-| Noise                                     | 22 units (60% through walls) — every shot alerts the area               |
+|                        | Sidearm         | Rivet gun       | Shotgun                         |
+| ---------------------- | --------------- | --------------- | ------------------------------- |
+| Slot                   | 1               | 2               | 3                               |
+| Damage                 | 26 (×2.5 head)  | 17 (×3 head)    | 8 pellets × 13 (×1.5 head)      |
+| Fire cooldown          | 0.24 s          | 0.17 s          | 0.85 s (pump)                   |
+| Magazine / reserve max | 8 / 48          | 12 / 60         | 5 / 24                          |
+| Reload                 | 1.5 s, magazine | 1.9 s, magazine | 0.55 s per shell, interruptible |
+| Range                  | 40              | 22              | 22                              |
+| Base spread            | 0.006 rad       | 0.012 rad       | 0.075 rad                       |
+| Noise radius           | 22              | **4.5**         | **32**                          |
+| Found                  | Start           | Ventilation (6) | Armory (8)                      |
+
+Spread grows with movement and rapid fire (the crosshair shows it). Every
+pellet is its own ray; a shot counts as one hit for accuracy if any pellet
+lands. Ammo pickups are per weapon (`A` rounds, `T` shells, `J` rivets); you
+can't pick up ammo for a weapon you don't have yet, and a test checks no
+level asks you to.
+
+**Switching** (1–3, Q to cycle, mouse wheel) takes 0.45 s: the weapon drops
+out of view and the next comes up. Switching cancels a reload.
+
+**Melee.** The nearest creature within reach (1.9 + its radius) and within
+50° of your aim is struck. If it's unaware and you're behind it (more than
+105° off its facing), or it's a Watcher frozen in your light, it's a
+**takedown**: an instant, nearly silent kill (noise 1.5). Otherwise it takes
+20 damage, is knocked back and staggered, and a wind-up in progress is
+interrupted. Brutes, the Remnant and anything on the ceiling can't be taken
+down.
 
 Hit-testing: ray vs. per-enemy spheres (head, chest, hips, legs) that follow
 the animated rig, clipped to the wall-hit distance. Feedback: hit marker
 (red for headshots, larger on kills), blood burst, hit sound, enemy flinch.
 
-The **viewmodel** is a primitive-built pistol + gloved hand with idle sway,
-mouse-lag sway, walk bob, recoil with slide blow-back, a full reload
-animation (dip, mag out, mag in, rack) timed to the reload sound, and a
-lowered pose while sprinting.
+The **viewmodels** are built from primitives: pistol and gloved hand, a
+yellow rivet gun with a side strip and gas canister, and a pump shotgun
+whose forend racks after every shot. All share idle and mouse-lag sway, walk
+bob, recoil, a lowered pose while sprinting, a melee swing, and an
+auto-injector animation while healing. The pistol and rivet gun have a full
+magazine reload (dip, mag out, mag in, rack); the shotgun rocks as each
+shell goes in.
 
 ---
 
@@ -313,63 +356,131 @@ lowered pose while sprinting.
 ### States
 
 ```
+lurk ──(ceiling) you pass beneath / hear or see you──► drop ──► chase
+  └──(mimic) you come close / hear or see you─────────────────► chase
+
 patrol ──hears you / half-sees you──► investigate ──arrives──► search ──timeout──► patrol
    │                                        │                     ▲
    └──────── fully sees you / shot ─────────┴──► chase ──lost 3.5 s─┘
                                                   │  ▲
                                             in reach  recover
                                                   ▼  │
-                                                attack (wind-up → strike)
+                                                attack (wind-up → strike or spit)
 ```
 
 - **Sight**: 60° half-angle cone, 6 units (your light off) / 15 (light on),
-  needs line of sight. Suspicion builds over time at range (instant up
-  close), so you get a moment to duck away. Once hunting, they track you all
-  round.
+  scaled by the creature's `sight` (0 = blind), needs line of sight.
+  Suspicion builds over time at range (instant up close). Once hunting, they
+  track you all round. Anything notices you bumping into it (1.1 units).
 - **Hearing**: your gait's noise radius × their hearing multiplier, 40%
-  through walls. Gunshots are separate noise events.
+  through walls. Gunshots, doors, generators and melee are separate noise
+  events.
 - **Losing them**: break line of sight and stay quiet for 3.5 s and a chaser
   switches to searching your last known position for ~6 s, then goes back
   to patrolling.
-- **Attacks** have a visible/audible wind-up (arms rise, hiss). Back off
-  during it and the strike misses.
-- **Movement**: BFS path, string-pulled with line-of-sight so they don't zig-
-  zag cell to cell, circle-vs-wall collision, and separation so packs don't
-  overlap.
+- **Attacks** have a visible/audible wind-up. Back off during it and the
+  strike misses; a melee shove interrupts it.
+- **Movement**: BFS path, string-pulled with line-of-sight, circle-vs-wall
+  collision, and separation so packs don't overlap.
 
-|                                      | Husk            | Brute           |
-| ------------------------------------ | --------------- | --------------- |
-| Health                               | 60              | 190             |
-| Speed (patrol / investigate / chase) | 1.0 / 1.9 / 3.6 | 0.8 / 1.5 / 2.5 |
-| Attack range / damage                | 1.35 / 16       | 1.75 / 34       |
-| Wind-up / recover                    | 0.38 / 0.8 s    | 0.65 / 0.9 s    |
-| Hearing multiplier                   | 1.0             | 0.8             |
+### Traits
 
-A husk out-runs your walk but not your sprint.
+Creatures share the state machine; what makes them different is data in
+`content/enemies.ts`:
 
-### Model & animation
+| Trait                | Values                           | Effect                                                                                             |
+| -------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `sight`              | 0..                              | Multiplies sight range. 0 = blind (Listener).                                                      |
+| `light`              | `sees` / `ignores` / `freezes`   | Whether the beam gives you away, and whether it locks the creature in place (Watcher).             |
+| `behaviour: ceiling` |                                  | Starts upside down on the ceiling; drops when you pass beneath (1.7), hear or see it, or shoot it. |
+| `behaviour: ranged`  | `ranged: { range, minRange, … }` | Spits from range, holds position, backs off if you're too close.                                   |
+| `behaviour: lurker`  |                                  | Stays hidden; every 9–17 s makes a lure sound; ambushes within 3.2.                                |
+| `behaviour: boss`    | `armor`                          | See the Remnant below.                                                                             |
+| `pack`               | n                                | One glyph places n (the Swarm).                                                                    |
+| `takedown`           | bool                             | Whether a quiet melee kill is possible.                                                            |
 
-Gaunt, hunched humanoid from primitives: forward-leaning torso with exposed
-ribs and spine ridges, long neck, jutting head with jaw, glowing eyes (with
-additive glow sprites so they read in the dark), long clawed arms. Procedural
-walk cycle driven by actual speed, arms reach forward while hunting, head
-twitches, stagger on hit, red flash on damage, and a backwards collapse on
-death with the eyes fading out.
+|                 | Husk   | Brute   | Listener | Watcher | Crawler   | Spitter      | Swarm (rat) | Mimic     |
+| --------------- | ------ | ------- | -------- | ------- | --------- | ------------ | ----------- | --------- |
+| Health          | 60     | 190     | 80       | 110     | 45        | 70           | 9           | 90        |
+| Chase speed     | 3.6    | 2.5     | 3.9      | 5.2     | 4.2       | 2.8          | 5.0         | 4.0       |
+| Damage          | 16     | 34      | 22       | 28      | 14        | 12 / 18 acid | 5           | 24        |
+| Wind-up         | 0.38 s | 0.65 s  | 0.45 s   | 0.3 s   | 0.3 s     | 0.7 s spit   | 0.18 s      | 0.35 s    |
+| Hearing / sight | 1 / 1  | 0.8 / 1 | 2.1 / 0  | 0.9 / 1 | 1.3 / 0.6 | 1 / 1        | 1.3 / 0.5   | 1.2 / 0.8 |
+| Takedown        | yes    | no      | yes      | yes     | yes       | yes          | yes         | yes       |
+
+A husk out-runs your walk but not your sprint. A Watcher out-runs almost
+anything — keep the light on it.
+
+- **Watcher**: frozen while the lit beam (within ~0.42 rad of your aim and 20
+  units) is on it and it's in line of sight. Frozen, it can't move or finish
+  a wind-up, and can be taken down from any side.
+- **Crawler**: moves on all fours. On the ceiling it spider-walks upside
+  down, with limbs in the concrete, and clicks. It flips and falls when it
+  drops, then hunts like a husk.
+- **Spitter**: globs fly on a ballistic arc (gravity 9, ~11 units/s) aimed at
+  where you were, so strafing dodges them. They burst on walls, the floor or
+  you.
+- **Mimic**: its lures are your own footsteps, a pickup sound, or one of the
+  Operator's lines spoken from its hiding place — subtitled as "OPERATOR —
+  NOT ON THE RADIO".
+
+### The Remnant (boss)
+
+A stationary mass at the end of the Hive with an arena around it. It wakes
+when you come within 16 units with line of sight (or hurt it). It has 1100
+health, and its hide takes only 35% damage; the **core** takes full damage
+(×headshot) while it's open — during every attack wind-up and for 2.2 s
+after — and 35% while shut.
+
+| Phase (health) | Tendril slam (within 6)   | Acid volley         | Summons                      |
+| -------------- | ------------------------- | ------------------- | ---------------------------- |
+| 1 (above ⅔)    | 30 damage, 0.95 s wind-up | 1 glob, every 3.2 s | —                            |
+| 2 (above ⅓)    | 0.85 s wind-up            | 3-glob fan, 3.4 s   | 3 rats every 14 s            |
+| 3              | 0.7 s wind-up             | 5-glob fan, 2.6 s   | 4 rats and a husk every 10 s |
+
+Entering a new phase it screams (every creature on the level hears it),
+opens its core for 3.5 s and summons at once. The exit is sealed until it
+dies; when it does, everything it birthed dies with it. The player can't
+walk into it.
+
+### Bodies & animation (`enemies/bodies.ts`)
+
+Each creature type has its own rig, all from primitives:
+
+- **Humanoid**, pushed per type: the Husk's gaunt hunch; the Brute's width,
+  fused shoulder masses and half-absorbed second face; the Listener's skull
+  opened into a ring of bone plates round a glowing chamber, and no eyes;
+  the Watcher's height, long arms and six pale eyes; the Crawler's long
+  limbs and all-fours gait; the Spitter's swelling throat sac and split jaw;
+  the Mimic's eyeless split jaw.
+- **Rat** (Swarm): body, snout, spines, scurrying legs and a swinging tail.
+- **Mass** (the Remnant): heaving lumps, crystal growths, seven tendrils
+  that wave and slam, and a core with lids that part.
+
+Skin is a procedural flesh texture tinted per creature, with the Remnant's
+**veins** as an emissive map that pulses faster when the creature is
+agitated. A hit flashes the whole body. Procedural walk cycles are driven by
+actual speed, with wind-up and strike poses, hit flinches, and a collapse on
+death (a Crawler killed on the ceiling falls first).
 
 ---
 
 ## 9. Items
 
-| Item    | Effect                                |
-| ------- | ------------------------------------- |
-| Ammo    | +8 reserve (not picked up if full)    |
-| Medkit  | +45 HP (not picked up at full health) |
-| Battery | +45 flashlight charge                 |
-| Keycard | Unlocks the level exit                |
-| Note    | Shows a typewritten note card for 7 s |
+| Item      | Effect                                                         |
+| --------- | -------------------------------------------------------------- |
+| Ammo      | +8 rounds (not picked up if full)                              |
+| Shells    | +4 shotgun shells                                              |
+| Rivets    | +12 rivets                                                     |
+| Medkit    | Carried (max 3). Use it to heal 45                             |
+| Battery   | +45 flashlight charge                                          |
+| Keycard   | Opens security doors, or the exit                              |
+| Note      | Shows a typewritten note card for 7 s                          |
+| Shotgun   | The weapon, loaded, plus 8 shells (or 8 shells if you have it) |
+| Rivet gun | The weapon, loaded, plus 24 rivets                             |
 
-Each has a small modelled mesh and a coloured glow so it's findable with
-the light off.
+Amounts are scaled by the difficulty's pickup multiplier. Each item has a
+small modelled mesh and a coloured glow so it's findable with the light off.
 
 ---
 
@@ -386,7 +497,14 @@ compressor.
   heartbeat below 40% health (faster as it drops), death drone.
 - **Enemies** (panned + distance-attenuated + muffled through walls):
   clicking or wet breathing idles, a wavering shriek on alert, wind-up hiss,
-  hurt screech, death groan. Brutes are pitched down.
+  hurt screech, death groan, a choked gurgle for takedowns, a thud and
+  skitter when a Crawler drops, a Spitter's rising gurgle, acid sizzle, and
+  the Remnant's slam and many-voiced roar. Voices are pitched per creature
+  (Brutes low, rats high). Mimic lures are positioned in the world, including
+  the Operator's radio voice coming from somewhere it shouldn't.
+- **Weapons**: the pistol as before; the shotgun's boom and pump; the rivet
+  gun's pneumatic hiss and chunk; shell loading; weapon switching; melee
+  swings; the medkit injector.
 - **Ambience**: detuned low drone with a slow filter swell, plus random
   distant drips, metal groans and clanks.
 - **World & radio**: a synthesized radio voice (key-up click, static bed and
@@ -402,8 +520,10 @@ compressor.
 - **HUD**: level + objective (top left); awareness eye showing SUSPICIOUS /
   HUNTED (top centre); dynamic crosshair; hit marker; directional damage
   arcs; health (with lag bar) / stamina / battery (bottom left); keycard
-  indicator; noise meter (bottom centre); magazine, reserve, round pips and
-  reload hint (bottom right); pickup toasts; context prompts; interact
+  indicator; carried medkits with the heal key; noise meter (bottom centre);
+  weapon strip, weapon name, magazine, reserve, round pips and
+  reload / loading / healing status (bottom right); the boss's health bar
+  (top centre) while it's awake; pickup toasts; context prompts; interact
   prompt with the bound key; radio subtitles with the speaker's name; note
   card; level-name intro. DOM updates only when values change.
 - **Screens**: main menu (Continue / New Game / Chapters / Settings /
@@ -435,12 +555,18 @@ any of it fails.
 
 The tests run in Node without a GPU. That's possible because the logic that
 matters is separated from rendering: the level parser, grid queries,
-pathfinding, weapon, player movement (driven by commands), bindings, settings
-and save migration are all pure or near-pure.
+pathfinding, weapons, player movement (driven by commands), bindings,
+settings, loadouts and save migration are all pure or near-pure. Creature AI
+is tested by giving `Enemy` a stand-in body (the real rigs need a canvas for
+their textures): blindness, hearing, light-freezing, ceiling drops, spitting,
+lures, takedown rules and the boss's armour, phases and summons.
 
 **Every shipped level is validated** (`world/levels/levels.test.ts`): it must
 parse, have a closed outer wall, a reachable exit, reachable keycards and
-pickups, no enemies spawning next to the player, and no orphaned notes.
+pickups, no enemies spawning next to the player, and no orphaned notes. The
+campaign is checked too: each creature first appears on the level the story
+introduces it, each weapon is found where it should be, and no level places
+ammo for a weapon the player can't have yet.
 
 ---
 
@@ -448,16 +574,15 @@ pickups, no enemies spawning next to the player, and no orphaned notes.
 
 See [`ROADMAP.md`](ROADMAP.md) for the full plan.
 
-1. **Two creature types.** Levels 4–9 use Husks and Brutes where
-   [`STORY.md`](STORY.md) introduces new creatures; Phase 3 adds them.
-2. **One weapon, no melee.** A quiet melee takedown would suit the stealth
-   design.
-3. **Pathfinding** is per-enemy BFS (fine at this scale; switch to a shared
-   flow field if enemy counts grow a lot).
-4. **Dead enemies never despawn** (fine without respawning).
-5. **No shadows**, deliberately, for integrated-GPU performance. Lamp light
+1. **Pathfinding** is per-enemy BFS (fine at this scale — the Armory's 18
+   rats included; switch to a shared flow field if enemy counts grow a lot).
+2. **Dead enemies never despawn** (fine without respawning).
+3. **No shadows**, deliberately, for integrated-GPU performance. Lamp light
    passes through closed doors for the same reason.
-6. **No gamepad or touch input.**
-7. **Performance** hasn't been profiled on low-end GPUs. If needed: lower
+4. **Creatures are primitives.** Per-type rigs and glowing veins make them
+   readable in the dark, but a proper model pipeline (see the roadmap's
+   asset rule) would be the next step up.
+5. **No gamepad or touch input.**
+6. **Performance** hasn't been profiled on low-end GPUs. If needed: lower
    the lamp pool from 6, drop the pixel-ratio cap (1.5), or remove the
    bump maps.

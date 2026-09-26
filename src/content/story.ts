@@ -39,3 +39,15 @@ export const ENDINGS: Record<EndingId, Ending> = {
     ],
   },
 };
+
+/**
+ * What a Mimic says in the Operator's voice to draw you in. It has been
+ * listening to the radio too.
+ */
+export const MIMIC_LINES = [
+  "Aida. Over here.",
+  "This way. Quickly. I found a way up.",
+  "Aida? Can you hear me? Follow my voice.",
+  "It's safe in here. Come and see.",
+  "Keep going, Aida. Nearly there. This way.",
+];

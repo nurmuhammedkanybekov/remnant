@@ -179,6 +179,7 @@ export class Screens {
       <span>KILLS</span><span>${s.kills}</span>
       <span>ACCURACY</span><span>${Math.round(accuracy(s) * 100)}%</span>
       <span>HEADSHOTS</span><span>${s.headshots}</span>
+      <span>TAKEDOWNS</span><span>${s.takedowns}</span>
       <span>DAMAGE TAKEN</span><span>${Math.round(s.damageTaken)}</span>
     </div>`;
   }
@@ -232,7 +233,8 @@ export class Screens {
          )}<span>Look</span><kbd>Mouse</kbd><kbd>—</kbd><span>Pause</span><kbd>Esc</kbd><kbd>—</kbd></div>
          <div class="tips">
            Everything makes noise, and gunshots carry through walls. Your flashlight lets them see you from much
-           further. Break line of sight and stay quiet — they give up eventually. Headshots do 2.5× damage.
+           further. Break line of sight and stay quiet — they give up eventually. Headshots do extra damage.
+           Sneak up behind an unaware creature and melee for a silent takedown. Medkits are carried: heal when you choose.
          </div>
        </div>`,
       [
@@ -277,8 +279,14 @@ export class Screens {
         e.stopPropagation();
         finish(`Mouse${e.button}`);
       };
+      const onWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.deltaY !== 0) finish(e.deltaY < 0 ? "WheelUp" : "WheelDown");
+      };
       const noMenu = (e: Event) => e.preventDefault();
       window.addEventListener("keydown", onKey, true);
+      window.addEventListener("wheel", onWheel, { capture: true, passive: false });
       window.addEventListener("contextmenu", noMenu, true);
       // Attach on the next tick so the click that started listening isn't captured as the binding.
       const t = window.setTimeout(() => window.addEventListener("mousedown", onMouse, true));
@@ -286,6 +294,7 @@ export class Screens {
         window.clearTimeout(t);
         window.removeEventListener("keydown", onKey, true);
         window.removeEventListener("mousedown", onMouse, true);
+        window.removeEventListener("wheel", onWheel, true);
         window.removeEventListener("contextmenu", noMenu, true);
         stopListening = null;
       };

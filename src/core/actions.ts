@@ -3,7 +3,7 @@
  * key codes — it reads actions — so every control can be rebound.
  *
  * Codes are `KeyboardEvent.code` values, plus `Mouse0`–`Mouse4` for mouse
- * buttons (see `Input`).
+ * buttons and `WheelUp`/`WheelDown` for the scroll wheel (see `Input`).
  */
 export const ACTIONS = [
   "moveForward",
@@ -16,6 +16,13 @@ export const ACTIONS = [
   "reload",
   "flashlight",
   "interact",
+  "melee",
+  "heal",
+  "nextWeapon",
+  "prevWeapon",
+  "weapon1",
+  "weapon2",
+  "weapon3",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -35,6 +42,13 @@ export const ACTION_LABELS: Record<Action, string> = {
   reload: "Reload",
   flashlight: "Flashlight",
   interact: "Interact",
+  melee: "Melee / takedown",
+  heal: "Use medkit",
+  nextWeapon: "Next weapon",
+  prevWeapon: "Previous weapon",
+  weapon1: "Sidearm",
+  weapon2: "Rivet gun",
+  weapon3: "Shotgun",
 };
 
 export const DEFAULT_BINDINGS: Bindings = {
@@ -48,6 +62,13 @@ export const DEFAULT_BINDINGS: Bindings = {
   reload: ["KeyR", null],
   flashlight: ["KeyF", null],
   interact: ["KeyE", null],
+  melee: ["KeyV", "Mouse2"],
+  heal: ["KeyH", null],
+  nextWeapon: ["KeyQ", "WheelDown"],
+  prevWeapon: [null, "WheelUp"],
+  weapon1: ["Digit1", null],
+  weapon2: ["Digit2", null],
+  weapon3: ["Digit3", null],
 };
 
 /** Codes that can never be bound: Escape is reserved by the browser for releasing the mouse. */
@@ -65,11 +86,18 @@ export function normalizeBindings(raw: unknown): Bindings {
   const out = cloneBindings(DEFAULT_BINDINGS);
   if (!raw || typeof raw !== "object") return out;
   const src = raw as Record<string, unknown>;
-  for (const action of ACTIONS) {
-    const v = src[action];
-    if (!Array.isArray(v)) continue;
+  const stored = ACTIONS.filter((a) => Array.isArray(src[a]));
+  for (const action of stored) {
+    const v = src[action] as unknown[];
     const slot = (x: unknown) => (typeof x === "string" && x.length > 0 && !RESERVED_CODES.has(x) ? x : null);
     out[action] = [slot(v[0]), slot(v[1])];
+  }
+  // Actions added since these bindings were saved get their defaults — unless
+  // the player has already put one of those keys on something else.
+  const taken = new Set(stored.flatMap((a) => out[a]));
+  for (const action of ACTIONS) {
+    if (stored.includes(action)) continue;
+    out[action] = out[action].map((c) => (c !== null && taken.has(c) ? null : c)) as Binding;
   }
   return out;
 }
@@ -111,6 +139,8 @@ const NAMED_KEYS: Record<string, string> = {
   CapsLock: "Caps",
   Enter: "Enter",
   Backquote: "`",
+  WheelUp: "Wheel Up",
+  WheelDown: "Wheel Down",
 };
 
 /** Short, human-readable name for a code: "KeyW" → "W", "Mouse0" → "Left Mouse". */

@@ -28,5 +28,23 @@ describe("bindings", () => {
     expect(keyLabel("Mouse0")).toBe("Left Mouse");
     expect(keyLabel("ShiftLeft")).toBe("L-Shift");
     expect(keyLabel(null)).toBe("—");
+    expect(keyLabel("WheelDown")).toBe("Wheel Down");
+  });
+
+  it("gives actions added in an update their defaults, without stealing keys the player already uses", () => {
+    // Saved before melee existed, with V already put on the flashlight.
+    const old = { ...DEFAULT_BINDINGS, flashlight: ["KeyV", null] } as Record<string, unknown>;
+    delete old.melee;
+    const b = normalizeBindings(old);
+    expect(b.flashlight).toEqual(["KeyV", null]);
+    expect(b.melee).toEqual([null, "Mouse2"]);
+    expect(b.heal).toEqual(DEFAULT_BINDINGS.heal);
+  });
+
+  it("has no key bound to two actions by default", () => {
+    const codes = Object.values(DEFAULT_BINDINGS)
+      .flat()
+      .filter((c) => c !== null);
+    expect(new Set(codes).size).toBe(codes.length);
   });
 });

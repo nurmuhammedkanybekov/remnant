@@ -1,7 +1,7 @@
 import { aida, checkpoint, hint, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
-/** Level 4 — flooded halls: wading is loud. Security doors and the pump control card. */
+/** Level 4 — flooded halls: wading is loud, and the first Listener hears every step. */
 export const PUMPING_STATION: LevelDef = {
   id: "pumping-station",
   name: "Sublevel 7",
@@ -13,14 +13,14 @@ export const PUMPING_STATION: LevelDef = {
     "############################",
     "#S...L...#~~~~~~~~#...L....#",
     "#.#####..#~~~~~~~~#.#####..#",
-    "#.#A..#..D~~~E~~~~D.#...#..#",
+    "#.#A..#..D~~~U~~~~D.#...#..#",
     "#.#...#..#~~~~~~~~#.#.2.#..#",
     "#.##.##..####~#####.##.##..#",
-    "#....a....L..~.......L.....#",
+    "#....a....L.b~.......L.....#",
     "####.####.###~#####.######=#",
     "#1...#...L..#~#....L...#.R.#",
     "#.####~~~~~~#~#.~~~~~~.#.X.#",
-    "#.....~~E~~~D~D~~H~~~..#...#",
+    "#.....~~U~~~D~D~~H~~~..#...#",
     "#.####~~~~~~#~#.~~~~~~.#####",
     "#.#M.#......#~#...R....#...#",
     "#.#..#####.##~####.#####.K.#",
@@ -48,5 +48,12 @@ export const PUMPING_STATION: LevelDef = {
   },
   triggers: {
     a: [hint("Wading through water is slow and loud — crouch to stay quiet"), checkpoint()],
+    b: [
+      radio(
+        op("Aida. There's one in the flooded hall that doesn't see at all. It hears. Everything."),
+        aida("No eyes. Its head is split open like a... like an ear.")
+      ),
+      hint("Listeners are blind — your flashlight won't give you away, but every sound will"),
+    ],
   },
 };

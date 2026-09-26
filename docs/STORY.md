@@ -75,6 +75,16 @@ Sublevel 6 a Mimic uses the exact same voice.
 
 ---
 
+## Weapons
+
+| Weapon        | Where                  | Notes                                                                                                                                                    |
+| ------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sidearm**   | Carried from the start | Not Aida's. Whoever it belonged to didn't need it any more.                                                                                              |
+| **Rivet gun** | Ventilation            | A consortium construction tool. With the safety interlock off it fires across a room, almost silently. Aida is an engineer; she knows which wire to cut. |
+| **Shotgun**   | Armory                 | Consortium security issue. Devastating, and loud enough to bring the whole floor.                                                                        |
+
+---
+
 ## Endings
 
 At the top of the lift shaft the blast door opens for you. Aida has a choice:
@@ -93,18 +103,18 @@ At the top of the lift shaft the blast door opens for you. Aida has a choice:
 Aida climbs from Sublevel 10 to the surface. Each level introduces **one new
 idea** so the game keeps teaching until the end.
 
-| #   | Level                | Location    | What's new                                                                                | Story beat                                                      |
-| --- | -------------------- | ----------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 1   | **Infirmary**        | Sublevel 10 | Tutorial: movement, flashlight, first pistol, first note. One Husk seen from safety.      | Aida wakes up. The Operator makes contact.                      |
-| 2   | **Maintenance Wing** | Sublevel 9  | Stealth against Husks, noise meter matters.                                               | Operator: "Stay off the main corridors."                        |
-| 3   | **Cold Storage**     | Sublevel 8  | Keycard doors, first Brute.                                                               | Hendricks' fate. Mara's first note.                             |
-| 4   | **Pumping Station**  | Sublevel 7  | Flooded rooms: wading is loud. First **Listener**.                                        | Arkadin log: "It hears the water. It hears everything."         |
-| 5   | **Containment Labs** | Sublevel 6  | The **Watcher**: light is now a weapon _and_ a risk.                                      | The original 1980s lab. First look at a Remnant sample.         |
-| 6   | **Ventilation**      | Sublevel 5  | Tight vents, **Crawlers**, melee takedowns. A **Mimic** speaks with the Operator's voice. | The first crack in the Operator's story.                        |
-| 7   | **Power Plant**      | Sublevel 4  | Multi-step objective: restart 3 generators. Each is loud and draws enemies. **Spitters**. | The lift has power again. The Operator is pleased. Too pleased. |
-| 8   | **Armory**           | Sublevel 3  | Shotgun. Large combat arena, **Swarms**.                                                  | Mara's last note: "Don't trust the radio."                      |
-| 9   | **The Hive**         | Sublevel 2  | The Remnant's core. Boss fight.                                                           | The Operator stops pretending.                                  |
-| 10  | **Lift Shaft**       | Surface     | Escape sequence, then the ending choice.                                                  | Seal or Leave.                                                  |
+| #   | Level                | Location    | What's new                                                                                               | Story beat                                                      |
+| --- | -------------------- | ----------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1   | **Infirmary**        | Sublevel 10 | Tutorial: movement, flashlight, first pistol, first note. One Husk seen from safety.                     | Aida wakes up. The Operator makes contact.                      |
+| 2   | **Maintenance Wing** | Sublevel 9  | Stealth against Husks, noise meter matters.                                                              | Operator: "Stay off the main corridors."                        |
+| 3   | **Cold Storage**     | Sublevel 8  | Keycard doors, first Brute.                                                                              | Hendricks' fate. Mara's first note.                             |
+| 4   | **Pumping Station**  | Sublevel 7  | Flooded rooms: wading is loud. First **Listener**.                                                       | Arkadin log: "It hears the water. It hears everything."         |
+| 5   | **Containment Labs** | Sublevel 6  | The **Watcher**: light is now a weapon _and_ a risk.                                                     | The original 1980s lab. First look at a Remnant sample.         |
+| 6   | **Ventilation**      | Sublevel 5  | Tight vents, **Crawlers**, melee takedowns, the rivet gun. A **Mimic** speaks with the Operator's voice. | The first crack in the Operator's story.                        |
+| 7   | **Power Plant**      | Sublevel 4  | Multi-step objective: restart 3 generators. Each is loud and draws enemies. **Spitters**.                | The lift has power again. The Operator is pleased. Too pleased. |
+| 8   | **Armory**           | Sublevel 3  | Shotgun. Large combat arena, **Swarms**.                                                                 | Mara's last note: "Don't trust the radio."                      |
+| 9   | **The Hive**         | Sublevel 2  | The Remnant's core. Boss fight.                                                                          | The Operator stops pretending.                                  |
+| 10  | **Lift Shaft**       | Surface     | Escape sequence, then the ending choice.                                                                 | Seal or Leave.                                                  |
 
 ---
 

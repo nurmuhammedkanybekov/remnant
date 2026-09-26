@@ -16,6 +16,8 @@ export interface DifficultyDef {
   batteryDrain: number;
   /** Reserve ammo at the start of a new campaign. */
   startingReserve: number;
+  /** Medkits carried at the start of a new campaign. */
+  startingMedkits: number;
   /** Health and battery are topped up to at least these between levels. */
   carryHealthFloor: number;
   carryBatteryFloor: number;
@@ -36,6 +38,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     pickupMultiplier: 1.5,
     batteryDrain: 0.6,
     startingReserve: 32,
+    startingMedkits: 2,
     carryHealthFloor: 70,
     carryBatteryFloor: 50,
     permadeath: false,
@@ -50,6 +53,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     pickupMultiplier: 1,
     batteryDrain: 1,
     startingReserve: 16,
+    startingMedkits: 1,
     carryHealthFloor: 40,
     carryBatteryFloor: 30,
     permadeath: false,
@@ -64,6 +68,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     pickupMultiplier: 0.75,
     batteryDrain: 1.3,
     startingReserve: 8,
+    startingMedkits: 0,
     carryHealthFloor: 25,
     carryBatteryFloor: 20,
     permadeath: false,
@@ -78,6 +83,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     pickupMultiplier: 1,
     batteryDrain: 1,
     startingReserve: 16,
+    startingMedkits: 1,
     carryHealthFloor: 40,
     carryBatteryFloor: 30,
     permadeath: true,

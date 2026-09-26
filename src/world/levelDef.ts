@@ -7,7 +7,9 @@ import type { LevelTheme } from "./theme";
  *
  *   #  wall                  .  floor
  *   S  player spawn          X  exit
- *   A  ammo                  M  medkit
+ *   A  pistol ammo           M  medkit (carried, used with the heal key)
+ *   T  shotgun shells        J  rivets
+ *   !  shotgun               ^  rivet gun
  *   B  flashlight battery    K  keycard
  *   L  ceiling lamp          R  red emergency lamp
  *   C  crate stack (solid)   O  barrels (solid)
@@ -21,10 +23,12 @@ import type { LevelTheme } from "./theme";
  *   0–9  note pickup, text from the level's `notes` table
  *   a–z  invisible trigger; runs `triggers[letter]` the first time any cell with that letter is entered
  *
- * Enemy glyphs come from `content/enemies.ts` (E = husk, H = brute, …).
+ * Enemy glyphs come from `content/enemies.ts`: E husk, H brute, U listener,
+ * W watcher, V crawler, P spitter, % swarm (a pack), Q mimic, @ the Remnant.
+ * Item glyphs come from `content/items.ts`.
  *
  * The keycard opens security doors if the level has any; otherwise it
- * unlocks the exit.
+ * unlocks the exit. If the level has a boss, the exit stays sealed until it's dead.
  */
 export interface LevelDef {
   id: string;
@@ -48,6 +52,11 @@ export interface LevelDef {
     keycard?: ScriptAction[];
     /** When the last generator comes online. */
     power?: ScriptAction[];
+    /** When the boss reaches phase 2 and phase 3. */
+    bossPhase2?: ScriptAction[];
+    bossPhase3?: ScriptAction[];
+    /** When the boss dies. */
+    bossDefeated?: ScriptAction[];
   };
   theme?: Partial<LevelTheme>;
   /** The last level: the exit and the detonator console each end the game. */

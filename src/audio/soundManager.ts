@@ -1,3 +1,5 @@
+import type { VocalKind } from "../enemies/enemy";
+
 /**
  * All audio is synthesized at runtime with the Web Audio API — no sound files.
  *
@@ -173,10 +175,31 @@ export class SoundManager {
 
   // ---------------------------------------------------------------- weapon
 
-  playGunshot(): void {
+  playGunshot(weapon: "pistol" | "shotgun" | "rivet" = "pistol"): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    const o = this.out(CENTER, 1, 1.2)!;
+    if (weapon === "rivet") {
+      // Pneumatic: a hiss and a hard "chunk". Quiet — that's the point.
+      const o = this.out(CENTER, 1, 0.3)!;
+      this.burst(o, "highpass", 3500, 0.8, t, 0.07, 0.25);
+      this.tone(o, "square", 900, 300, t, 0.03, 0.18);
+      this.burst(o, "bandpass", 1200, 4, t + 0.01, 0.05, 0.35);
+      this.burst(o, "lowpass", 600, 1, t + 0.06, 0.12, 0.08, 0.02); // air bleed
+      return;
+    }
+    const o = this.out(CENTER, 1, weapon === "shotgun" ? 1.6 : 1.2)!;
+    if (weapon === "shotgun") {
+      this.burst(o, "highpass", 1200, 0.6, t, 0.12, 1.0);
+      this.burst(o, "bandpass", 400, 0.6, t, 0.4, 1.0);
+      this.tone(o, "sine", 90, 28, t, 0.5, 1.0);
+      // Pump: back, then forward
+      this.burst(o, "bandpass", 1400, 3, t + 0.34, 0.05, 0.3);
+      this.tone(o, "square", 700, 400, t + 0.34, 0.03, 0.12);
+      this.burst(o, "bandpass", 1800, 3, t + 0.5, 0.05, 0.35);
+      this.tone(o, "square", 900, 500, t + 0.5, 0.03, 0.14);
+      this.tone(this.out(CENTER, 1, 0.2)!, "sine", 2300, 2100, t + 0.75, 0.08, 0.05); // shell hits the floor
+      return;
+    }
     this.burst(o, "highpass", 1800, 0.7, t, 0.08, 1.0); // crack
     this.burst(o, "bandpass", 700, 0.8, t, 0.22, 0.9); // body
     this.tone(o, "sine", 120, 38, t, 0.3, 1.0); // boom
@@ -185,6 +208,81 @@ export class SoundManager {
     const tc = t + 0.35 + Math.random() * 0.1;
     this.tone(this.out(CENTER, 1, 0.2)!, "sine", 4200, 3900, tc, 0.06, 0.05);
     this.tone(this.out(CENTER, 1, 0.2)!, "sine", 5100, 4800, tc + 0.09, 0.05, 0.03);
+  }
+
+  /** One shotgun shell pushed into the tube. */
+  playShellLoad(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.15)!;
+    this.burst(o, "bandpass", 1100, 3, t, 0.05, 0.22);
+    this.tone(o, "square", 650, 450, t + 0.02, 0.025, 0.1);
+  }
+
+  playWeaponSwitch(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.1)!;
+    this.burst(o, "bandpass", 700, 1, t, 0.12, 0.1, 0.02); // cloth
+    this.burst(o, "bandpass", 1600, 3, t + 0.2, 0.04, 0.2);
+    this.tone(o, "square", 1100, 700, t + 0.2, 0.02, 0.08);
+  }
+
+  /** A swing; `hit` adds the impact. */
+  playMelee(hit: boolean): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.2)!;
+    this.burst(o, "bandpass", 900, 0.8, t, 0.16, 0.14, 0.05); // whoosh
+    if (hit) {
+      this.burst(o, "lowpass", 350, 1, t + 0.12, 0.12, 0.6);
+      this.tone(o, "sine", 110, 50, t + 0.12, 0.12, 0.5);
+    }
+  }
+
+  /** A silent kill up close: muffled, wet, final. */
+  playTakedown(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.1)!;
+    this.burst(o, "lowpass", 500, 1, t + 0.1, 0.18, 0.55);
+    this.burst(o, "bandpass", 1500, 2, t + 0.12, 0.08, 0.2); // crack
+    this.tone(o, "sine", 80, 40, t + 0.1, 0.25, 0.4);
+  }
+
+  playHeal(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.1)!;
+    this.tone(o, "square", 1800, 1600, t, 0.02, 0.08); // cap off
+    this.burst(o, "highpass", 5000, 1, t + 0.55, 0.25, 0.12, 0.02); // injector hiss
+    this.burst(o, "bandpass", 300, 1, t + 0.6, 0.35, 0.18, 0.05); // exhale
+  }
+
+  playAcidSplash(sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 26, 0.4);
+    if (!o) return;
+    this.burst(o, "bandpass", 700, 1.2, t, 0.18, 0.4);
+    this.burst(o, "highpass", 4000, 0.8, t + 0.05, 0.6, 0.12, 0.1); // sizzle
+  }
+
+  /** A Mimic's imitation of your own footsteps, or of an item being picked up — from over there. */
+  playLure(kind: "footsteps" | "pickup", sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 30, 0.6);
+    if (!o) return;
+    if (kind === "pickup") {
+      this.burst(o, "bandpass", 1800, 3, t, 0.05, 0.3);
+      this.burst(o, "bandpass", 2400, 3, t + 0.07, 0.05, 0.25);
+      return;
+    }
+    for (let i = 0; i < 4; i++) {
+      this.burst(o, "lowpass", i % 2 ? 420 : 520, 1, t + i * 0.5, 0.09, 0.3);
+      this.burst(o, "bandpass", i % 2 ? 2200 : 2600, 2, t + i * 0.5 + 0.01, 0.04, 0.08);
+    }
   }
 
   playEmptyClick(): void {
@@ -252,9 +350,13 @@ export class SoundManager {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const o = this.out(CENTER, 1, 0.3)!;
-    if (kind === "ammo") {
+    if (kind === "ammo" || kind === "shells" || kind === "rivets") {
       this.burst(o, "bandpass", 1800, 3, t, 0.05, 0.3);
       this.burst(o, "bandpass", 2400, 3, t + 0.07, 0.05, 0.25);
+    } else if (kind === "shotgun" || kind === "rivetGun") {
+      this.burst(o, "lowpass", 500, 1, t, 0.12, 0.35);
+      this.burst(o, "bandpass", 1400, 3, t + 0.15, 0.05, 0.3);
+      this.burst(o, "bandpass", 1900, 3, t + 0.3, 0.05, 0.35);
     } else if (kind === "note") {
       this.burst(o, "bandpass", 3000, 0.8, t, 0.25, 0.12, 0.05); // paper rustle
     } else if (kind === "keycard") {
@@ -323,10 +425,11 @@ export class SoundManager {
    * "syllables" riding on static for `duration` seconds. Not words — the
    * subtitles carry the words — but it sells a person talking.
    */
-  playRadioVoice(duration: number, distorted = false): void {
+  playRadioVoice(duration: number, distorted = false, sp: Spatial = CENTER): void {
     if (!this.ctx) return;
     const t0 = this.ctx.currentTime;
-    const o = this.out(CENTER, 1, 0.15)!;
+    const o = this.out(sp, sp === CENTER ? 1 : 32, sp === CENTER ? 0.15 : 0.7);
+    if (!o) return;
     this.burst(o, "highpass", 3000, 0.7, t0, 0.06, 0.12); // key-up click
     this.burst(o, "bandpass", 2500, 0.6, t0, duration, 0.018, 0.05); // static bed
     const base = distorted ? 78 : 118;
@@ -426,7 +529,7 @@ export class SoundManager {
   // ---------------------------------------------------------------- enemies
 
   /** `p` is the creature's voice pitch multiplier (1 = husk, lower = bigger). */
-  playEnemy(kind: "alert" | "idle" | "windup" | "hurt" | "death", p: number, sp: Spatial): void {
+  playEnemy(kind: "alert" | VocalKind, p: number, sp: Spatial): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     switch (kind) {
@@ -478,6 +581,55 @@ export class SoundManager {
         if (!o) return;
         this.tone(o, "sawtooth", 300 * p, 60 * p, t, 1.0, 0.3, 0.02);
         this.burst(o, "lowpass", 500, 1, t + 0.6, 0.3, 0.4); // body hits floor
+        break;
+      }
+      case "takedown": {
+        // A choked-off gurgle; barely carries.
+        const o = this.out(sp, 10, 0.2);
+        if (!o) return;
+        this.tone(o, "sawtooth", 180 * p, 70 * p, t, 0.35, 0.12, 0.02);
+        this.burst(o, "lowpass", 500, 1, t + 0.4, 0.25, 0.3); // body lowered to the floor
+        break;
+      }
+      case "drop": {
+        // Lands from the ceiling: a thud and a skitter of claws.
+        const o = this.out(sp, 26, 0.5);
+        if (!o) return;
+        this.burst(o, "lowpass", 260, 1, t, 0.2, 0.6);
+        for (let i = 0; i < 5; i++) this.burst(o, "bandpass", 3000 * p, 6, t + 0.15 + i * 0.05, 0.02, 0.25);
+        break;
+      }
+      case "spit": {
+        // A wet, rising gurgle as the throat sac fills.
+        const o = this.out(sp, 26, 0.5);
+        if (!o) return;
+        this.burst(o, "bandpass", 500 * p, 2, t, 0.6, 0.35, 0.3);
+        this.tone(o, "sawtooth", 90 * p, 180 * p, t, 0.6, 0.12, 0.3);
+        this.burst(o, "highpass", 2500, 1, t + 0.6, 0.15, 0.3); // the spit
+        break;
+      }
+      case "slam": {
+        const o = this.out(sp, 40, 0.9);
+        if (!o) return;
+        this.burst(o, "lowpass", 160, 1, t, 0.5, 1.0);
+        this.tone(o, "sine", 55, 25, t, 0.7, 0.9);
+        break;
+      }
+      case "roar": {
+        // The whole mass screams: a chord of voices, low to high.
+        const o = this.out(sp, 60, 1.2);
+        if (!o) return;
+        for (const f of [55, 82, 110, 165, 247]) {
+          const osc = this.tone(o, "sawtooth", f * p * 2, f * p * 1.6, t, 2.2, 0.08, 0.3);
+          const lfo = this.ctx.createOscillator();
+          lfo.frequency.value = 5 + Math.random() * 4;
+          const lg = this.ctx.createGain();
+          lg.gain.value = f * 0.08;
+          lfo.connect(lg).connect(osc.frequency);
+          lfo.start(t);
+          lfo.stop(t + 2.6);
+        }
+        this.burst(o, "lowpass", 300, 1, t, 2.2, 0.5, 0.3);
         break;
       }
     }

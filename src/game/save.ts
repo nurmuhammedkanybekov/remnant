@@ -1,7 +1,7 @@
 import { isDifficultyId, type DifficultyId } from "../content/difficulty";
 import type { EndingId } from "../content/story";
 import { parseCheckpoint, type CheckpointState } from "./checkpoint";
-import type { Loadout } from "./loadout";
+import { cloneLoadout, parseLoadout, upgradeLegacyLoadout, type Loadout } from "./loadout";
 import { freshStats, type RunStats } from "./stats";
 import { readJson, removeKey, writeJson } from "../core/storage";
 
@@ -41,7 +41,7 @@ export interface Progress {
   endings: EndingId[];
 }
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 const KEY = "remnant.save";
 
 export function emptySave(): SaveData {
@@ -74,7 +74,7 @@ export function parseSave(raw: unknown, levelCount: number): SaveData {
   }
 
   const c = obj(root.campaign);
-  const loadout = obj(c?.loadout);
+  const loadout = parseLoadout(c?.loadout);
   if (c && loadout && isDifficultyId(c.difficulty)) {
     const levelIndex = Math.floor(num(c.levelIndex, -1));
     if (levelIndex >= 0 && levelIndex < levelCount) {
@@ -84,12 +84,7 @@ export function parseSave(raw: unknown, levelCount: number): SaveData {
       save.campaign = {
         difficulty: c.difficulty,
         levelIndex,
-        loadout: {
-          health: Math.min(100, Math.max(1, num(loadout.health, 100))),
-          battery: Math.min(100, Math.max(0, num(loadout.battery, 100))),
-          mag: Math.max(0, Math.floor(num(loadout.mag))),
-          reserve: Math.max(0, Math.floor(num(loadout.reserve))),
-        },
+        loadout,
         stats,
         checkpoint: parseCheckpoint(c.checkpoint),
         updatedAt: num(c.updatedAt, Date.now()),
@@ -108,6 +103,7 @@ function migrate(root: Record<string, unknown> | null): Record<string, unknown> 
   if (!root) return null;
   let data = root;
   if (data.version === 1) data = migrateV1(data);
+  if (data.version === 2) data = migrateV2(data);
   return data.version === SAVE_VERSION ? data : null;
 }
 
@@ -124,6 +120,27 @@ function migrateV1(v1: Record<string, unknown>): Record<string, unknown> {
     version: 2,
     progress: { ...p, unlockedLevel: num(p.unlockedLevel) + 1, bestTimes, endings: [] },
     campaign: c ? { ...c, levelIndex: num(c.levelIndex) + 1, checkpoint: null } : null,
+  };
+}
+
+/**
+ * v2 → v3: weapons and a medkit inventory. The single pistol loadout
+ * (`mag` + `reserve`) becomes one entry in `weapons`. Mid-level checkpoints
+ * are dropped (the run resumes at the start of its level).
+ */
+function migrateV2(v2: Record<string, unknown>): Record<string, unknown> {
+  const c = obj(v2.campaign);
+  if (!c) return { ...v2, version: 3 };
+  return {
+    ...v2,
+    version: 3,
+    campaign: {
+      ...c,
+      loadout: upgradeLegacyLoadout(c.loadout),
+      // Creatures and pickups changed on most levels, so an old mid-level
+      // checkpoint's indices no longer line up: restart the level instead.
+      checkpoint: null,
+    },
   };
 }
 
@@ -148,7 +165,7 @@ export class SaveStore {
     this.data.campaign = {
       ...campaign,
       stats: { ...campaign.stats },
-      loadout: { ...campaign.loadout },
+      loadout: cloneLoadout(campaign.loadout),
       checkpoint: campaign.checkpoint ? structuredClone(campaign.checkpoint) : null,
       updatedAt: Date.now(),
     };
