@@ -1,7 +1,7 @@
 # REMNANT — Technical & Design Documentation
 
 A browser based first person survival horror shooter. Doom's structural
-simplicity (grid levels, primitive geometry, zero external assets) carrying a
+simplicity (grid levels, primitive geometry, almost no external assets) carrying a
 scarcity/stealth layer borrowed from The Last of Us: limited ammo and battery,
 no health regen, and enemies that hunt by sound as much as sight.
 
@@ -12,14 +12,14 @@ the known gaps.
 
 ## 1. Quick facts
 
-|              |                                                                                                                                                                               |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Engine       | Three.js r166 (WebGL) + its `EffectComposer` post-processing                                                                                                                  |
-| Language     | TypeScript (strict)                                                                                                                                                           |
-| Build        | Vite 5                                                                                                                                                                        |
-| Runtime deps | `three` only                                                                                                                                                                  |
-| Assets       | **None shipped.** Textures are painted onto `<canvas>` at startup; all audio is synthesized with the Web Audio API. (UI fonts load from Google Fonts, with system fallbacks.) |
-| Levels       | 10 hand-authored grid maps with scripted story beats (see `STORY.md`)                                                                                                         |
+|              |                                                                                                                                                                                                                                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine       | Three.js r166 (WebGL) + its `EffectComposer` post-processing                                                                                                                                                                                                                                        |
+| Language     | TypeScript (strict)                                                                                                                                                                                                                                                                                 |
+| Build        | Vite 5                                                                                                                                                                                                                                                                                              |
+| Runtime deps | `three` only                                                                                                                                                                                                                                                                                        |
+| Assets       | Textures are painted onto `<canvas>` at startup and music and most audio are synthesized with the Web Audio API. Weapon sounds are CC0 recordings in `public/sfx/` (~550 KB, credited in `CREDITS.md`), each with a synthesized fallback. (UI fonts load from Google Fonts, with system fallbacks.) |
+| Levels       | 10 hand-authored grid maps with scripted story beats (see `STORY.md`)                                                                                                                                                                                                                               |
 
 ```bash
 npm install
@@ -508,13 +508,18 @@ All synthesized. Chain: voice → (low-pass if a wall is between you) → stereo
 panner → dry bus + convolution reverb (generated impulse) → master →
 compressor.
 
-- **Weapon**: gunshots built like a shot in a concrete corridor: an
-  overdriven crack, body and chest punch, four early reflections off the
-  walls, a low rumble rolling away and a faint ear ring, then the slide or
-  pump cycling and casings bouncing on the floor. Bullets hitting concrete
-  crack, thud and shed grit, sometimes with a ricochet whine; hits on flesh
-  are a wet thud (with a crunch for headshots). Dry-fire click, 5-stage
-  reload matched to the animation.
+- **Weapon**: real recordings (CC0, `public/sfx/`, loaded by
+  `audio/samples.ts` from the list in `content/sounds.ts`): a 9 mm fired in
+  a small room, a Colt .45 and a close 9 mm for the pistol; a Mossberg 500
+  and a Beretta for the shotgun; a nail gun for the rivet gun; Taurus and
+  Glock magazine, slide and trigger handling; a Remington 870 pump; brass
+  and shells bouncing on concrete; stone impacts and ricochets; flesh hits.
+  Each has two to five takes picked at random with slight pitch variation.
+  The engine layers a synthesized chest-punch and a rolling rumble under
+  the shots, and a bullet crack and falling grit over the stone impacts.
+  Anything without a recording (or that fails to load) falls back to the
+  synthesized version: an overdriven crack and body, early reflections, a
+  rumble and ear ring, the action cycling and casings bouncing.
 - **Player**: alternating footsteps per gait, flashlight click, hurt grunt,
   heartbeat below 40% health (faster as it drops), death drone.
 - **Enemies** (panned + distance-attenuated + muffled through walls):

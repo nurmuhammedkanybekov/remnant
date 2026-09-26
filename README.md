@@ -4,12 +4,12 @@
 
 **A first-person survival horror shooter that runs in the browser.**
 <br>
-Built from scratch with TypeScript and Three.js. No asset files: every texture, model and sound is generated in code.
+Built from scratch with TypeScript and Three.js. Every texture, model and piece of music is generated in code; only the weapons use real (CC0) recordings.
 
 [![Build & Deploy](https://github.com/nurmuhammedkanybekov/remnant/actions/workflows/deploy.yml/badge.svg)](https://github.com/nurmuhammedkanybekov/remnant/actions/workflows/deploy.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![Three.js](https://img.shields.io/badge/Three.js-r166-black?logo=threedotjs)
-![Assets](https://img.shields.io/badge/asset%20files-0-d8432f)
+![Assets](https://img.shields.io/badge/art%20%26%20music-generated%20in%20code-d8432f)
 
 ### ▶ [Play it in your browser](https://nurmuhammedkanybekov.github.io/remnant/)
 
@@ -56,9 +56,13 @@ _Desktop with mouse and keyboard. Headphones strongly recommended._
 
 I wanted a project that pushed me outside my usual backend work: real-time
 rendering, game AI, audio and performance all in one codebase. I also set
-myself one constraint to make it interesting: **no asset files at all.**
-Every texture is painted onto a canvas in code when the game starts, and
-every sound is synthesized with the Web Audio API. The whole game is
+myself one constraint to make it interesting: **generate everything in
+code.** Every texture is painted onto a canvas when the game starts, every
+creature is built from primitives, and the music and most sounds are
+synthesized with the Web Audio API. The one exception is weapons: a gun
+never sounds real without a real recording, so shots, reloads and impacts
+use public-domain (CC0) recordings, credited in
+[`public/sfx/CREDITS.md`](public/sfx/CREDITS.md). The whole game is
 TypeScript plus one runtime dependency, `three`.
 
 ---

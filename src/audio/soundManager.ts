@@ -217,12 +217,18 @@ export class SoundManager {
     const t = this.ctx.currentTime;
     const recorded: Record<typeof weapon, SampleId> = { pistol: "pistolShot", shotgun: "shotgunShot", rivet: "rivetShot" };
     if (this.sample(recorded[weapon], t, CENTER, 1, weapon === "rivet" ? 0.3 : 0.9)) {
-      // The recording is the shot; the facility adds its own low rumble, and the brass hits the floor.
-      if (weapon !== "rivet")
-        this.burst(this.out(CENTER, 1, 0.6)!, "lowpass", 380, 0.6, t + 0.05, weapon === "shotgun" ? 1.6 : 1.1, 0.12, 0.05);
+      if (weapon !== "rivet") {
+        // Field recordings miss the thump you feel in your chest; add it, and let the shot roll away down the level.
+        const o = this.out(CENTER, 1, 0.6)!;
+        const big = weapon === "shotgun";
+        this.tone(o, "sine", big ? 105 : 130, big ? 38 : 48, t, big ? 0.3 : 0.2, big ? 0.75 : 0.55, 0.002);
+        this.burst(o, "lowpass", 380, 0.6, t + 0.05, big ? 1.6 : 1.1, 0.12, 0.05);
+      }
       if (weapon === "shotgun") {
-        if (!this.sample("pumpBack", t + 0.36)) this.action(t + 0.36, 1100, 0.35);
-        if (!this.sample("pumpForward", t + 0.52)) this.action(t + 0.52, 1500, 0.4);
+        if (!this.sample("pump", t + 0.34)) {
+          this.action(t + 0.36, 1100, 0.35);
+          this.action(t + 0.52, 1500, 0.4);
+        }
         if (!this.sample("shellCasing", t + 0.8)) this.casings(t + 0.8, 1, 1500);
       } else if (weapon === "pistol" && !this.sample("casing", t + 0.38 + Math.random() * 0.08)) {
         this.casings(t + 0.38 + Math.random() * 0.08, 1, 3800);
@@ -452,6 +458,11 @@ export class SoundManager {
     const o = this.out(sp, 40, 0.6);
     if (!o) return;
     if (this.sample("impactConcrete", t, sp, 1, 0.6)) {
+      // The recording is the stone; add the bullet's own crack and the grit it knocks loose.
+      this.burst(o, "bandpass", 2400 + Math.random() * 800, 1.5, t, 0.015, 0.22, 0.0005);
+      for (let i = 0; i < 4; i++) {
+        this.burst(o, "highpass", 4000 + Math.random() * 3000, 1, t + 0.05 + Math.random() * 0.3, 0.012, 0.05 * Math.random(), 0.0005);
+      }
       if (Math.random() < 0.18) this.sample("ricochet", t + 0.01, sp, 0.8, 0.6);
       return;
     }

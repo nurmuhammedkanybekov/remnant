@@ -8,9 +8,11 @@ ten-level campaign. See [`STORY.md`](STORY.md) for the narrative and
 
 - **Free to build, free to host, free to play.** GitHub Pages hosting, no paid
   services. Any backend must fit a free tier.
-- **No asset files** for now. Textures, models and audio are generated in
-  code. Revisit after Phase 3 if creature models are the weak point; the
-  content system is designed so a model loader can be swapped in.
+- **Generated in code by default.** Textures, models, music and most audio
+  are generated in code. Recordings are used only where synthesis can't
+  sound real — weapon shots, reloads and impacts — and only public-domain
+  (CC0) ones, credited in `public/sfx/CREDITS.md`, each with a synthesized
+  fallback.
 - **Every phase ships.** Each phase ends with a playable build, green CI and
   updated docs.
 
