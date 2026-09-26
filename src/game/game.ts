@@ -11,8 +11,8 @@ import { Input } from "../core/input";
 import { SaveStore } from "./save";
 import { loadSettings, saveSettings, type Settings } from "../core/settings";
 import type { Enemy } from "../enemies/enemy";
-import { hasRelay } from "../net/ice";
-import { CLOSE_REASONS, PeerLink } from "../net/link";
+import { hasRelay, relayState } from "../net/ice";
+import { describeClose, PeerLink } from "../net/link";
 import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg } from "../net/protocol";
 import { DEFAULT_SIGNAL_URL } from "../net/signaling";
 import { buildCommand, emptyCommand, type PlayerCommand } from "../player/command";
@@ -83,6 +83,8 @@ export class Game {
   private scriptedFire = false;
   /** Co-op: the connection to the other player, while there is one. */
   private link: PeerLink | null = null;
+  /** Bumped whenever the co-op menu is shown or left, so a late relay check can't redraw another screen. */
+  private coopMenuToken = 0;
   /** Co-op: which level attempt this is (see `start` in net/protocol.ts). */
   private epoch = 0;
   /** Co-op host: what the room is for, to reopen it under a new code if the old one was taken. */
@@ -174,6 +176,7 @@ export class Game {
   }
 
   private showMainMenu(): void {
+    this.coopMenuToken++;
     this.endCoop();
     this.state = "menu";
     this.music.setMode("silent");
@@ -548,20 +551,36 @@ export class Game {
   private showCoopMenu(): void {
     this.endCoop();
     this.state = "menu";
-    this.screens.lobby(
-      "CO-OP",
-      "TWO PLAYERS · ONLINE",
-      "One of you hosts and picks the sublevel; the other joins with the host's room code.\nYou leave each sublevel together — and when one of you goes down, the other has 45 seconds to get them back up.\n" +
-        (hasRelay() ? "Relay: on — works even on strict networks." : "Relay: off — strict school or office networks may not connect."),
-      [
-        { label: "Host a Game", primary: true, action: () => this.showCoopChapters() },
-        { label: "Join a Game", action: () => this.showJoin() },
-        { label: "Back", action: () => this.showMainMenu() },
-      ]
-    );
+    const token = ++this.coopMenuToken;
+    const show = (relay: string) =>
+      this.screens.lobby(
+        "CO-OP",
+        "TWO PLAYERS · ONLINE",
+        "One of you hosts and picks the sublevel; the other joins with the host's room code.\nYou leave each sublevel together — and when one of you goes down, the other has 45 seconds to get them back up.\n" +
+          relay,
+        [
+          { label: "Host a Game", primary: true, action: () => this.showCoopChapters() },
+          { label: "Join a Game", action: () => this.showJoin() },
+          { label: "Back", action: () => this.showMainMenu() },
+        ]
+      );
+    if (!hasRelay()) return show("Relay: off — strict school or office networks may not connect.");
+    show("Relay: checking…");
+    // Ask the relay now, so a wrong key shows up here rather than as a failed game later.
+    void relayState().then((r) => {
+      if (token !== this.coopMenuToken || this.state !== "menu") return;
+      show(
+        r === "ready"
+          ? "Relay: on — works even on strict networks."
+          : r === "rejected"
+            ? "Relay: key refused — use the API key shown next to a TURN credential in the Metered dashboard."
+            : "Relay: unreachable right now — direct connections still work."
+      );
+    });
   }
 
   private showCoopChapters(): void {
+    this.coopMenuToken++;
     const { unlockedLevel, bestTimes } = this.save.progress;
     this.screens.chapters(
       LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, unlocked: i <= unlockedLevel, bestTime: bestTimes[def.id] })),
@@ -577,6 +596,7 @@ export class Game {
 
   /** Opens a room and waits for the partner. Returns the room code. */
   private hostGame(level: number, difficulty: DifficultyId, tries = 0, note = ""): string {
+    this.coopMenuToken++;
     this.hosting = { level, difficulty, tries };
     const code = makeRoomCode();
     const link = this.openLink("host", code);
@@ -591,7 +611,7 @@ export class Game {
       this.screens.lobby(
         "HOST",
         "ROOM CODE",
-        `Someone tried to join but couldn't get through.\n${CLOSE_REASONS.timeout}\nThe room is still open.`,
+        `Someone tried to join but couldn't get through.\n${describeClose("timeout")}\nThe room is still open.`,
         [{ label: "Cancel", action: () => this.showCoopMenu() }],
         code
       );
@@ -636,6 +656,7 @@ export class Game {
   }
 
   private showJoin(error = "", typed = ""): void {
+    this.coopMenuToken++;
     this.screens.joinForm(
       (input) => this.joinGame(input),
       () => this.showCoopMenu(),
@@ -697,7 +718,7 @@ export class Game {
       this.hostGame(h.level, h.difficulty, 0, "Your partner left. The room is open again with a new code.\n");
       return;
     }
-    const text = CLOSE_REASONS[reason] ?? CLOSE_REASONS.lost;
+    const text = describeClose(reason);
     const playing = this.run?.coop && this.state !== "menu" && this.state !== "title";
     if (!playing) {
       this.screens.lobby("CO-OP", "NOT CONNECTED", text, [{ label: "Back", primary: true, action: () => this.showCoopMenu() }]);
