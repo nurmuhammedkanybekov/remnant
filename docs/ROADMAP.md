@@ -16,24 +16,24 @@ ten-level campaign. See [`STORY.md`](STORY.md) for the narrative and
 
 ---
 
-## Phase 1 — Foundations
+## Phase 1 — Foundations ✅
 
 Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 
 - [x] Story bible and roadmap
-- [ ] Data-driven content: enemies, weapons, items and difficulty live in
+- [x] Data-driven content: enemies, weapons, items and difficulty live in
       `src/content/` as plain definitions
-- [ ] Level parsing separated from geometry building (testable without WebGL)
-- [ ] Input actions + key rebinding (two keys per action, persisted)
-- [ ] Simulation driven by a per-frame `PlayerCommand`, not raw input
+- [x] Level parsing separated from geometry building (testable without WebGL)
+- [x] Input actions + key rebinding (two keys per action, persisted)
+- [x] Simulation driven by a per-frame `PlayerCommand`, not raw input
       (prerequisite for co-op and replays)
-- [ ] `LevelSession` extracted from `Game`: the game shell handles flow and
+- [x] `LevelSession` extracted from `Game`: the game shell handles flow and
       menus; the session handles one level of gameplay
-- [ ] Difficulty modes: Story, Normal, Nightmare, Ironman
-- [ ] Save system: continue a campaign, chapter select for unlocked levels,
+- [x] Difficulty modes: Story, Normal, Nightmare, Ironman
+- [x] Save system: continue a campaign, chapter select for unlocked levels,
       versioned save format with migration
-- [ ] Unit tests (Vitest) + CI on every push and pull request
-- [ ] Prettier formatting, EditorConfig
+- [x] Unit tests (Vitest) + CI on every push and pull request
+- [x] Prettier formatting, EditorConfig
 
 ## Phase 2 — Campaign
 

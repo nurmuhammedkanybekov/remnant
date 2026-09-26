@@ -19,7 +19,7 @@ the known gaps.
 | Build        | Vite 5                                                                                                                                                                        |
 | Runtime deps | `three` only                                                                                                                                                                  |
 | Assets       | **None shipped.** Textures are painted onto `<canvas>` at startup; all audio is synthesized with the Web Audio API. (UI fonts load from Google Fonts, with system fallbacks.) |
-| Levels       | 2 hand-authored grid maps, played in sequence                                                                                                                                 |
+| Levels       | 2 hand-authored grid maps, played in sequence (10 planned, see `STORY.md`)                                                                                                    |
 
 ```bash
 npm install
@@ -31,68 +31,117 @@ Append `?debug` to the URL to expose `window.game` (see §12).
 
 ---
 
-## 2. Directory structure
+## 2. Architecture
 
 ```
 src/
 ├── main.ts                    Bootstraps `new Game(#app)`
-├── game.ts                    Orchestrator: state machine, level lifecycle, wiring, main loop
+├── game/                      Orchestration
+│   ├── game.ts                App shell: main loop, state machine, menus, campaign flow
+│   ├── levelSession.ts        One level of gameplay: player, enemies, weapon, pickups, rules
+│   ├── menuBackdrop.ts        The live 3D scene behind the main menu
+│   ├── save.ts                Versioned save data: campaign checkpoint, unlocks, best times
+│   ├── loadout.ts             What carries between levels
+│   └── stats.ts               Run statistics
+├── content/                   Game data — balancing is a data change, not a code change
+│   ├── enemies.ts             Enemy definitions and map glyphs
+│   ├── weapons.ts             Weapon definitions
+│   ├── items.ts               Pickup amounts and glow colours
+│   └── difficulty.ts          Difficulty modes
 ├── core/
 │   ├── engine.ts              Renderer, tone mapping, post-processing, world + viewmodel scenes
-│   ├── input.ts               Keyboard / mouse / pointer-lock state
-│   ├── clock.ts               Clamped delta time
-│   └── settings.ts            Sensitivity / FOV / volume / invert-Y, persisted to localStorage
+│   ├── input.ts               Raw keyboard / mouse / pointer-lock state
+│   ├── actions.ts             Named actions, default bindings, rebinding rules
+│   ├── settings.ts            Settings (incl. bindings) with validation
+│   ├── storage.ts             localStorage JSON that never throws
+│   └── clock.ts               Clamped delta time
 ├── world/
-│   ├── level.ts               Map parser, geometry, exit door, collision, LOS, bullet raycast
-│   ├── lamps.ts               Pooled ceiling lights with flicker behaviours
+│   ├── levelDef.ts            The authored level format
+│   ├── levelParser.ts         Text map → grid + spawns (pure, no WebGL)
+│   ├── levelValidator.ts      "Is this level completable?" checks
+│   ├── levelBuilder.ts        Parsed level → Three.js geometry, props, exit
+│   ├── grid.ts                Collision, line of sight, bullet raycasts
 │   ├── pathfinding.ts         Grid BFS
-│   └── levels/                level1.ts, level2.ts, index.ts (play order)
+│   ├── lamps.ts               Pooled ceiling lights with flicker behaviours
+│   └── levels/                The campaign levels, in play order
 ├── player/
+│   ├── command.ts             PlayerCommand: per-frame intent, built from input
 │   ├── playerController.ts    Movement, crouch/sprint, stamina, head-bob, recoil, camera shake
 │   ├── flashlight.ts          Spotlight, battery, beam sway, low-battery flicker
 │   └── health.ts              HP, mercy frames, damage source
-├── weapons/
-│   ├── weapon.ts              Ammo / cooldown / reload / spread state machine
-│   ├── pistol.ts              The pistol's numbers
-│   └── viewmodel.ts           First-person gun + hand, recoil / reload / sprint animation, muzzle flash
-├── enemies/
-│   ├── enemy.ts               AI state machine, perception, movement, procedural animation
-│   ├── enemyMesh.ts           Creature rig built from primitives
-│   └── enemyManager.ts        Owns enemies, noise events, hit-testing, threat level
-├── items/pickup.ts            Ammo, medkit, battery, keycard, note
-├── fx/
-│   ├── textures.ts            All procedural canvas textures (cached)
-│   └── particles.ts           Sparks, blood, bullet-hole decals, flashlight dust motes
-├── audio/soundManager.ts      Synth SFX, stereo panning, wall muffling, reverb, ambience, heartbeat
-└── ui/
-    ├── styles.ts              All UI CSS (injected once)
-    ├── hud.ts                 In-game HUD
-    └── menu.ts                Main / pause / settings / controls / death / level-complete / victory
+├── weapons/                   Weapon state machine and first-person viewmodel
+├── enemies/                   AI state machine, creature rig, enemy manager
+├── items/pickup.ts            Pickup meshes and animation
+├── fx/                        Procedural canvas textures, particles
+├── audio/soundManager.ts      Synth SFX, stereo panning, wall muffling, reverb, ambience
+└── ui/                        HUD, menus, styles
 ```
+
+Unit tests live next to the code they cover (`*.test.ts`).
+
+### Layers
+
+```
+      Input ──buildCommand──► PlayerCommand
+                                   │
+Game (shell) ──creates──► LevelSession.step(dt, command)
+   │  menus, saves,               │  player · enemies · weapon · pickups · exit
+   │  campaign flow               ▼
+   │                     world/grid (collision, LOS, raycasts)
+   └──────── Engine / SoundManager / Hud (shared services)
+```
+
+- **`Game`** owns long-lived services and moves between states. It never
+  touches gameplay objects directly.
+- **`LevelSession`** is created fresh for every level attempt and discarded
+  afterwards, so no state can leak between levels or retries.
+- **`PlayerCommand`** is the only way intent enters the simulation. Keyboard,
+  the debug harness and (in Phase 6) a remote player all produce commands.
+- **Content** is data. The level parser learns enemy glyphs from
+  `content/enemies.ts`, so a new creature is placeable as soon as it's defined.
 
 ---
 
 ## 3. Game flow
 
 ```
-menu ──New Game──► playing ──exit reached──► levelComplete ──Continue──► playing (next level)
-                     │  ▲                                   (last level) ► victory ──► menu
-                  Esc│  │Resume
-                     ▼  │
-                   paused ──Restart / Quit──► playing / menu
+menu ──New Game / Chapters──► difficulty ──► playing ──exit──► levelComplete ──Continue──► playing (next level)
+  ▲  └─Continue (saved run)─────────────────────┘ │ ▲                         (last level) ► victory ──► menu
+  │                                           Esc │ │ Resume
+  │                                               ▼ │
+  └──────────────Quit───────────────────────── paused ──Restart──► playing
 playing ──health 0──► dead ──Retry──► playing (same level, same starting loadout)
+                          └─(Ironman)──► run over, save deleted ──► menu
 ```
 
 - The main menu renders a slowly turning view of level 1 behind it.
-- **Carry-over**: health, battery and ammo carry into the next level. Health
-  is topped up to at least 40 and battery to 30 between levels so a bad run
-  isn't unwinnable. "Retry" restores the loadout you _entered_ the level with.
+- **Saving** (`game/save.ts`): the run is checkpointed whenever a level starts
+  and when one is completed. "Continue" resumes at the start of the saved
+  level with the loadout you entered it with. Reaching a level unlocks it in
+  **Chapters**. Best clear time per level is recorded. The save is one
+  versioned JSON document; anything malformed is repaired field by field
+  rather than discarded.
+- **Carry-over**: health, battery and ammo carry into the next level, topped
+  up to the difficulty's floors so a bad run isn't unwinnable.
 - If pointer lock is refused (browsers block re-locking right after Esc), the
   HUD shows "CLICK TO RESUME" and clicking the view re-locks.
 
-`Game.step(dt)` runs the simulation; the rAF loop calls `step`, then renders.
-Order per playing frame: player → enemies → weapon → shooting → pickups →
-lamps → particles → viewmodel → post-fx/audio → HUD → exit check.
+Per playing frame, `Game` builds a `PlayerCommand` and calls
+`LevelSession.step`: player → enemies → weapon → shooting → pickups → lamps
+→ particles → viewmodel → post-fx/audio → HUD → exit check.
+
+### Difficulty (`content/difficulty.ts`)
+
+|                                       | Story   | Normal  | Nightmare | Ironman |
+| ------------------------------------- | ------- | ------- | --------- | ------- |
+| Enemy health                          | ×0.7    | ×1      | ×1.3      | ×1      |
+| Enemy damage                          | ×0.5    | ×1      | ×1.5      | ×1      |
+| Enemy sight & hearing                 | ×0.75   | ×1      | ×1.25     | ×1      |
+| Pickup amounts                        | ×1.5    | ×1      | ×0.75     | ×1      |
+| Flashlight drain                      | ×0.6    | ×1      | ×1.3      | ×1      |
+| Starting reserve ammo                 | 32      | 16      | 8         | 16      |
+| Health / battery floor between levels | 70 / 50 | 40 / 30 | 25 / 20   | 40 / 30 |
+| Lives                                 | ∞       | ∞       | ∞         | **1**   |
 
 ---
 
@@ -143,8 +192,10 @@ One character = one 4×4 world-unit cell. Wall height 3.2.
 | `0`–`9` | note, text from the level's `notes` table |      |                                   |
 
 A level is a `LevelDef` (`id`, `name`, `subtitle`, `objective`, `map`,
-`notes`, `spawnYaw`). Spawn facing now lives in the level data rather than
-being hard-coded in the player.
+`notes`, `spawnYaw`). Enemy glyphs are not hard-coded in the parser; they come
+from `content/enemies.ts`. The parser rejects unknown characters, missing or
+duplicate spawns/exits and notes without text, with an error naming the level
+and cell.
 
 | #   | Name                          | Size  | Enemies           | Notes               |
 | --- | ----------------------------- | ----- | ----------------- | ------------------- |
@@ -154,7 +205,7 @@ being hard-coded in the player.
 The exit is a door + EXIT sign mounted on the wall next to the `X` cell. Its
 sign and light turn red while locked.
 
-### Collision & raycasts (`world/level.ts`)
+### Collision & raycasts (`world/grid.ts`)
 
 - `resolveCollision` — circle vs. grid, axis-separated so you slide along walls.
   Used by the player (r 0.35) and enemies (r 0.35 / 0.5).
@@ -301,35 +352,58 @@ compressor.
   indicator; noise meter (bottom centre); magazine, reserve, round pips and
   reload hint (bottom right); pickup toasts; context prompts; note card;
   level-name intro. DOM updates only when values change.
-- **Screens**: main menu, pause (resume / restart / settings / controls /
-  quit), settings (sensitivity, FOV, volume, invert Y — saved), controls +
-  tips, death with run stats, level complete with stats, victory with totals.
+- **Screens**: main menu (Continue / New Game / Chapters / Settings /
+  Controls), difficulty select, chapter select with best times, confirm
+  dialog, pause, settings (sensitivity, FOV, volume, invert Y — saved),
+  controls with **rebinding** (click a slot, press a key or mouse button;
+  Backspace clears; a key moved to a new action is removed from its old one),
+  death with run stats, level complete with stats and "new best", victory with
+  run totals.
 
 ---
 
 ## 12. Debug hooks (`?debug`)
 
 With `?debug`, pointer lock isn't required and `window.game` exposes:
-`debugStart(levelIndex)`, `debugSimulate(seconds, heldKeys[])`,
+`debugStart(levelIndex, difficulty?)`, `debugSimulate(seconds, heldCodes[])`,
 `debugFire()`, `debugLook(yaw, pitch)`, `debugTeleport(x, z)`,
 `debugEnemies()`, `debugState()`. `debugSimulate` steps the game at a fixed
-30 Hz without rendering, which is handy for testing AI headlessly.
+30 Hz without rendering, holding the given key codes (e.g. `["KeyW",
+"ShiftLeft"]`), which is handy for testing AI headlessly.
 
 ---
 
-## 13. Known limitations / next steps
+## 13. Testing
 
-1. **Two levels.** Level format supports more; add a `LevelDef` to
-   `world/levels/index.ts`.
+`npm test` runs the Vitest suite; `npm run check` adds the typecheck and
+formatting check, and CI runs all of it on every push. Deploys are blocked if
+any of it fails.
+
+The tests run in Node without a GPU. That's possible because the logic that
+matters is separated from rendering: the level parser, grid queries,
+pathfinding, weapon, player movement (driven by commands), bindings, settings
+and save migration are all pure or near-pure.
+
+**Every shipped level is validated** (`world/levels/levels.test.ts`): it must
+parse, have a closed outer wall, a reachable exit, reachable keycards and
+pickups, no enemies spawning next to the player, and no orphaned notes.
+
+---
+
+## 14. Known limitations / next steps
+
+See [`ROADMAP.md`](ROADMAP.md) for the full plan.
+
+1. **Two levels.** The campaign in [`STORY.md`](STORY.md) has ten.
 2. **One weapon, no melee.** A quiet melee takedown would suit the stealth
    design.
-3. **No save/checkpoints** within or between sessions.
+3. **Checkpoints are per level**, not mid-level.
 4. **Pathfinding** is per-enemy BFS (fine at this scale; switch to a shared
    flow field if enemy counts grow a lot).
 5. **Dead enemies never despawn** (fine without respawning).
-6. **No shadows** — deliberate for integrated-GPU performance. The
+6. **No shadows**, deliberately, for integrated-GPU performance. The
    flashlight could cast shadows as an optional quality setting.
-7. **No gamepad / touch input, no key rebinding.**
+7. **No gamepad or touch input.**
 8. **Performance** hasn't been profiled on low-end GPUs. If needed: lower
    the lamp pool from 6, drop the pixel-ratio cap (1.5), or remove the
    bump maps.
