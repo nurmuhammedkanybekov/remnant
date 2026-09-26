@@ -17,9 +17,10 @@ _Desktop with mouse and keyboard. Headphones strongly recommended._
 
 ![Main menu](docs/screenshots/menu.jpg)
 
-|                                                       |                                                             |
-| ----------------------------------------------------- | ----------------------------------------------------------- |
-| ![A husk in the corridor](docs/screenshots/enemy.jpg) | ![The locked exit on Sublevel 2](docs/screenshots/exit.jpg) |
+|                                                                |                                                                       |
+| -------------------------------------------------------------- | --------------------------------------------------------------------- |
+| ![A husk caught in the flashlight](docs/screenshots/enemy.jpg) | ![The Operator on the radio, Sublevel 10](docs/screenshots/radio.jpg) |
+| ![The flooded pumping station](docs/screenshots/water.jpg)     | ![A generator in the power plant](docs/screenshots/generator.jpg)     |
 
 </div>
 
@@ -109,6 +110,19 @@ TypeScript plus one runtime dependency, `three`.
 - Ambient drone with distant drips and metal groans, and a heartbeat at low
   health.
 
+### Campaign
+
+- **Ten levels**, from the infirmary on Sublevel 10 up to the surface, each
+  introducing something new: flooded halls, keycard doors, a maze of ducts,
+  generators that draw every creature on the floor.
+- **A story told through the radio.** A calm voice guides you upward, with
+  subtitles and a synthesized radio voice. Notes left by survivors fill in
+  the rest. There are **two endings**.
+- **A world you use:** doors, security doors, generators, intercoms.
+- **Checkpoints** mid-level, and a distinct look for every sublevel.
+
+![The hive, Sublevel 2](docs/screenshots/hive.jpg)
+
 ### Game
 
 - **Four difficulty modes:** Story, Normal, Nightmare, and **Ironman**
@@ -133,10 +147,12 @@ Every action can be rebound in **Controls**. Defaults:
 | Sprint (loud)  | Shift            |
 | Crouch (quiet) | C / Ctrl         |
 | Flashlight     | F                |
+| Interact       | E                |
 | Pause          | Esc              |
 
-**Goal:** reach the exit of each sublevel. Some exits are locked until you
-find the keycard. Killing enemies is optional, and often a bad idea.
+**Goal:** climb from Sublevel 10 to the surface. Find keycards, restore
+power, and listen to the radio, but don't believe everything it says.
+Killing creatures is optional, and often a bad idea.
 
 ---
 
@@ -208,17 +224,23 @@ src/
 └── ui/         HUD, menus, styles
 ```
 
-Levels are plain text, so designing one is drawing a map:
+Levels are plain text plus a small script, so designing one is drawing a map:
 
 ```ts
 map: [
-  "##########",
-  "#S..L...A#", // S start, L lamp, A ammo
-  "#.####.#.#",
-  "#...E..#X#", // E husk, X exit
-  "##########",
+  "############",
+  "#S.a.D..L.A#", // S start, a trigger, D door, L lamp, A ammo
+  "#.####.###.#",
+  "#.Y..E.K.=X#", // Y intercom, E husk, K keycard, = security door, X exit
+  "############",
 ],
+triggers: {
+  a: [radio(op("Something is moving past that door. Stay low.")), checkpoint()],
+},
 ```
+
+A validator checks that every level can actually be finished, including that
+the keycard is reachable before the door it opens.
 
 ---
 
@@ -237,12 +259,17 @@ map: [
 - **Logic that runs without a GPU.** Level parsing is separated from
   geometry building, and the simulation is driven by commands instead of
   reading the keyboard. Almost everything that matters can be tested in Node.
-- **Levels are verified, not trusted.** A validator flood-fills every map and
-  fails the build if an exit, keycard or pickup is unreachable, the outer
-  wall has a gap, or an enemy spawns on top of the player.
+- **Levels are verified, not trusted.** A lock-aware validator flood-fills
+  every map and fails the build if an exit, keycard, generator or pickup is
+  unreachable, a keycard sits behind the door it opens, a door isn't in a
+  doorway, or an enemy spawns on top of the player.
+- **Declarative scripting.** Story beats are data: triggers, intercoms and
+  level events run radio lines, objectives, hints and checkpoints. No level
+  needs custom code.
 - **Saves that can't brick the game.** The save file is versioned and
   validated field by field: corrupt or out-of-range values are repaired, not
-  fatal, and the game keeps running when browser storage is blocked.
+  fatal, older versions are migrated, and the game keeps running when
+  browser storage is blocked.
 - **A headless debug mode.** With `?debug`, the game exposes hooks to step
   the simulation at a fixed timestep without rendering, which makes it
   possible to script and test AI behaviour.
@@ -265,13 +292,14 @@ push and pull request, and a failing check blocks deployment.
 
 ## Roadmap
 
-REMNANT is growing from a two-level slice into a full ten-level campaign.
+REMNANT grew from a two-level slice into a full ten-level campaign, and it
+keeps growing.
 
 | Phase                                           | Status   |
 | ----------------------------------------------- | -------- |
 | 1. Foundations                                  | ✅ Done  |
-| 2. Campaign: 10 levels, radio dialogue, endings | ⏳ Next  |
-| 3. New creatures, melee, more weapons           | Planned  |
+| 2. Campaign: 10 levels, radio dialogue, endings | ✅ Done  |
+| 3. New creatures, melee, more weapons           | ⏳ Next  |
 | 4. Adaptive music, interface redesign, gamepad  | Planned  |
 | 5. Cloud saves                                  | Optional |
 | 6. Two-player online co-op                      | Optional |
@@ -282,11 +310,11 @@ Details in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Documentation
 
-| Document                                | Contents                                           |
-| --------------------------------------- | -------------------------------------------------- |
-| [`GAME_DESIGN.md`](docs/GAME_DESIGN.md) | Every system, with its tuning values               |
-| [`STORY.md`](docs/STORY.md)             | World, characters, creatures and the campaign plan |
-| [`ROADMAP.md`](docs/ROADMAP.md)         | What's done and what's next                        |
+| Document                                | Contents                                      |
+| --------------------------------------- | --------------------------------------------- |
+| [`GAME_DESIGN.md`](docs/GAME_DESIGN.md) | Every system, with its tuning values          |
+| [`STORY.md`](docs/STORY.md)             | World, characters, creatures and the campaign |
+| [`ROADMAP.md`](docs/ROADMAP.md)         | What's done and what's next                   |
 
 ---
 
@@ -298,6 +326,12 @@ Details in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - **Vite** for the dev server and build
 - **Vitest** for tests, **Prettier** for formatting, **GitHub Actions** for
   CI and deployment
+
+---
+
+## License
+
+[MIT](LICENSE)
 
 ---
 

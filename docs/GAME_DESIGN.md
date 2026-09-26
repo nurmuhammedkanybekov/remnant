@@ -19,7 +19,7 @@ the known gaps.
 | Build        | Vite 5                                                                                                                                                                        |
 | Runtime deps | `three` only                                                                                                                                                                  |
 | Assets       | **None shipped.** Textures are painted onto `<canvas>` at startup; all audio is synthesized with the Web Audio API. (UI fonts load from Google Fonts, with system fallbacks.) |
-| Levels       | 2 hand-authored grid maps, played in sequence (10 planned, see `STORY.md`)                                                                                                    |
+| Levels       | 10 hand-authored grid maps with scripted story beats (see `STORY.md`)                                                                                                         |
 
 ```bash
 npm install
@@ -114,13 +114,20 @@ playing ──health 0──► dead ──Retry──► playing (same level, s
                           └─(Ironman)──► run over, save deleted ──► menu
 ```
 
-- The main menu renders a slowly turning view of level 1 behind it.
-- **Saving** (`game/save.ts`): the run is checkpointed whenever a level starts
-  and when one is completed. "Continue" resumes at the start of the saved
+- The main menu renders a slowly turning view of the Maintenance Wing behind it.
+- A new game from the first level opens with the **prologue**; the last
+  level ends with one of **two endings** (`content/story.ts`).
+- **Saving** (`game/save.ts`): the run is saved whenever a level starts,
+  when one is completed, and at every **mid-level checkpoint**. A checkpoint
+  stores the player's position, loadout, stats and which pickups, kills,
+  doors, generators, intercoms and triggers are already done
+  (`game/checkpoint.ts`); on death the player can retry from it or restart
+  the level. "Continue" resumes at the start of the saved
   level with the loadout you entered it with. Reaching a level unlocks it in
   **Chapters**. Best clear time per level is recorded. The save is one
   versioned JSON document; anything malformed is repaired field by field
-  rather than discarded.
+  rather than discarded, and older versions are migrated (v1 → v2 shifted
+  level indices when the campaign grew from two levels to ten).
 - **Carry-over**: health, battery and ammo carry into the next level, topped
   up to the difficulty's floors so a bad run isn't unwinnable.
 - If pointer lock is refused (browsers block re-locking right after Esc), the
@@ -180,30 +187,71 @@ still glow; they just don't cast light.
 
 One character = one 4×4 world-unit cell. Wall height 3.2.
 
-| Char    | Meaning                                   | Char | Meaning                           |
-| ------- | ----------------------------------------- | ---- | --------------------------------- |
-| `#`     | wall                                      | `.`  | floor                             |
-| `S`     | player spawn                              | `X`  | exit                              |
-| `E`     | husk                                      | `H`  | brute                             |
-| `A`     | ammo                                      | `M`  | medkit                            |
-| `B`     | battery                                   | `K`  | keycard (exit locked until taken) |
-| `L`     | ceiling lamp                              | `R`  | red emergency lamp                |
-| `C`     | crate stack (solid)                       | `O`  | barrels (solid)                   |
-| `0`–`9` | note, text from the level's `notes` table |      |                                   |
+| Char    | Meaning                                    | Char    | Meaning                             |
+| ------- | ------------------------------------------ | ------- | ----------------------------------- |
+| `#`     | wall                                       | `.`     | floor                               |
+| `S`     | player spawn                               | `X`     | exit                                |
+| `E`     | husk                                       | `H`     | brute                               |
+| `A`     | ammo                                       | `M`     | medkit                              |
+| `B`     | battery                                    | `K`     | keycard                             |
+| `L`     | ceiling lamp                               | `R`     | red emergency lamp                  |
+| `C`     | crate stack (solid)                        | `O`     | barrels (solid)                     |
+| `D`     | door                                       | `=`     | security door (needs the keycard)   |
+| `G`     | generator (solid)                          | `Y`     | intercom                            |
+| `~`     | shallow water                              | `*`     | checkpoint                          |
+| `Z`     | detonator console (finale only)            | `0`–`9` | note, text from the level's `notes` |
+| `a`–`z` | invisible trigger, runs `triggers[letter]` |         |                                     |
 
-A level is a `LevelDef` (`id`, `name`, `subtitle`, `objective`, `map`,
-`notes`, `spawnYaw`). Enemy glyphs are not hard-coded in the parser; they come
-from `content/enemies.ts`. The parser rejects unknown characters, missing or
-duplicate spawns/exits and notes without text, with an error naming the level
-and cell.
+A level is a `LevelDef`: map, notes, spawn facing, and optionally
+`triggers`, `intercoms`, `events` (`start`, `keycard`, `power`), a `theme`
+and the `finale` flag. Enemy glyphs come from `content/enemies.ts`. The
+parser rejects unknown characters, missing or duplicate spawns/exits, notes
+or triggers without text, and intercom counts that don't match their
+scripts, with an error naming the level and cell.
 
-| #   | Name                          | Size  | Enemies           | Notes               |
-| --- | ----------------------------- | ----- | ----------------- | ------------------- |
-| 1   | Sublevel 3 — Maintenance Wing | 22×17 | 3 husks           | Find the exit       |
-| 2   | Sublevel 2 — Cold Storage     | 26×19 | 2 husks + 1 brute | Keycard-locked exit |
+**Locks.** If a level has security doors, the keycard opens them; otherwise
+it unlocks the exit. If a level has generators, the exit has no power until
+every one is running.
+
+**Themes** (`world/theme.ts`) set fog colour and density, fill light, wall
+and floor tint and lamp colour per level.
+
+| #   | Level                         | Enemies           | What's new                                |
+| --- | ----------------------------- | ----------------- | ----------------------------------------- |
+| 1   | Sublevel 10 — Infirmary       | 2 husks           | Tutorial, intercom, doors, hints          |
+| 2   | Sublevel 9 — Maintenance Wing | 3 husks           | Stealth                                   |
+| 3   | Sublevel 8 — Cold Storage     | 2 husks, brute    | Keycard-locked exit, first Brute          |
+| 4   | Sublevel 7 — Pumping Station  | 3 husks, brute    | Water, security doors                     |
+| 5   | Sublevel 6 — Containment Labs | 4 husks, brute    | Doors everywhere                          |
+| 6   | Sublevel 5 — Ventilation      | 5 husks           | Duct maze, the radio lies                 |
+| 7   | Sublevel 4 — Power Plant      | 3 husks, brute    | Three generators power the exit           |
+| 8   | Sublevel 3 — Armory           | 5 husks, 2 brutes | Big open hall, supplies                   |
+| 9   | Sublevel 2 — The Hive         | 3 husks, 3 brutes | The Operator reveals itself               |
+| 10  | Surface — Lift Shaft          | 2 husks, brute    | The choice: leave, or trigger the charges |
 
 The exit is a door + EXIT sign mounted on the wall next to the `X` cell. Its
 sign and light turn red while locked.
+
+### Interaction (`world/interactables.ts`)
+
+Doors, generators, intercoms and the detonator console implement
+`Interactable`: a position, a reach, a prompt and `interact()`. Each frame
+the session picks the closest one within reach and within 55° of where the
+player is looking, and shows `[E] OPEN DOOR`.
+
+- **Doors** block movement, sight and pathfinding until opened, then
+  retract into the ceiling. Opening one makes noise (radius 9).
+- **Generators** are loud to start (radius 26) and keep thrumming every
+  4.5 s (radius 11), so running generators keep drawing creatures.
+- **Intercoms** play their script once.
+
+### Scripting (`game/script.ts`)
+
+Story beats are data. Triggers, intercoms and level events hold lists of
+actions: `radio` (subtitled lines from the Operator, Aida or an unknown
+voice), `objective`, `hint` (with `{action}` placeholders replaced by the
+player's current key binding), `checkpoint` and `alarm`. The radio plays one
+line at a time on the simulation clock, so pausing pauses the conversation.
 
 ### Collision & raycasts (`world/grid.ts`)
 
@@ -227,7 +275,8 @@ sign and light turn red while locked.
 | Feel                         | head-bob, strafe lean, recoil pitch kick, trauma-based camera shake                           |
 
 **Noise.** Each gait has a hearing radius: still 0, crouch 1.6, walk 5.5,
-sprint 12. Walls cut it to 40%. The HUD noise meter shows your current level.
+sprint 12. Walls cut it to 40%. **Water** multiplies it by 1.8 and slows you
+to 72%. The HUD noise meter shows your current level.
 
 **Flashlight** (F): spotlight held low-right with beam sway that lags your
 aim. Battery 100, drains 1.7/s (~60 s). While off it trickles back to at
@@ -340,6 +389,10 @@ compressor.
   hurt screech, death groan. Brutes are pitched down.
 - **Ambience**: detuned low drone with a slow filter swell, plus random
   distant drips, metal groans and clanks.
+- **World & radio**: a synthesized radio voice (key-up click, static bed and
+  band-passed "syllables" for the length of the subtitle), door motors,
+  generator start-up and thrum, splashing footsteps, intercom chime,
+  checkpoint tone and the detonation.
 - Pause ducks the mix. Master volume is a setting.
 
 ---
@@ -350,10 +403,11 @@ compressor.
   HUNTED (top centre); dynamic crosshair; hit marker; directional damage
   arcs; health (with lag bar) / stamina / battery (bottom left); keycard
   indicator; noise meter (bottom centre); magazine, reserve, round pips and
-  reload hint (bottom right); pickup toasts; context prompts; note card;
-  level-name intro. DOM updates only when values change.
+  reload hint (bottom right); pickup toasts; context prompts; interact
+  prompt with the bound key; radio subtitles with the speaker's name; note
+  card; level-name intro. DOM updates only when values change.
 - **Screens**: main menu (Continue / New Game / Chapters / Settings /
-  Controls), difficulty select, chapter select with best times, confirm
+  Controls), prologue, ending, difficulty select, chapter select with best times, confirm
   dialog, pause, settings (sensitivity, FOV, volume, invert Y — saved),
   controls with **rebinding** (click a slot, press a key or mouse button;
   Backspace clears; a key moved to a new action is removed from its old one),
@@ -394,16 +448,16 @@ pickups, no enemies spawning next to the player, and no orphaned notes.
 
 See [`ROADMAP.md`](ROADMAP.md) for the full plan.
 
-1. **Two levels.** The campaign in [`STORY.md`](STORY.md) has ten.
+1. **Two creature types.** Levels 4–9 use Husks and Brutes where
+   [`STORY.md`](STORY.md) introduces new creatures; Phase 3 adds them.
 2. **One weapon, no melee.** A quiet melee takedown would suit the stealth
    design.
-3. **Checkpoints are per level**, not mid-level.
-4. **Pathfinding** is per-enemy BFS (fine at this scale; switch to a shared
+3. **Pathfinding** is per-enemy BFS (fine at this scale; switch to a shared
    flow field if enemy counts grow a lot).
-5. **Dead enemies never despawn** (fine without respawning).
-6. **No shadows**, deliberately, for integrated-GPU performance. The
-   flashlight could cast shadows as an optional quality setting.
-7. **No gamepad or touch input.**
-8. **Performance** hasn't been profiled on low-end GPUs. If needed: lower
+4. **Dead enemies never despawn** (fine without respawning).
+5. **No shadows**, deliberately, for integrated-GPU performance. Lamp light
+   passes through closed doors for the same reason.
+6. **No gamepad or touch input.**
+7. **Performance** hasn't been profiled on low-end GPUs. If needed: lower
    the lamp pool from 6, drop the pixel-ratio cap (1.5), or remove the
    bump maps.
