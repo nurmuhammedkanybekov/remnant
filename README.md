@@ -146,8 +146,8 @@ Nine kinds of creature, each built to break a habit the last one taught you:
   health.
 - **Adaptive music**, synthesized too, closer to horror sound design than
   a tune: a low drone that drifts out of tune, bowed metal and distant
-  booms, then a heartbeat under trembling strings, then a pounding throb,
-  metal clangs and screeching strings, fading in and out with how much
+  booms, then a heartbeat under trembling strings, then deep drum hits, a
+  grinding bass, metal scrapes and climbing strings, fading in and out with how much
   danger you're in. The
   menus keep only the ambient drone.
 
