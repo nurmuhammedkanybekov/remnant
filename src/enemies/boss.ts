@@ -56,6 +56,11 @@ export class RemnantBoss extends Enemy {
     return this.mass.open;
   }
 
+  /** Would a hit to `part` right now be soaked by the hide? */
+  isArmoured(part: "head" | "body"): boolean {
+    return part === "body" || this.mass.open <= 0.5;
+  }
+
   override canBeTakenDown(): boolean {
     return false;
   }

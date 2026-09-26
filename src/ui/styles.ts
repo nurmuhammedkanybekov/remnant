@@ -30,6 +30,7 @@ const CSS = /* css */ `
 .hitmark::after { transform: rotate(-45deg); }
 .hitmark.head::before, .hitmark.head::after { background: linear-gradient(var(--ui-red) 0 32%, transparent 32% 68%, var(--ui-red) 68%); }
 .hitmark.kill { transform: scale(1.4); }
+.hitmark.armoured { transform: scale(0.6); filter: grayscale(1) brightness(.6); }
 
 /* ---- damage direction ---- */
 .dmgdir { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }

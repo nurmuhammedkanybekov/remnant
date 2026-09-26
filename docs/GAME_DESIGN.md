@@ -456,6 +456,11 @@ opens its core for 3.5 s and summons at once. The exit is sealed until it
 dies; when it does, everything it birthed dies with it. The player can't
 walk into it.
 
+Hits the hide soaks get a small grey hit marker and a dull impact sound
+instead of the usual feedback, and after a few of them a prompt says to
+shoot the core when it opens. While it's awake, ammo picked up near it
+comes back after 25 s, so the fight can be slow but never unwinnable.
+
 ### Bodies & animation (`enemies/bodies.ts`)
 
 Each creature type has its own rig, all from primitives:

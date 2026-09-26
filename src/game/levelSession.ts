@@ -47,6 +47,9 @@ const MELEE_DAMAGE = 20;
 const MELEE_NOISE = 4;
 const TAKEDOWN_NOISE = 1.5;
 const MELEE_FACING = Math.cos(THREE.MathUtils.degToRad(50));
+/** Ammo picked up this close to the boss while it is awake comes back after RESTOCK_TIME seconds. */
+const RESTOCK_RADIUS = 40;
+const RESTOCK_TIME = 25;
 const AMMO_LABEL: Record<WeaponId, string> = { pistol: "ROUNDS", rivet: "RIVETS", shotgun: "SHELLS" };
 
 /** The systems a session renders and plays sound through; owned by `Game`, shared across levels. */
@@ -108,6 +111,9 @@ export class LevelSession {
   private healTimer = 0;
   private meleeCooldown = 0;
   private healHintShown = false;
+  private armouredHits = 0;
+  /** Supplies in the boss arena come back while the fight goes on: [pickup, seconds left]. */
+  private readonly restock: [Pickup, number][] = [];
   /** Everything the boss has birthed; it dies with its mother. */
   private readonly brood = new Set<Enemy>();
   private humTimer = 0;
@@ -681,13 +687,16 @@ export class LevelSession {
     let anyHit = false;
     let anyHead = false;
     let anyKill = false;
+    let allArmoured = true;
     let impactSound = false;
     for (const dir of shot.dirs) {
       const wall = raycastWorld(this.level, shot.origin, dir, cfg.range);
       const hit = this.enemies.raycast(new THREE.Ray(shot.origin, dir), wall ? wall.distance : cfg.range);
       if (hit) {
         const dmg = cfg.damage * (hit.headshot ? cfg.headshotMultiplier : 1);
-        const killed = this.damageEnemy(hit.enemy, dmg, hit.headshot ? "head" : "body");
+        const part = hit.headshot ? "head" : "body";
+        if (!(hit.enemy instanceof RemnantBoss && hit.enemy.isArmoured(part))) allArmoured = false;
+        const killed = this.damageEnemy(hit.enemy, dmg, part);
         this.effects.bloodBurst(hit.point, dir.clone(), (killed ? 28 : 14) / Math.sqrt(cfg.pellets));
         anyHit = true;
         anyHead ||= hit.headshot;
@@ -700,9 +709,17 @@ export class LevelSession {
     }
     if (anyHit) {
       this.stats.hits++;
-      if (anyHead) this.stats.headshots++;
-      hud.hitMarker(anyHead, anyKill);
-      sound.playHitmarker(anyHead);
+      if (anyHead && !allArmoured) this.stats.headshots++;
+      if (allArmoured) {
+        // The hide soaked it. Say so, so nobody empties their ammo into it.
+        hud.hitMarker(false, anyKill, true);
+        sound.playImpact(this.spatial(this.boss!.position2D));
+        this.armouredHits++;
+        if (this.armouredHits === 4) hud.prompt("ITS HIDE STOPS BULLETS — SHOOT THE CORE WHEN IT OPENS", 4);
+      } else {
+        hud.hitMarker(anyHead, anyKill);
+        sound.playHitmarker(anyHead);
+      }
     }
   }
 
@@ -775,6 +792,15 @@ export class LevelSession {
 
   private updatePickups(dt: number): void {
     const { sound, hud } = this.services;
+    // Arena supplies restock until the Remnant is dead, so the fight can never run you dry.
+    for (let i = this.restock.length - 1; i >= 0; i--) {
+      this.restock[i][1] -= dt;
+      if (this.boss?.isDead) this.restock.splice(i, 1);
+      else if (this.restock[i][1] <= 0) {
+        this.restock[i][0].restore();
+        this.restock.splice(i, 1);
+      }
+    }
     const px = this.player.position.x;
     const pz = this.player.position.z;
     const amount = (base: number) => Math.round(base * this.difficulty.pickupMultiplier);
@@ -797,6 +823,9 @@ export class LevelSession {
         }
         const got = w.addReserveAmmo(amount(w.config.ammoPickup));
         hud.toast(`+${got} ${AMMO_LABEL[item.ammoFor]}`);
+        const b = this.boss;
+        if (b && b.awake && !b.isDead && b.position2D.distanceTo(new THREE.Vector2(px, pz)) < RESTOCK_RADIUS)
+          this.restock.push([p, RESTOCK_TIME]);
         p.collect();
         sound.playPickup(p.type);
         continue;
