@@ -1,6 +1,7 @@
 import { ACTIONS, ACTION_LABELS, RESERVED_CODES, keyLabel, rebind, type Action, type Bindings } from "../core/actions";
 import type { Settings } from "../core/settings";
 import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyId } from "../content/difficulty";
+import type { Ending } from "../content/story";
 import { accuracy, type RunStats } from "../game/stats";
 import { injectStyles } from "./styles";
 
@@ -153,9 +154,20 @@ export class Screens {
     );
   }
 
-  victory(stats: RunStats, difficultyName: string, items: MenuItem[]): void {
+  /** Narrative text screen (prologue). */
+  story(title: string, lines: string[], items: MenuItem[]): void {
     this.render(
-      `<h2>DAYLIGHT</h2><div class="tag">YOU MADE IT OUT · ${esc(difficultyName.toUpperCase())}</div>${this.statsHtml(stats)}`,
+      `<h2>${esc(title)}</h2><div class="story">${lines.map((l, i) => `<p style="animation-delay:${0.3 + i * 0.9}s">${esc(l)}</p>`).join("")}</div>`,
+      items,
+      true
+    );
+  }
+
+  ending(ending: Ending, stats: RunStats, difficultyName: string, items: MenuItem[]): void {
+    this.render(
+      `<h2>${esc(ending.title)}</h2><div class="tag">${esc(ending.tag)} · ${esc(difficultyName.toUpperCase())}</div>
+       <div class="story">${ending.lines.map((l, i) => `<p style="animation-delay:${0.4 + i * 1.1}s">${esc(l)}</p>`).join("")}</div>
+       ${this.statsHtml(stats)}`,
       items,
       true
     );

@@ -20,10 +20,22 @@ export interface PlayerCommand {
   fire: boolean;
   reload: boolean;
   toggleFlashlight: boolean;
+  interact: boolean;
 }
 
 export function emptyCommand(): PlayerCommand {
-  return { moveX: 0, moveY: 0, turn: 0, tilt: 0, sprint: false, crouch: false, fire: false, reload: false, toggleFlashlight: false };
+  return {
+    moveX: 0,
+    moveY: 0,
+    turn: 0,
+    tilt: 0,
+    sprint: false,
+    crouch: false,
+    fire: false,
+    reload: false,
+    toggleFlashlight: false,
+    interact: false,
+  };
 }
 
 /** The slice of `Input` a command needs (kept narrow so tests can fake it). */
@@ -55,5 +67,6 @@ export function buildCommand(input: InputSource, bindings: Bindings, look: LookS
     fire: pressed("fire"),
     reload: pressed("reload"),
     toggleFlashlight: pressed("flashlight"),
+    interact: pressed("interact"),
   };
 }

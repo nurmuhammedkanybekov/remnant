@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { textures } from "../fx/textures";
 import { CELL_SIZE, WALL_HEIGHT, cellCenter, isSolid, type Cell } from "./grid";
 import type { ParsedLevel } from "./levelParser";
+import { resolveTheme } from "./theme";
 
 /** Ceiling-lamp meshes the LampSystem dims when a lamp flickers off. */
 export interface LampFixture {
@@ -26,11 +27,13 @@ export function buildLevel(scene: THREE.Scene, level: ParsedLevel): LevelData {
 
 function buildGeometry(scene: THREE.Scene, level: ParsedLevel): LampFixture[] {
   const tex = textures();
+  const theme = resolveTheme(level.def.theme);
   const { walls, crates, barrels } = level.props;
 
   // Walls: one instanced mesh, one draw call.
   const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
   const wallMat = new THREE.MeshStandardMaterial({
+    color: theme.wallTint,
     map: tex.wall,
     bumpMap: tex.wall,
     bumpScale: 1.2,
@@ -56,6 +59,7 @@ function buildGeometry(scene: THREE.Scene, level: ParsedLevel): LampFixture[] {
   floorTex.repeat.set(level.cols, level.rows);
   floorTex.needsUpdate = true;
   const floorMat = new THREE.MeshStandardMaterial({
+    color: theme.floorTint,
     map: floorTex,
     bumpMap: floorTex,
     bumpScale: 0.8,
@@ -149,10 +153,32 @@ function buildGeometry(scene: THREE.Scene, level: ParsedLevel): LampFixture[] {
     scene.add(halo);
   }
 
-  scene.fog = new THREE.FogExp2(0x050607, 0.06);
-  scene.background = new THREE.Color(0x050607);
+  // Shallow water: one instanced sheet per flooded cell, slightly above the floor.
+  if (level.spawns.water.length) {
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x1d3438,
+      emissive: 0x04110f, // a faint sheen, so flooded floors read even in the dark
+      roughness: 0.18,
+      metalness: 0.15,
+      transparent: true,
+      opacity: 0.78,
+      depthWrite: false,
+    });
+    const waterMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE), waterMat, level.spawns.water.length);
+    level.spawns.water.forEach((w, i) => {
+      dummy.position.set(w.pos.x, 0.32, w.pos.y);
+      dummy.rotation.set(-Math.PI / 2, 0, 0);
+      dummy.updateMatrix();
+      waterMesh.setMatrixAt(i, dummy.matrix);
+    });
+    waterMesh.instanceMatrix.needsUpdate = true;
+    scene.add(waterMesh);
+  }
+
+  scene.fog = new THREE.FogExp2(theme.fog, theme.fogDensity);
+  scene.background = new THREE.Color(theme.fog);
   // A cool, very dim fill so nothing is ever pure black.
-  scene.add(new THREE.HemisphereLight(0x55606a, 0x1a1510, 1.1));
+  scene.add(new THREE.HemisphereLight(theme.skyLight, theme.groundLight, theme.fillIntensity));
   return fixtures;
 }
 

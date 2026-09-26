@@ -1,6 +1,25 @@
 import type { LevelDef } from "../levelDef";
-import { LEVEL_1 } from "./level1";
-import { LEVEL_2 } from "./level2";
+import { ARMORY } from "./armory";
+import { COLD_STORAGE } from "./coldStorage";
+import { CONTAINMENT_LABS } from "./containmentLabs";
+import { HIVE } from "./hive";
+import { INFIRMARY } from "./infirmary";
+import { LIFT_SHAFT } from "./liftShaft";
+import { MAINTENANCE_WING } from "./maintenanceWing";
+import { POWER_PLANT } from "./powerPlant";
+import { PUMPING_STATION } from "./pumpingStation";
+import { VENTILATION } from "./ventilation";
 
-/** Played in order. Reaching the exit of the last one wins the game. */
-export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2];
+/** The campaign, bottom to top. Reaching the end of the last one finishes the game. */
+export const LEVELS: LevelDef[] = [
+  INFIRMARY,
+  MAINTENANCE_WING,
+  COLD_STORAGE,
+  PUMPING_STATION,
+  CONTAINMENT_LABS,
+  VENTILATION,
+  POWER_PLANT,
+  ARMORY,
+  HIVE,
+  LIFT_SHAFT,
+];

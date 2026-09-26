@@ -20,6 +20,16 @@ const EXHAUSTED_UNTIL = 25; // after emptying stamina you can't sprint again unt
 export const NOISE_RADIUS = { still: 0, crouch: 1.6, walk: 5.5, sprint: 12 } as const;
 export type Gait = keyof typeof NOISE_RADIUS;
 
+/** Ground the player is standing on. Water is slow and loud. */
+export interface Terrain {
+  speed: number;
+  noise: number;
+  wet: boolean;
+}
+
+export const DRY: Terrain = { speed: 1, noise: 1, wet: false };
+export const WATER: Terrain = { speed: 0.72, noise: 1.8, wet: true };
+
 export class PlayerController {
   readonly health = new Health(100);
   readonly flashlight: Flashlight;
@@ -40,7 +50,9 @@ export class PlayerController {
   private trauma = 0; // camera shake 0..1
   private recoil = 0; // extra pitch from firing, recovers over time
   private roll = 0;
-  onFootstep: ((gait: Gait) => void) | null = null;
+  /** Set by the level each frame from the cell under the player. */
+  terrain: Terrain = DRY;
+  onFootstep: ((gait: Gait, wet: boolean) => void) | null = null;
 
   constructor(
     private readonly camera: THREE.PerspectiveCamera,
@@ -64,7 +76,7 @@ export class PlayerController {
   }
 
   get noiseRadius(): number {
-    return NOISE_RADIUS[this.gait];
+    return NOISE_RADIUS[this.gait] * this.terrain.noise;
   }
 
   /** 0..1 — current movement speed relative to sprint, used for weapon sway and spread. */
@@ -106,7 +118,7 @@ export class PlayerController {
       ? Math.max(0, this.stamina - STAMINA_DRAIN_PER_SEC * dt)
       : Math.min(MAX_STAMINA, this.stamina + STAMINA_REGEN_PER_SEC * dt * (crouching || !wantsMove ? 1.3 : 1));
 
-    const speed = crouching ? CROUCH_SPEED : sprinting ? SPRINT_SPEED : WALK_SPEED;
+    const speed = (crouching ? CROUCH_SPEED : sprinting ? SPRINT_SPEED : WALK_SPEED) * this.terrain.speed;
     const target = new THREE.Vector2();
     if (wantsMove) {
       const len = Math.hypot(mx, mz);
@@ -143,7 +155,7 @@ export class PlayerController {
       const stride = this.gait === "sprint" ? 2.2 : this.gait === "crouch" ? 1.1 : 1.7;
       if (this.footstepDistance > stride) {
         this.footstepDistance = 0;
-        this.onFootstep?.(this.gait);
+        this.onFootstep?.(this.gait, this.terrain.wet);
       }
     }
 

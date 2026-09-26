@@ -316,6 +316,113 @@ export class SoundManager {
     this.tone(o, "sine", 65, 38, t + 0.2, 0.12, v * 0.7);
   }
 
+  // ---------------------------------------------------------------- world & radio
+
+  /**
+   * A voice over a bad radio: a click, then a murmur of band-passed
+   * "syllables" riding on static for `duration` seconds. Not words — the
+   * subtitles carry the words — but it sells a person talking.
+   */
+  playRadioVoice(duration: number, distorted = false): void {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.15)!;
+    this.burst(o, "highpass", 3000, 0.7, t0, 0.06, 0.12); // key-up click
+    this.burst(o, "bandpass", 2500, 0.6, t0, duration, 0.018, 0.05); // static bed
+    const base = distorted ? 78 : 118;
+    let t = t0 + 0.12;
+    const end = t0 + duration - 0.25;
+    while (t < end) {
+      const syl = 0.08 + Math.random() * 0.14;
+      const formant = (distorted ? 450 : 700) + Math.random() * 900;
+      const f = this.tone(o, "sawtooth", base * (0.9 + Math.random() * 0.25), base * (0.85 + Math.random() * 0.2), t, syl, 0.05, 0.02);
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = formant;
+      bp.Q.value = 3;
+      f.disconnect();
+      const g = this.ctx.createGain();
+      this.env(g, t, 0.07, 0.02, syl);
+      f.connect(bp).connect(g).connect(o);
+      this.burst(o, "bandpass", formant * 2.2, 5, t, syl * 0.6, 0.015);
+      // Words come in clumps with short pauses between them.
+      t += syl + (Math.random() < 0.22 ? 0.18 + Math.random() * 0.2 : 0.02);
+    }
+    this.burst(o, "highpass", 2600, 0.7, end + 0.05, 0.05, 0.1); // key-down click
+  }
+
+  playDoor(sp: Spatial, security: boolean): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 30, 0.7);
+    if (!o) return;
+    if (security) {
+      this.tone(o, "square", 660, 660, t, 0.08, 0.08);
+      this.tone(o, "square", 990, 990, t + 0.1, 0.1, 0.08);
+    }
+    this.tone(o, "sawtooth", 55, 70, t + 0.1, 0.9, 0.18, 0.1); // motor
+    this.burst(o, "lowpass", 400, 1, t + 0.1, 0.9, 0.3, 0.15); // grind
+    this.burst(o, "lowpass", 220, 1, t + 1.0, 0.25, 0.6); // clunk at the top
+  }
+
+  playGeneratorStart(sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 40, 0.8);
+    if (!o) return;
+    this.burst(o, "lowpass", 300, 1, t, 0.4, 0.5); // crank
+    this.tone(o, "sawtooth", 30, 120, t + 0.3, 1.6, 0.25, 0.4); // spin-up whine
+    this.tone(o, "square", 60, 60, t + 1.7, 0.8, 0.12, 0.1);
+  }
+
+  /** One low thrum of a running generator. Called every few seconds per generator. */
+  playGeneratorHum(sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 22, 0.5);
+    if (!o) return;
+    this.tone(o, "sawtooth", 60, 58, t, 2.6, 0.08, 0.4);
+    this.tone(o, "sine", 120, 118, t, 2.6, 0.05, 0.4);
+  }
+
+  playSplash(gait: "crouch" | "walk" | "sprint" | "still"): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const vol = gait === "sprint" ? 0.45 : gait === "crouch" ? 0.12 : 0.28;
+    const o = this.out(CENTER, 1, 0.5)!;
+    this.burst(o, "bandpass", 900 + Math.random() * 500, 1.2, t, 0.18, vol, 0.01);
+    this.burst(o, "highpass", 3500, 0.8, t + 0.03, 0.12, vol * 0.4, 0.01);
+  }
+
+  playCheckpoint(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.6)!;
+    this.tone(o, "triangle", 392, 392, t, 0.25, 0.1, 0.02);
+    this.tone(o, "triangle", 587, 587, t + 0.14, 0.5, 0.1, 0.02);
+  }
+
+  playIntercom(sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 12, 0.3);
+    if (!o) return;
+    this.tone(o, "sine", 1000, 1000, t, 0.06, 0.1);
+    this.tone(o, "sine", 1500, 1500, t + 0.08, 0.08, 0.1);
+  }
+
+  /** The final choice: charges going off in sequence, then the mountain coming down. */
+  playDetonation(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 1.6)!;
+    for (let i = 0; i < 4; i++) {
+      this.burst(o, "lowpass", 180, 1, t + i * 0.55, 1.2, 0.9, 0.01);
+      this.tone(o, "sine", 60, 20, t + i * 0.55, 1.4, 0.8, 0.01);
+    }
+    this.burst(o, "lowpass", 120, 0.7, t + 2.2, 5, 0.9, 0.5);
+  }
+
   // ---------------------------------------------------------------- enemies
 
   /** `p` is the creature's voice pitch multiplier (1 = husk, lower = bigger). */

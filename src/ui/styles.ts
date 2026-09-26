@@ -104,6 +104,20 @@ const CSS = /* css */ `
 .intro .a { font-family: var(--font-display); font-size: 58px; letter-spacing: 14px; font-weight: 300; }
 .intro .b { font-size: 14px; letter-spacing: 8px; color: var(--ui-dim); margin-top: 6px; }
 
+.interact { position: absolute; left: 50%; top: calc(50% + 46px); transform: translateX(-50%); display: none; align-items: center; gap: 10px;
+  font-size: 13px; letter-spacing: 3px; color: var(--ui-fg); white-space: nowrap; }
+.interact.show { display: flex; }
+.interact kbd { font-family: var(--font-mono); font-size: 12px; padding: 2px 8px; border: 1px solid rgba(255,255,255,.55);
+  border-bottom-width: 2px; border-radius: 3px; background: rgba(0,0,0,.45); }
+.subtitle { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); width: min(760px, 86vw); text-align: center;
+  opacity: 0; transition: opacity .25s ease; pointer-events: none; }
+.subtitle.show { opacity: 1; }
+.subtitle .who { font-size: 10px; letter-spacing: 4px; color: var(--ui-amber); margin-bottom: 5px; }
+.subtitle .line { display: inline-block; font-size: 17px; line-height: 1.5; padding: 6px 14px; background: rgba(0,0,0,.55); border-radius: 2px; }
+.subtitle.aida .who { color: var(--ui-dim); }
+.subtitle.aida .line { font-style: italic; color: rgba(232,226,214,.85); }
+.subtitle.unknown .who { color: var(--ui-red); }
+.subtitle.unknown .line { color: #f0c8c0; letter-spacing: 1px; }
 /* ---- screens (menus) ---- */
 .screen { position: absolute; inset: 0; z-index: 10; display: none; flex-direction: column; align-items: center; justify-content: safe center;
   overflow-y: auto; padding: 24px 16px; box-sizing: border-box;
@@ -123,6 +137,10 @@ const CSS = /* css */ `
 .menu button:hover, .menu button:focus-visible { color: #fff; letter-spacing: 8px; outline: none; }
 .menu button:hover::before, .menu button:focus-visible::before { content: "›"; position: absolute; left: 12px; color: var(--ui-red); }
 .menu button.primary { color: var(--ui-fg); }
+.story { width: min(620px, 88vw); text-align: left; margin: 6px 0 30px; }
+.story p { font-family: "Special Elite", var(--font-mono); font-size: 15px; line-height: 1.75; color: rgba(232,226,214,.88); margin: 0 0 16px;
+  opacity: 0; animation: storyin 1.4s ease forwards; }
+@keyframes storyin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .menu.row { flex-direction: row; gap: 18px; }
 .menu button small { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: none;
   color: var(--ui-dim); margin-top: 3px; opacity: .8; }

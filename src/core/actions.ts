@@ -5,7 +5,18 @@
  * Codes are `KeyboardEvent.code` values, plus `Mouse0`–`Mouse4` for mouse
  * buttons (see `Input`).
  */
-export const ACTIONS = ["moveForward", "moveBack", "moveLeft", "moveRight", "sprint", "crouch", "fire", "reload", "flashlight"] as const;
+export const ACTIONS = [
+  "moveForward",
+  "moveBack",
+  "moveLeft",
+  "moveRight",
+  "sprint",
+  "crouch",
+  "fire",
+  "reload",
+  "flashlight",
+  "interact",
+] as const;
 
 export type Action = (typeof ACTIONS)[number];
 
@@ -23,6 +34,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   fire: "Fire",
   reload: "Reload",
   flashlight: "Flashlight",
+  interact: "Interact",
 };
 
 export const DEFAULT_BINDINGS: Bindings = {
@@ -35,6 +47,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   fire: ["Mouse0", null],
   reload: ["KeyR", null],
   flashlight: ["KeyF", null],
+  interact: ["KeyE", null],
 };
 
 /** Codes that can never be bound: Escape is reserved by the browser for releasing the mouse. */

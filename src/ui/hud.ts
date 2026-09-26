@@ -1,3 +1,4 @@
+import type { RadioLine } from "../game/script";
 import { injectStyles } from "./styles";
 
 const ICON = {
@@ -5,6 +6,12 @@ const ICON = {
   run: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="14" cy="4" r="2.2"/><path d="M9 21l2.2-6 2.4 2.2V22h2v-6.2l-2.6-2.6.8-3.6c1.2 1.5 3 2.4 5.2 2.4v-2c-1.7 0-3.2-.9-4-2.2l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5 0-.8.1L6 7.6V12h2V9l1.8-.7L7 21h2z"/></svg>`,
   torch: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2h10v5l-3 4v11h-4V11L7 7V2zm2 2v2h6V4H9z"/></svg>`,
   eye: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 10C7 3 12 1 18 1s11 2 16 9c-5 7-10 9-16 9S7 17 2 10z"/><circle cx="18" cy="10" r="4" fill="currentColor"/></svg>`,
+};
+
+const SPEAKER_NAMES: Record<RadioLine["speaker"], string> = {
+  operator: "OPERATOR — RADIO",
+  aida: "AIDA",
+  unknown: "??? — RADIO",
 };
 
 export interface HudState {
@@ -34,6 +41,8 @@ export class Hud {
   private hitTimeout = 0;
   private introTimeout = 0;
   private last: Partial<HudState> = {};
+  private lastInteract: string | null = null;
+  private lastInteractKey: string | null = null;
 
   constructor(container: HTMLElement) {
     injectStyles();
@@ -47,6 +56,8 @@ export class Hud {
       <div class="dmgdir" data-k="dmg"></div>
       <div class="intro" data-k="intro"><div class="a" data-k="introA"></div><div class="b" data-k="introB"></div></div>
       <div class="prompt" data-k="prompt"></div>
+      <div class="interact" data-k="interact"><kbd data-k="interactKey"></kbd><span data-k="interactTxt"></span></div>
+      <div class="subtitle" data-k="sub"><div class="who" data-k="subWho"></div><div class="line" data-k="subLine"></div></div>
       <div class="toasts" data-k="toasts"></div>
       <div class="note" data-k="note"><div class="hdr">RECOVERED NOTE</div><div data-k="noteTxt"></div></div>
       <div class="vitals">
@@ -200,7 +211,33 @@ export class Hud {
     this.noteTimeout = window.setTimeout(() => this.el.note.classList.remove("show"), 7000);
   }
 
+  /** Shows a radio line (or the player's own thought), or hides the subtitle with null. */
+  subtitle(line: RadioLine | null): void {
+    const el = this.el.sub;
+    if (!line) {
+      el.classList.remove("show");
+      return;
+    }
+    el.className = `subtitle show ${line.speaker}`;
+    this.el.subWho.textContent = SPEAKER_NAMES[line.speaker];
+    this.el.subLine.textContent = line.text;
+  }
+
+  /** The "[E] OPEN DOOR" prompt. Pass null to hide. */
+  interactPrompt(key: string | null, text: string | null): void {
+    const show = key !== null && text !== null;
+    if (show && (this.lastInteract !== text || this.lastInteractKey !== key)) {
+      this.el.interactKey.textContent = key;
+      this.el.interactTxt.textContent = text;
+    }
+    this.lastInteract = show ? text : null;
+    this.lastInteractKey = show ? key : null;
+    this.el.interact.classList.toggle("show", show);
+  }
+
   hideTransient(): void {
+    this.subtitle(null);
+    this.interactPrompt(null, null);
     this.el.note.classList.remove("show");
     this.el.intro.classList.remove("show");
     this.el.prompt.classList.remove("show");

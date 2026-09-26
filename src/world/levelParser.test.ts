@@ -41,4 +41,28 @@ describe("parseLevel", () => {
     expect(() => parseLevel(def(map))).toThrow(LevelParseError);
     expect(() => parseLevel(def(map))).toThrow(message);
   });
+
+  it("reads interactables, water and triggers", () => {
+    const level = parseLevel({
+      ...def(["#########", "#S~aD.G.#", "#Y*=..KX#", "#########"]),
+      triggers: { a: [] },
+      intercoms: [[]],
+    });
+    const s = level.spawns;
+    expect(s.water).toHaveLength(1);
+    expect(s.triggers.map((t) => t.key)).toEqual(["a"]);
+    expect(s.doors.map((d) => d.security)).toEqual([false, true]);
+    expect(s.generators).toHaveLength(1);
+    expect(s.intercoms).toHaveLength(1);
+    expect(s.checkpoints).toHaveLength(1);
+    expect(level.solid[1][4]).toBe(true); // closed door blocks
+    expect(level.solid[1][6]).toBe(true); // generator blocks
+    expect(level.solid[1][2]).toBe(false); // water is walkable
+  });
+
+  it("requires every trigger letter and intercom to have a script", () => {
+    expect(() => parseLevel(def(["######", "#SbX.#", "######"]))).toThrow(/trigger "b"/);
+    expect(() => parseLevel(def(["######", "#SYX.#", "######"]))).toThrow(/1 intercoms/);
+    expect(() => parseLevel(def(["######", "#SZX.#", "######"]))).toThrow(/outside the finale/);
+  });
 });

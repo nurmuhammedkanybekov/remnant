@@ -8,6 +8,7 @@ const campaign = {
   levelIndex: 1,
   loadout: { health: 80, battery: 50, mag: 8, reserve: 16 },
   stats: { ...freshStats(), kills: 3 },
+  checkpoint: null,
 };
 
 describe("parseSave", () => {
@@ -21,7 +22,7 @@ describe("parseSave", () => {
     const data = {
       version: SAVE_VERSION,
       campaign: { ...campaign, updatedAt: 5 },
-      progress: { unlockedLevel: 1, completed: ["story"], bestTimes: { a: 12 } },
+      progress: { unlockedLevel: 1, completed: ["story"], bestTimes: { a: 12 }, endings: ["seal"] },
     };
     expect(parseSave(JSON.parse(JSON.stringify(data)), LEVELS)).toEqual(data);
   });
@@ -39,6 +40,42 @@ describe("parseSave", () => {
     expect(s.progress.unlockedLevel).toBe(LEVELS - 1);
     expect(s.progress.completed).toEqual(["normal"]);
     expect(s.progress.bestTimes).toEqual({ b: 30 });
+  });
+
+  it("migrates a v1 save: levels shifted by one, ids renamed", () => {
+    const v1 = {
+      version: 1,
+      campaign: { ...campaign, levelIndex: 1, checkpoint: undefined },
+      progress: { unlockedLevel: 1, completed: [], bestTimes: { "sublevel-3": 90, "sublevel-2": 120 } },
+    };
+    const s = parseSave(v1, 10);
+    expect(s.campaign!.levelIndex).toBe(2);
+    expect(s.campaign!.checkpoint).toBeNull();
+    expect(s.progress.unlockedLevel).toBe(2);
+    expect(s.progress.bestTimes).toEqual({ "maintenance-wing": 90, "cold-storage": 120 });
+  });
+
+  it("keeps a valid mid-level checkpoint and drops a broken one", () => {
+    const cp = {
+      x: 5,
+      z: 6,
+      yaw: 1,
+      loadout: campaign.loadout,
+      stats: freshStats(),
+      collected: [0, 2, -1, 1.5],
+      killed: [1],
+      doorsOpen: [],
+      generatorsOn: [],
+      intercomsUsed: [],
+      markersReached: [0],
+      firedTriggers: ["a", 3],
+      hasKeycard: true,
+      objective: "Go.",
+    };
+    const ok = parseSave({ version: SAVE_VERSION, campaign: { ...campaign, checkpoint: cp } }, LEVELS);
+    expect(ok.campaign!.checkpoint).toMatchObject({ x: 5, collected: [0, 2], firedTriggers: ["a"], hasKeycard: true });
+    const broken = parseSave({ version: SAVE_VERSION, campaign: { ...campaign, checkpoint: { x: "nope" } } }, LEVELS);
+    expect(broken.campaign!.checkpoint).toBeNull();
   });
 
   it("drops a campaign that points past the last level", () => {
@@ -77,9 +114,10 @@ describe("SaveStore", () => {
   it("finishing the campaign clears the run and remembers the difficulty", () => {
     const s = new SaveStore(LEVELS);
     s.checkpoint(campaign);
-    s.completeCampaign("nightmare");
+    s.completeCampaign("nightmare", "leave");
     expect(new SaveStore(LEVELS).campaign).toBeNull();
     expect(new SaveStore(LEVELS).progress.completed).toEqual(["nightmare"]);
+    expect(new SaveStore(LEVELS).progress.endings).toEqual(["leave"]);
   });
 
   it("keeps working when storage throws", () => {

@@ -2,6 +2,7 @@ import type * as THREE from "three";
 import { ENEMY_GLYPHS, type EnemyKind } from "../content/enemies";
 import { cellCenter, type Cell, type LevelGrid } from "./grid";
 import type { LevelDef } from "./levelDef";
+import { resolveTheme } from "./theme";
 
 export interface NoteSpawn {
   pos: THREE.Vector2;
@@ -19,6 +20,20 @@ export interface EnemySpawn {
   kind: EnemyKind;
 }
 
+/** A thing in a cell: its cell coordinates and world-space centre. */
+export interface CellSpawn {
+  cell: Cell;
+  pos: THREE.Vector2;
+}
+
+export interface DoorSpawn extends CellSpawn {
+  security: boolean;
+}
+
+export interface TriggerSpawn extends CellSpawn {
+  key: string;
+}
+
 export interface Spawns {
   playerStart: THREE.Vector2;
   enemies: EnemySpawn[];
@@ -28,6 +43,13 @@ export interface Spawns {
   keycards: THREE.Vector2[];
   notes: NoteSpawn[];
   lamps: LampSpawn[];
+  doors: DoorSpawn[];
+  generators: CellSpawn[];
+  intercoms: CellSpawn[];
+  consoles: CellSpawn[];
+  checkpoints: CellSpawn[];
+  triggers: TriggerSpawn[];
+  water: CellSpawn[];
   exit: THREE.Vector2;
 }
 
@@ -48,7 +70,6 @@ export class LevelParseError extends Error {
   }
 }
 
-const WARM_LAMP = 0xffd9a0;
 const EMERGENCY_LAMP = 0xff2a1a;
 
 /**
@@ -60,6 +81,7 @@ export function parseLevel(def: LevelDef): ParsedLevel {
   const rows = def.map.length;
   // Pad short rows with walls so a hand-authored map can never leak.
   const map = def.map.map((r) => r.padEnd(cols, "#"));
+  const lampColor = resolveTheme(def.theme).lampColor;
 
   const solid: boolean[][] = [];
   const props: ParsedLevel["props"] = { walls: [], crates: [], barrels: [] };
@@ -71,15 +93,26 @@ export function parseLevel(def: LevelDef): ParsedLevel {
     keycards: [],
     notes: [],
     lamps: [],
+    doors: [],
+    generators: [],
+    intercoms: [],
+    consoles: [],
+    checkpoints: [],
+    triggers: [],
+    water: [],
   };
   let startCell: Cell | null = null;
   let exitCell: Cell | null = null;
+  const fail = (msg: string): never => {
+    throw new LevelParseError(def.id, msg);
+  };
 
   for (let row = 0; row < rows; row++) {
     const solidRow: boolean[] = [];
     for (let col = 0; col < cols; col++) {
       const ch = map[row][col];
       const c = cellCenter(col, row);
+      const at: CellSpawn = { cell: { col, row }, pos: c };
       let blocked = false;
       switch (ch) {
         case "#":
@@ -97,11 +130,11 @@ export function parseLevel(def: LevelDef): ParsedLevel {
         case ".":
           break;
         case "S":
-          if (startCell) throw new LevelParseError(def.id, `more than one player spawn (second at ${col},${row})`);
+          if (startCell) fail(`more than one player spawn (second at ${col},${row})`);
           startCell = { col, row };
           break;
         case "X":
-          if (exitCell) throw new LevelParseError(def.id, `more than one exit (second at ${col},${row})`);
+          if (exitCell) fail(`more than one exit (second at ${col},${row})`);
           exitCell = { col, row };
           break;
         case "A":
@@ -117,10 +150,31 @@ export function parseLevel(def: LevelDef): ParsedLevel {
           spawns.keycards.push(c);
           break;
         case "L":
-          spawns.lamps.push({ pos: c, color: WARM_LAMP, emergency: false });
+          spawns.lamps.push({ pos: c, color: lampColor, emergency: false });
           break;
         case "R":
           spawns.lamps.push({ pos: c, color: EMERGENCY_LAMP, emergency: true });
+          break;
+        case "D":
+        case "=":
+          blocked = true;
+          spawns.doors.push({ ...at, security: ch === "=" });
+          break;
+        case "G":
+          blocked = true;
+          spawns.generators.push(at);
+          break;
+        case "Y":
+          spawns.intercoms.push(at);
+          break;
+        case "Z":
+          spawns.consoles.push(at);
+          break;
+        case "*":
+          spawns.checkpoints.push(at);
+          break;
+        case "~":
+          spawns.water.push(at);
           break;
         default: {
           const enemy = ENEMY_GLYPHS.get(ch);
@@ -128,10 +182,13 @@ export function parseLevel(def: LevelDef): ParsedLevel {
             spawns.enemies.push({ pos: c, kind: enemy });
           } else if (ch >= "0" && ch <= "9") {
             const text = def.notes[ch];
-            if (!text) throw new LevelParseError(def.id, `note "${ch}" at ${col},${row} has no text in the notes table`);
+            if (!text) fail(`note "${ch}" at ${col},${row} has no text in the notes table`);
             spawns.notes.push({ pos: c, text });
+          } else if (ch >= "a" && ch <= "z") {
+            if (!def.triggers?.[ch]) fail(`trigger "${ch}" at ${col},${row} has no actions in the triggers table`);
+            spawns.triggers.push({ ...at, key: ch });
           } else {
-            throw new LevelParseError(def.id, `unknown map character "${ch}" at ${col},${row}`);
+            fail(`unknown map character "${ch}" at ${col},${row}`);
           }
         }
       }
@@ -140,21 +197,28 @@ export function parseLevel(def: LevelDef): ParsedLevel {
     solid.push(solidRow);
   }
 
-  if (!startCell) throw new LevelParseError(def.id, "no player spawn (S)");
-  if (!exitCell) throw new LevelParseError(def.id, "no exit (X)");
+  if (!startCell) fail("no player spawn (S)");
+  if (!exitCell) fail("no exit (X)");
+  const intercomScripts = def.intercoms?.length ?? 0;
+  if (spawns.intercoms.length !== intercomScripts) {
+    fail(`${spawns.intercoms.length} intercoms (Y) on the map but ${intercomScripts} intercom scripts`);
+  }
+  if (spawns.consoles.length > 0 && !def.finale) fail("detonator console (Z) outside the finale");
 
+  const start = startCell!;
+  const exit = exitCell!;
   return {
     def,
     cols,
     rows,
     solid,
     props,
-    startCell,
-    exitCell,
+    startCell: start,
+    exitCell: exit,
     spawns: {
       ...spawns,
-      playerStart: cellCenter(startCell.col, startCell.row),
-      exit: cellCenter(exitCell.col, exitCell.row),
+      playerStart: cellCenter(start.col, start.row),
+      exit: cellCenter(exit.col, exit.row),
     },
   };
 }

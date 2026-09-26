@@ -1,6 +1,7 @@
 import { SoundManager } from "../audio/soundManager";
 import { DIFFICULTIES, type DifficultyDef, type DifficultyId } from "../content/difficulty";
-import { cloneBindings, DEFAULT_BINDINGS } from "../core/actions";
+import { cloneBindings, DEFAULT_BINDINGS, keyLabel, type Action } from "../core/actions";
+import { ENDINGS, PROLOGUE, type EndingId } from "../content/story";
 import { Clock } from "../core/clock";
 import { Engine } from "../core/engine";
 import { Input } from "../core/input";
@@ -12,6 +13,7 @@ import { Hud } from "../ui/hud";
 import { Screens, type MenuItem } from "../ui/menu";
 import { Viewmodel } from "../weapons/viewmodel";
 import { LEVELS } from "../world/levels";
+import type { CheckpointState } from "./checkpoint";
 import { LevelSession, type SessionServices } from "./levelSession";
 import { carryOver, startingLoadout, type Loadout } from "./loadout";
 import { MenuBackdrop } from "./menuBackdrop";
@@ -31,6 +33,8 @@ interface Run {
   loadout: Loadout;
   /** Totals across finished levels. */
   stats: RunStats;
+  /** Mid-level checkpoint in the current level, if one was reached. */
+  checkpoint: CheckpointState | null;
 }
 
 /**
@@ -66,7 +70,16 @@ export class Game {
     this.screens = new Screens(container);
     this.screens.onUiSound = () => this.sound.playUi();
     this.viewmodel = new Viewmodel(this.engine.viewScene, this.engine.camera);
-    this.services = { engine: this.engine, sound: this.sound, hud: this.hud, viewmodel: this.viewmodel };
+    this.services = {
+      engine: this.engine,
+      sound: this.sound,
+      hud: this.hud,
+      viewmodel: this.viewmodel,
+      keyFor: (action: Action) => {
+        const [primary, alternate] = this.settings.bindings[action];
+        return keyLabel(primary ?? alternate);
+      },
+    };
     this.hud.setVisible(false);
     this.sound.setVolume(this.settings.volume);
 
@@ -94,7 +107,8 @@ export class Game {
     this.hud.hideTransient();
     this.viewmodel.setVisible(false);
     this.sound.setPaused(false);
-    this.backdrop = new MenuBackdrop(this.engine, LEVELS[0]);
+    // The maintenance wing's long lamp-lit corridor makes the best establishing shot.
+    this.backdrop = new MenuBackdrop(this.engine, LEVELS[1]);
 
     const saved = this.save.campaign;
     const items: MenuItem[] = [];
@@ -130,10 +144,16 @@ export class Game {
 
   private showDifficulty(levelIndex: number): void {
     this.screens.difficulty(
-      (id) => this.startCampaign(id, levelIndex),
+      (id) => (levelIndex === 0 ? this.showPrologue(id) : this.startCampaign(id, levelIndex)),
       () => this.showMainMenu(),
       this.save.progress.completed
     );
+  }
+
+  private showPrologue(difficulty: DifficultyId): void {
+    this.screens.story(PROLOGUE.title, PROLOGUE.lines, [
+      { label: "Begin", primary: true, action: () => this.startCampaign(difficulty, 0) },
+    ]);
   }
 
   private showChapters(): void {
@@ -182,7 +202,8 @@ export class Game {
       this.screens.pause(
         [
           { label: "Resume", primary: true, action: () => this.resume() },
-          { label: "Restart Level", action: () => this.startLevel() },
+          ...(this.run!.checkpoint ? [{ label: "Restart from Checkpoint", action: () => this.startLevel() }] : []),
+          { label: "Restart Level", action: () => this.restartLevelFresh() },
           { label: "Settings", action: () => this.showSettings(show) },
           { label: "Controls", action: () => this.showControls(show) },
           { label: "Quit to Menu", detail: "Progress is saved at the start of each level", action: () => this.showMainMenu() },
@@ -204,7 +225,7 @@ export class Game {
 
   private startCampaign(difficulty: DifficultyId, levelIndex: number): void {
     const def = DIFFICULTIES[difficulty];
-    this.run = { difficulty: def, levelIndex, loadout: startingLoadout(def), stats: freshStats() };
+    this.run = { difficulty: def, levelIndex, loadout: startingLoadout(def), stats: freshStats(), checkpoint: null };
     this.startLevel();
   }
 
@@ -216,23 +237,46 @@ export class Game {
       levelIndex: saved.levelIndex,
       loadout: { ...saved.loadout },
       stats: { ...saved.stats },
+      checkpoint: saved.checkpoint ? structuredClone(saved.checkpoint) : null,
     };
     this.startLevel();
   }
 
-  /** (Re)starts the run's current level from its checkpoint. */
+  private restartLevelFresh(): void {
+    if (!this.run) return;
+    this.run.checkpoint = null;
+    this.startLevel();
+  }
+
+  private persistRun(): void {
+    const run = this.run;
+    if (!run) return;
+    this.save.checkpoint({
+      difficulty: run.difficulty.id,
+      levelIndex: run.levelIndex,
+      loadout: run.loadout,
+      stats: run.stats,
+      checkpoint: run.checkpoint,
+    });
+  }
+
+  /** (Re)starts the run's current level — from its mid-level checkpoint if there is one. */
   private startLevel(): void {
     const run = this.run;
     if (!run) return;
     this.sound.init();
-    this.save.checkpoint({ difficulty: run.difficulty.id, levelIndex: run.levelIndex, loadout: run.loadout, stats: run.stats });
+    this.persistRun();
 
     this.backdrop = null;
     this.screens.hide();
     this.hud.hideTransient();
-    const session = new LevelSession(this.services, LEVELS[run.levelIndex], run.difficulty, run.loadout);
+    const session = new LevelSession(this.services, LEVELS[run.levelIndex], run.difficulty, run.loadout, run.checkpoint);
     session.onDeath = () => this.onDeath();
-    session.onExit = () => this.onLevelComplete();
+    session.onExit = (ending) => this.onLevelComplete(ending);
+    session.onCheckpoint = (state) => {
+      run.checkpoint = state;
+      this.persistRun();
+    };
     this.session = session;
 
     this.hud.setVisible(true);
@@ -263,7 +307,8 @@ export class Game {
         runOver
           ? [{ label: "Main Menu", primary: true, action: () => this.showMainMenu() }]
           : [
-              { label: "Retry Level", primary: true, action: () => this.startLevel() },
+              { label: run.checkpoint ? "Retry from Checkpoint" : "Retry Level", primary: true, action: () => this.startLevel() },
+              ...(run.checkpoint ? [{ label: "Restart Level", action: () => this.restartLevelFresh() }] : []),
               { label: "Quit to Menu", action: () => this.showMainMenu() },
             ],
         runOver
@@ -271,7 +316,7 @@ export class Game {
     }, DEATH_SCREEN_DELAY_MS);
   }
 
-  private onLevelComplete(): void {
+  private onLevelComplete(ending: EndingId | null): void {
     const run = this.run!;
     const session = this.session!;
     this.leaveGameplay();
@@ -281,16 +326,20 @@ export class Game {
 
     if (run.levelIndex >= LEVELS.length - 1) {
       this.state = "victory";
-      this.save.completeCampaign(run.difficulty.id);
-      this.screens.victory(run.stats, run.difficulty.name, [{ label: "Main Menu", primary: true, action: () => this.showMainMenu() }]);
+      const id = ending ?? "leave";
+      this.save.completeCampaign(run.difficulty.id, id);
+      this.screens.ending(ENDINGS[id], run.stats, run.difficulty.name, [
+        { label: "Main Menu", primary: true, action: () => this.showMainMenu() },
+      ]);
       return;
     }
 
     this.state = "levelComplete";
     run.levelIndex++;
     run.loadout = carryOver(session.loadout, run.difficulty);
-    // Checkpoint now, so quitting from the results screen resumes at the next level.
-    this.save.checkpoint({ difficulty: run.difficulty.id, levelIndex: run.levelIndex, loadout: run.loadout, stats: run.stats });
+    run.checkpoint = null;
+    // Save now, so quitting from the results screen resumes at the next level.
+    this.persistRun();
     this.screens.levelComplete(session.def.name, session.def.subtitle, session.stats, newBest, [
       { label: "Continue", primary: true, action: () => this.startLevel() },
       { label: "Quit to Menu", action: () => this.showMainMenu() },

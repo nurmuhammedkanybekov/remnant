@@ -128,6 +128,13 @@ export class Enemy {
     return false;
   }
 
+  /** Removes the enemy without a death scene (it was killed before a checkpoint). */
+  removeFromPlay(): void {
+    this.health = 0;
+    this.state = "dead";
+    this.rig.root.visible = false;
+  }
+
   /** A loud noise (gunshot) at `pos`. `radius` is already reduced for walls by the caller. */
   hearNoise(pos: THREE.Vector2, radius: number): void {
     if (this.isDead) return;
