@@ -431,14 +431,7 @@ export function raycastWorld(level: LevelData, origin: THREE.Vector3, dir: THREE
 }
 
 /** Resolve a moving circle against the level's wall grid, one axis at a time (slides along walls). */
-export function resolveCollision(
-  level: LevelData,
-  x: number,
-  z: number,
-  dx: number,
-  dz: number,
-  radius: number
-): { x: number; z: number } {
+export function resolveCollision(level: LevelData, x: number, z: number, dx: number, dz: number, radius: number): { x: number; z: number } {
   let nx = x;
   let nz = z;
   if (!circleHitsWall(level, nx + dx, nz, radius)) nx += dx;

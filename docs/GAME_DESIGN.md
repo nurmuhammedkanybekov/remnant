@@ -12,14 +12,14 @@ the known gaps.
 
 ## 1. Quick facts
 
-| | |
-|---|---|
-| Engine | Three.js r166 (WebGL) + its `EffectComposer` post-processing |
-| Language | TypeScript (strict) |
-| Build | Vite 5 |
-| Runtime deps | `three` only |
-| Assets | **None shipped.** Textures are painted onto `<canvas>` at startup; all audio is synthesized with the Web Audio API. (UI fonts load from Google Fonts, with system fallbacks.) |
-| Levels | 2 hand-authored grid maps, played in sequence |
+|              |                                                                                                                                                                               |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine       | Three.js r166 (WebGL) + its `EffectComposer` post-processing                                                                                                                  |
+| Language     | TypeScript (strict)                                                                                                                                                           |
+| Build        | Vite 5                                                                                                                                                                        |
+| Runtime deps | `three` only                                                                                                                                                                  |
+| Assets       | **None shipped.** Textures are painted onto `<canvas>` at startup; all audio is synthesized with the Web Audio API. (UI fonts load from Google Fonts, with system fallbacks.) |
+| Levels       | 2 hand-authored grid maps, played in sequence                                                                                                                                 |
 
 ```bash
 npm install
@@ -86,7 +86,7 @@ playing ──health 0──► dead ──Retry──► playing (same level, s
 - The main menu renders a slowly turning view of level 1 behind it.
 - **Carry-over**: health, battery and ammo carry into the next level. Health
   is topped up to at least 40 and battery to 30 between levels so a bad run
-  isn't unwinnable. "Retry" restores the loadout you *entered* the level with.
+  isn't unwinnable. "Retry" restores the loadout you _entered_ the level with.
 - If pointer lock is refused (browsers block re-locking right after Esc), the
   HUD shows "CLICK TO RESUME" and clicking the view re-locks.
 
@@ -131,30 +131,31 @@ still glow; they just don't cast light.
 
 One character = one 4×4 world-unit cell. Wall height 3.2.
 
-| Char | Meaning | Char | Meaning |
-|---|---|---|---|
-| `#` | wall | `.` | floor |
-| `S` | player spawn | `X` | exit |
-| `E` | husk | `H` | brute |
-| `A` | ammo | `M` | medkit |
-| `B` | battery | `K` | keycard (exit locked until taken) |
-| `L` | ceiling lamp | `R` | red emergency lamp |
-| `C` | crate stack (solid) | `O` | barrels (solid) |
-| `0`–`9` | note, text from the level's `notes` table | | |
+| Char    | Meaning                                   | Char | Meaning                           |
+| ------- | ----------------------------------------- | ---- | --------------------------------- |
+| `#`     | wall                                      | `.`  | floor                             |
+| `S`     | player spawn                              | `X`  | exit                              |
+| `E`     | husk                                      | `H`  | brute                             |
+| `A`     | ammo                                      | `M`  | medkit                            |
+| `B`     | battery                                   | `K`  | keycard (exit locked until taken) |
+| `L`     | ceiling lamp                              | `R`  | red emergency lamp                |
+| `C`     | crate stack (solid)                       | `O`  | barrels (solid)                   |
+| `0`–`9` | note, text from the level's `notes` table |      |                                   |
 
 A level is a `LevelDef` (`id`, `name`, `subtitle`, `objective`, `map`,
 `notes`, `spawnYaw`). Spawn facing now lives in the level data rather than
 being hard-coded in the player.
 
-| # | Name | Size | Enemies | Notes |
-|---|---|---|---|---|
-| 1 | Sublevel 3 — Maintenance Wing | 22×17 | 3 husks | Find the exit |
-| 2 | Sublevel 2 — Cold Storage | 26×19 | 2 husks + 1 brute | Keycard-locked exit |
+| #   | Name                          | Size  | Enemies           | Notes               |
+| --- | ----------------------------- | ----- | ----------------- | ------------------- |
+| 1   | Sublevel 3 — Maintenance Wing | 22×17 | 3 husks           | Find the exit       |
+| 2   | Sublevel 2 — Cold Storage     | 26×19 | 2 husks + 1 brute | Keycard-locked exit |
 
 The exit is a door + EXIT sign mounted on the wall next to the `X` cell. Its
 sign and light turn red while locked.
 
 ### Collision & raycasts (`world/level.ts`)
+
 - `resolveCollision` — circle vs. grid, axis-separated so you slide along walls.
   Used by the player (r 0.35) and enemies (r 0.35 / 0.5).
 - `hasLineOfSight` — samples the segment every 0.8 units against the grid.
@@ -165,14 +166,14 @@ sign and light turn red while locked.
 
 ## 6. Player
 
-| | |
-|---|---|
-| Walk / sprint / crouch speed | 3.3 / 5.8 / 1.7 (smoothed acceleration) |
-| Sprint | Shift, forward only, not while crouched. Can't fire while sprinting. |
-| Stamina | 100, drain 20/s, regen 16/s (×1.3 when still or crouched). Emptying it locks sprint until 25. |
-| Crouch | Hold C (or Ctrl): eye height 1.05, near-silent |
-| Health | 100, no regen, 0.35 s mercy window between hits |
-| Feel | head-bob, strafe lean, recoil pitch kick, trauma-based camera shake |
+|                              |                                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------- |
+| Walk / sprint / crouch speed | 3.3 / 5.8 / 1.7 (smoothed acceleration)                                                       |
+| Sprint                       | Shift, forward only, not while crouched. Can't fire while sprinting.                          |
+| Stamina                      | 100, drain 20/s, regen 16/s (×1.3 when still or crouched). Emptying it locks sprint until 25. |
+| Crouch                       | Hold C (or Ctrl): eye height 1.05, near-silent                                                |
+| Health                       | 100, no regen, 0.35 s mercy window between hits                                               |
+| Feel                         | head-bob, strafe lean, recoil pitch kick, trauma-based camera shake                           |
 
 **Noise.** Each gait has a hearing radius: still 0, crouch 1.6, walk 5.5,
 sprint 12. Walls cut it to 40%. The HUD noise meter shows your current level.
@@ -186,15 +187,15 @@ With it on, enemies can see you from 15 units instead of 6.
 
 ## 7. Weapon
 
-| Stat | Value |
-|---|---|
-| Damage | 26 (×2.5 headshot) |
-| Fire cooldown | 0.24 s, semi-auto |
-| Magazine / reserve max / starting reserve | 8 / 48 / 16 |
-| Reload | 1.5 s (auto-reload on dry trigger pull) |
-| Range | 40 |
-| Spread | 0.006 rad base, grows with movement and rapid fire (crosshair shows it) |
-| Noise | 22 units (60% through walls) — every shot alerts the area |
+| Stat                                      | Value                                                                   |
+| ----------------------------------------- | ----------------------------------------------------------------------- |
+| Damage                                    | 26 (×2.5 headshot)                                                      |
+| Fire cooldown                             | 0.24 s, semi-auto                                                       |
+| Magazine / reserve max / starting reserve | 8 / 48 / 16                                                             |
+| Reload                                    | 1.5 s (auto-reload on dry trigger pull)                                 |
+| Range                                     | 40                                                                      |
+| Spread                                    | 0.006 rad base, grows with movement and rapid fire (crosshair shows it) |
+| Noise                                     | 22 units (60% through walls) — every shot alerts the area               |
 
 Hit-testing: ray vs. per-enemy spheres (head, chest, hips, legs) that follow
 the animated rig, clipped to the wall-hit distance. Feedback: hit marker
@@ -210,6 +211,7 @@ lowered pose while sprinting.
 ## 8. Enemies
 
 ### States
+
 ```
 patrol ──hears you / half-sees you──► investigate ──arrives──► search ──timeout──► patrol
    │                                        │                     ▲
@@ -235,17 +237,18 @@ patrol ──hears you / half-sees you──► investigate ──arrives──�
   zag cell to cell, circle-vs-wall collision, and separation so packs don't
   overlap.
 
-| | Husk | Brute |
-|---|---|---|
-| Health | 60 | 190 |
+|                                      | Husk            | Brute           |
+| ------------------------------------ | --------------- | --------------- |
+| Health                               | 60              | 190             |
 | Speed (patrol / investigate / chase) | 1.0 / 1.9 / 3.6 | 0.8 / 1.5 / 2.5 |
-| Attack range / damage | 1.35 / 16 | 1.75 / 34 |
-| Wind-up / recover | 0.38 / 0.8 s | 0.65 / 0.9 s |
-| Hearing multiplier | 1.0 | 0.8 |
+| Attack range / damage                | 1.35 / 16       | 1.75 / 34       |
+| Wind-up / recover                    | 0.38 / 0.8 s    | 0.65 / 0.9 s    |
+| Hearing multiplier                   | 1.0             | 0.8             |
 
 A husk out-runs your walk but not your sprint.
 
 ### Model & animation
+
 Gaunt, hunched humanoid from primitives: forward-leaning torso with exposed
 ribs and spine ridges, long neck, jutting head with jaw, glowing eyes (with
 additive glow sprites so they read in the dark), long clawed arms. Procedural
@@ -257,13 +260,13 @@ death with the eyes fading out.
 
 ## 9. Items
 
-| Item | Effect |
-|---|---|
-| Ammo | +8 reserve (not picked up if full) |
-| Medkit | +45 HP (not picked up at full health) |
-| Battery | +45 flashlight charge |
-| Keycard | Unlocks the level exit |
-| Note | Shows a typewritten note card for 7 s |
+| Item    | Effect                                |
+| ------- | ------------------------------------- |
+| Ammo    | +8 reserve (not picked up if full)    |
+| Medkit  | +45 HP (not picked up at full health) |
+| Battery | +45 flashlight charge                 |
+| Keycard | Unlocks the level exit                |
+| Note    | Shows a typewritten note card for 7 s |
 
 Each has a small modelled mesh and a coloured glow so it's findable with
 the light off.

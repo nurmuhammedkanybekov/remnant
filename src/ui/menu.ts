@@ -91,11 +91,7 @@ export class Screens {
   }
 
   victory(stats: RunStats, items: MenuItem[]): void {
-    this.render(
-      `<h2>DAYLIGHT</h2><div class="tag">YOU MADE IT OUT. NOT EVERYONE DOES.</div>${this.statsHtml(stats)}`,
-      items,
-      true
-    );
+    this.render(`<h2>DAYLIGHT</h2><div class="tag">YOU MADE IT OUT. NOT EVERYONE DOES.</div>${this.statsHtml(stats)}`, items, true);
   }
 
   private statsHtml(s: RunStats): string {

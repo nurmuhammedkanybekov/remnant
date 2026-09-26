@@ -34,7 +34,11 @@ export class Weapon {
   onReloadStart: (() => void) | null = null;
   onReloadEnd: (() => void) | null = null;
 
-  constructor(readonly config: WeaponConfig, reserveAmmo: number, ammoInMag = config.magSize) {
+  constructor(
+    readonly config: WeaponConfig,
+    reserveAmmo: number,
+    ammoInMag = config.magSize
+  ) {
     this.ammoInMag = ammoInMag;
     this.reserveAmmo = reserveAmmo;
   }
@@ -105,7 +109,10 @@ export class Weapon {
       const realUp = new THREE.Vector3().crossVectors(right, dir).normalize();
       const r = Math.sqrt(Math.random()) * Math.tan(spread);
       const a = Math.random() * Math.PI * 2;
-      dir.addScaledVector(right, Math.cos(a) * r).addScaledVector(realUp, Math.sin(a) * r).normalize();
+      dir
+        .addScaledVector(right, Math.cos(a) * r)
+        .addScaledVector(realUp, Math.sin(a) * r)
+        .normalize();
     }
     this.onFire?.();
     return { origin, dir };

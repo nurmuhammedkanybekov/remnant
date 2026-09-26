@@ -23,7 +23,10 @@ export class Viewmodel {
   private sprintBlend = 0;
   private bobPhase = 0;
 
-  constructor(private readonly viewScene: THREE.Scene, private readonly camera: THREE.Camera) {
+  constructor(
+    private readonly viewScene: THREE.Scene,
+    private readonly camera: THREE.Camera
+  ) {
     const metal = new THREE.MeshStandardMaterial({ color: 0x4a4e55, metalness: 0.75, roughness: 0.35 });
     const darkMetal = new THREE.MeshStandardMaterial({ color: 0x26282c, metalness: 0.6, roughness: 0.5 });
     const polymer = new THREE.MeshStandardMaterial({ color: 0x2c2d30, metalness: 0.1, roughness: 0.7 });
@@ -90,7 +93,13 @@ export class Viewmodel {
 
     // Muzzle flash
     this.flash = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: textures().flash, color: 0xffd9a0, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false })
+      new THREE.SpriteMaterial({
+        map: textures().flash,
+        color: 0xffd9a0,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+      })
     );
     this.flash.position.set(0, 0.024, -0.16);
     this.flash.scale.setScalar(0.18);

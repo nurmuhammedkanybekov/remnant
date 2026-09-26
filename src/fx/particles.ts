@@ -44,7 +44,10 @@ class ParticlePool {
   private readonly color: Float32Array;
   private cursor = 0;
 
-  constructor(private readonly count: number, blending: THREE.Blending) {
+  constructor(
+    private readonly count: number,
+    blending: THREE.Blending
+  ) {
     const geo = new THREE.BufferGeometry();
     this.pos = new Float32Array(count * 3).fill(-999);
     this.size = new Float32Array(count);
@@ -221,9 +224,9 @@ export class Effects {
       // Wrap each mote into a 10x10 box around the camera, with slow drift.
       const bx = this.dustBase[i * 3] + Math.sin(time * 0.2 + i) * 0.4;
       const bz = this.dustBase[i * 3 + 2] + Math.cos(time * 0.17 + i * 1.3) * 0.4;
-      arr[i * 3] = cx + (((bx - cx) % 10) + 15) % 10 - 5;
+      arr[i * 3] = cx + ((((bx - cx) % 10) + 15) % 10) - 5;
       arr[i * 3 + 1] = (this.dustBase[i * 3 + 1] + time * 0.03 * ((i % 3) - 1) + 30) % 3;
-      arr[i * 3 + 2] = cz + (((bz - cz) % 10) + 15) % 10 - 5;
+      arr[i * 3 + 2] = cz + ((((bz - cz) % 10) + 15) % 10) - 5;
     }
     pos.needsUpdate = true;
     (this.dust.material as THREE.ShaderMaterial).uniforms.uLight.value = flashlightLevel;

@@ -9,12 +9,13 @@ things down here hunt by sound. You can fight, but sneaking is usually
 smarter.
 
 ### ▶ [Play it in your browser](https://nurmuhammedkanybekov.github.io/remnant/)
-*(Desktop with mouse and keyboard; headphones recommended)*
+
+_(Desktop with mouse and keyboard; headphones recommended)_
 
 ![Main menu](docs/screenshots/menu.jpg)
 
-| | |
-|---|---|
+|                                                       |                                                             |
+| ----------------------------------------------------- | ----------------------------------------------------------- |
 | ![A husk in the corridor](docs/screenshots/enemy.jpg) | ![The locked exit on Sublevel 2](docs/screenshots/exit.jpg) |
 
 ---
@@ -33,6 +34,7 @@ TypeScript plus one dependency, `three`.
 ## Features
 
 **Stealth and survival**
+
 - Everything makes noise. Walking, sprinting and crouching each have a
   different hearing radius, and a HUD meter shows how loud you are.
   Gunshots carry through walls.
@@ -43,6 +45,7 @@ TypeScript plus one dependency, `three`.
   between levels.
 
 **Enemy AI**
+
 - Six-state behaviour: patrol → investigate → chase → attack → search →
   back to patrol. Break line of sight and stay quiet, and they lose you.
 - Vision cone with suspicion that builds over distance, hearing that walls
@@ -54,6 +57,7 @@ TypeScript plus one dependency, `three`.
   by actual speed, attack poses, hit flinches and death collapses.
 
 **Graphics**
+
 - Procedural canvas textures (concrete panels, tiles, crates, signs…) with
   bump mapping.
 - Physically based lighting, ACES tone mapping, flickering and dying ceiling
@@ -66,6 +70,7 @@ TypeScript plus one dependency, `three`.
   decals.
 
 **Audio**
+
 - Layered, fully synthesized SFX: gunshot, reload stages, footsteps, creature
   clicks, shrieks and growls.
 - Stereo panning by direction, distance falloff, low-pass muffling through
@@ -74,6 +79,7 @@ TypeScript plus one dependency, `three`.
   at low health.
 
 **Game flow**
+
 - 2 levels (the second has a keycard-locked exit), a main menu over a live
   3D backdrop, pause, settings (sensitivity, FOV, volume, invert Y), and
   death, level-complete and victory screens with stats.
@@ -104,16 +110,16 @@ Headphones recommended.
 
 ## Controls
 
-| Key | Action |
-|---|---|
-| W A S D | Move |
-| Mouse | Look |
-| Left click | Fire |
-| R | Reload |
-| Shift | Sprint (loud) |
-| C / Ctrl | Crouch (quiet) |
-| F | Flashlight |
-| Esc | Pause |
+| Key        | Action         |
+| ---------- | -------------- |
+| W A S D    | Move           |
+| Mouse      | Look           |
+| Left click | Fire           |
+| R          | Reload         |
+| Shift      | Sprint (loud)  |
+| C / Ctrl   | Crouch (quiet) |
+| F          | Flashlight     |
+| Esc        | Pause          |
 
 **Goal:** reach the exit of both sublevels. On Sublevel 2 you'll need the
 security keycard first. Killing enemies is optional.

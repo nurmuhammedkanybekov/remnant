@@ -285,7 +285,7 @@ export function flashTexture(): THREE.CanvasTexture {
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.moveTo(0, -4);
-      ctx.lineTo(w / 2 * (0.6 + rand() * 0.4), 0);
+      ctx.lineTo((w / 2) * (0.6 + rand() * 0.4), 0);
       ctx.lineTo(0, 4);
       ctx.fill();
     }

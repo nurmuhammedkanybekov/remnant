@@ -106,7 +106,11 @@ export class Enemy {
   private vocalTimer = 3 + Math.random() * 6;
   private lookAround = 0;
 
-  constructor(private readonly scene: THREE.Scene, spawn: THREE.Vector2, kind: EnemyKind) {
+  constructor(
+    private readonly scene: THREE.Scene,
+    spawn: THREE.Vector2,
+    kind: EnemyKind
+  ) {
     this.kind = kind;
     this.stats = ENEMY_STATS[kind];
     this.health = this.stats.health;
@@ -260,7 +264,13 @@ export class Enemy {
           this.onVocal?.(this, "windup");
           break;
         }
-        this.followPathTo(dt, level, this.sinceContact < 0.2 ? p.playerPos : this.lastKnown, this.stats.chaseSpeed * (1 - this.stagger * 0.7), others);
+        this.followPathTo(
+          dt,
+          level,
+          this.sinceContact < 0.2 ? p.playerPos : this.lastKnown,
+          this.stats.chaseSpeed * (1 - this.stagger * 0.7),
+          others
+        );
         break;
       case "attack":
         this.faceToward(angleTo, dt, 10);

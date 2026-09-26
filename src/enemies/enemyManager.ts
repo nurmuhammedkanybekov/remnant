@@ -12,7 +12,11 @@ export interface EnemyHit {
 export class EnemyManager {
   readonly enemies: Enemy[] = [];
 
-  constructor(scene: THREE.Scene, private readonly level: LevelData, spawns: EnemySpawn[]) {
+  constructor(
+    scene: THREE.Scene,
+    private readonly level: LevelData,
+    spawns: EnemySpawn[]
+  ) {
     for (const s of spawns) this.enemies.push(new Enemy(scene, s.pos, s.kind));
   }
 

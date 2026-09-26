@@ -156,10 +156,13 @@ export class Hud {
     h.style.transition = "none";
     h.style.opacity = "1";
     window.clearTimeout(this.hitTimeout);
-    this.hitTimeout = window.setTimeout(() => {
-      h.style.transition = "";
-      h.style.opacity = "0";
-    }, kill ? 220 : 90);
+    this.hitTimeout = window.setTimeout(
+      () => {
+        h.style.transition = "";
+        h.style.opacity = "0";
+      },
+      kill ? 220 : 90
+    );
   }
 
   /** angle: radians, 0 = straight ahead, positive = to the right. */

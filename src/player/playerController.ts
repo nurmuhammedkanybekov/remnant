@@ -108,8 +108,7 @@ export class PlayerController {
 
     if (this.stamina <= 0) this.exhausted = true;
     if (this.exhausted && this.stamina >= EXHAUSTED_UNTIL) this.exhausted = false;
-    const sprinting =
-      (input.isDown("ShiftLeft") || input.isDown("ShiftRight")) && wantsMove && mz < 0 && !crouching && !this.exhausted;
+    const sprinting = (input.isDown("ShiftLeft") || input.isDown("ShiftRight")) && wantsMove && mz < 0 && !crouching && !this.exhausted;
 
     this.stamina = sprinting
       ? Math.max(0, this.stamina - STAMINA_DRAIN_PER_SEC * dt)
@@ -186,11 +185,7 @@ export class PlayerController {
 
     const rx = Math.cos(this.yaw);
     const rz = -Math.sin(this.yaw);
-    this.camera.position.set(
-      this.position.x + rx * bobX,
-      this.position.y + bobY - 0.03 * this.bobAmount,
-      this.position.z + rz * bobX
-    );
+    this.camera.position.set(this.position.x + rx * bobX, this.position.y + bobY - 0.03 * this.bobAmount, this.position.z + rz * bobX);
     this.camera.rotation.set(
       this.pitch + this.recoil + sy * 0.05,
       this.yaw + sx * 0.05,
