@@ -1,4 +1,4 @@
-import { aida, op, radio } from "../../game/script";
+import { nur, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 2 — stealth against a pack of husks. */
@@ -36,7 +36,7 @@ export const MAINTENANCE_WING: LevelDef = {
     start: [radio(op("Nine. The tunnels loop back on themselves. The next stairwell is in the far south-east corner."))],
   },
   triggers: {
-    a: [radio(aida("Three of them, at least. I can hear them clicking."), op("Then they can hear you too. Walk. Don't run."))],
+    a: [radio(nur("Three of them, at least. I can hear them clicking."), op("Then they can hear you too. Walk. Don't run."))],
     b: [radio(op("You're close. Eight is cold storage. It's where Hendricks went."))],
   },
 };

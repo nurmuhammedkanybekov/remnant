@@ -12,7 +12,7 @@ import { SaveStore } from "./save";
 import { loadSettings, saveSettings, type Settings } from "../core/settings";
 import type { Enemy } from "../enemies/enemy";
 import { CLOSE_REASONS, PeerLink } from "../net/link";
-import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg, type SessionMsg } from "../net/protocol";
+import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg } from "../net/protocol";
 import { DEFAULT_SIGNAL_URL } from "../net/signaling";
 import { buildCommand, emptyCommand, type PlayerCommand } from "../player/command";
 import { Hud } from "../ui/hud";
@@ -20,7 +20,7 @@ import { Screens, type MenuItem } from "../ui/menu";
 import { Viewmodel } from "../weapons/viewmodel";
 import { LEVELS } from "../world/levels";
 import type { CheckpointState } from "./checkpoint";
-import { LevelSession, type SessionServices } from "./levelSession";
+import { LevelSession, type CoopLink, type SessionServices } from "./levelSession";
 import { carryOver, cloneLoadout, startingLoadout, type Loadout } from "./loadout";
 import { MenuBackdrop } from "./menuBackdrop";
 import { addStats, freshStats, type RunStats } from "./stats";
@@ -82,6 +82,12 @@ export class Game {
   private scriptedFire = false;
   /** Co-op: the connection to the other player, while there is one. */
   private link: PeerLink | null = null;
+  /** Co-op: which level attempt this is (see `start` in net/protocol.ts). */
+  private epoch = 0;
+  /** Co-op host: what the room is for, to reopen it under a new code if the old one was taken. */
+  private hosting: { level: number; difficulty: DifficultyId; tries: number } | null = null;
+  /** Co-op: keeps the world running while this tab is in the background (browsers stop animation frames there). */
+  private backgroundTicker: Worker | null = null;
   /** Matchmaking server; `?signal=wss://…` points at a self-hosted one. */
   private readonly signalUrl = new URLSearchParams(location.search).get("signal") ?? DEFAULT_SIGNAL_URL;
 
@@ -123,6 +129,19 @@ export class Game {
     });
 
     if (this.debug) (window as unknown as { game: Game }).game = this;
+    document.addEventListener("visibilitychange", () => this.onVisibilityChange());
+    // A graphics driver reset (or the GPU being taken away) ends WebGL for this page.
+    this.engine.domElement.addEventListener("webglcontextlost", (e) => {
+      e.preventDefault();
+      this.input.exitLock();
+      this.screens.lobby(
+        "GRAPHICS RESET",
+        "THE GRAPHICS DRIVER STOPPED RESPONDING",
+        "Your progress is saved at the start of each level and at checkpoints.\nReload the page to carry on.",
+        [{ label: "Reload", primary: true, action: () => location.reload() }]
+      );
+      this.state = "menu";
+    });
 
     // The world behind the title and menus.
     this.backdrop = new MenuBackdrop(this.engine, LEVELS[1], QUALITY[this.settings.quality]);
@@ -143,7 +162,10 @@ export class Game {
   /** Loading is done; wait for a key, which is also what lets the browser start audio. */
   private showTitle(): void {
     this.state = "title";
-    this.screens.title(this.input.usingPad ? "PRESS A" : "PRESS ANY KEY", () => {
+    // Phones and tablets: say so up front rather than leave them stuck at the first corridor.
+    const touchOnly = matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches;
+    const prompt = this.input.usingPad ? "PRESS A" : touchOnly ? "NEEDS A KEYBOARD AND MOUSE, OR A GAMEPAD" : "PRESS ANY KEY";
+    this.screens.title(prompt, () => {
       this.sound.init();
       this.music.setMode("silent");
       this.showMainMenu();
@@ -364,7 +386,7 @@ export class Game {
       run.difficulty,
       run.loadout,
       run.checkpoint,
-      run.coop ? this.link : null
+      run.coop ? this.sessionLink() : null
     );
     session.onDeath = () => this.onDeath();
     session.onExit = (ending) => this.onLevelComplete(ending);
@@ -485,7 +507,7 @@ export class Game {
               label: "Continue",
               primary: true,
               action: () => {
-                this.link?.send({ t: "start", level: run.levelIndex, difficulty: run.difficulty.id, fresh: false });
+                this.hostBegins({ t: "start", level: run.levelIndex, difficulty: run.difficulty.id, fresh: false });
                 this.startLevel(true);
               },
             },
@@ -498,6 +520,28 @@ export class Game {
 
   private get isGuest(): boolean {
     return this.link?.role === "guest";
+  }
+
+  /** The level session's view of the connection: its messages are stamped with this attempt's number. */
+  private sessionLink(): CoopLink | null {
+    const link = this.link;
+    if (!link) return null;
+    const ep = this.epoch;
+    return {
+      role: link.role,
+      get connected() {
+        return link.open;
+      },
+      send: (m, fast) => link.send({ ...m, ep }, fast),
+    };
+  }
+
+  /** Host: start a level attempt for both (a new run, the next level or a retry). */
+  private hostBegins(
+    msg: { t: "start"; level: number; difficulty: DifficultyId; fresh: boolean } | { t: "restart"; checkpoint: boolean }
+  ): void {
+    this.epoch++;
+    this.link?.send({ ...msg, ep: this.epoch });
   }
 
   private showCoopMenu(): void {
@@ -530,39 +574,63 @@ export class Game {
   }
 
   /** Opens a room and waits for the partner. Returns the room code. */
-  private hostGame(level: number, difficulty: DifficultyId): string {
+  private hostGame(level: number, difficulty: DifficultyId, tries = 0, note = ""): string {
+    this.hosting = { level, difficulty, tries };
     const code = makeRoomCode();
     const link = this.openLink("host", code);
     this.screens.lobby(
       "HOST",
       "ROOM CODE",
-      "Send this code to your partner.\nWaiting for them to join…",
+      `${note}Send this code to your partner.\nWaiting for them to join…`,
       [{ label: "Cancel", action: () => this.showCoopMenu() }],
       code
     );
-    link.onOpen = () => {
-      link.send({ t: "hello", v: PROTOCOL_VERSION });
-      this.sound.playCheckpoint();
-      const def = LEVELS[level];
+    link.onJoinFailed = () =>
       this.screens.lobby(
-        "PARTNER CONNECTED",
-        `${def.name.toUpperCase()} · ${def.subtitle.toUpperCase()} · ${DIFFICULTIES[difficulty].name.toUpperCase()}`,
-        "Start when you're both ready.",
-        [
-          {
-            label: "Start",
-            primary: true,
-            action: () => {
-              link.send({ t: "start", level, difficulty, fresh: true });
-              this.startCoopRun(level, difficulty);
-            },
-          },
-          { label: "Cancel", action: () => this.showCoopMenu() },
-        ],
+        "HOST",
+        "ROOM CODE",
+        `Someone tried to join but couldn't get through.\n${CLOSE_REASONS.timeout}\nThe room is still open.`,
+        [{ label: "Cancel", action: () => this.showCoopMenu() }],
         code
       );
-    };
+    link.onOpen = () => void this.hostReady(link, code, level, difficulty);
     return code;
+  }
+
+  /** Host: the partner is in. Say hello, show how you're connected, and offer Start. */
+  private async hostReady(link: PeerLink, code: string, level: number, difficulty: DifficultyId): Promise<void> {
+    link.send({ t: "hello", v: PROTOCOL_VERSION, app: __APP_VERSION__ });
+    this.sound.playCheckpoint();
+    const def = LEVELS[level];
+    const route = await this.describeRoute(link);
+    if (this.link !== link || this.state !== "menu") return;
+    this.screens.lobby(
+      "PARTNER CONNECTED",
+      `${def.name.toUpperCase()} · ${def.subtitle.toUpperCase()} · ${DIFFICULTIES[difficulty].name.toUpperCase()}`,
+      `${route}\nStart when you're both ready.`,
+      [
+        {
+          label: "Start",
+          primary: true,
+          action: () => {
+            // A double click must not start two games.
+            if (this.run || this.link !== link) return;
+            this.hostBegins({ t: "start", level, difficulty, fresh: true });
+            this.startCoopRun(level, difficulty);
+          },
+        },
+        { label: "Cancel", action: () => this.showCoopMenu() },
+      ],
+      code
+    );
+  }
+
+  /** "Connected directly" or "through the relay", for the lobby. */
+  private async describeRoute(link: PeerLink): Promise<string> {
+    // The selected route is known a moment after the channel opens.
+    await new Promise((r) => setTimeout(r, 400));
+    const route = await link.route();
+    return route === "relay" ? "Connected through the relay." : route === "direct" ? "Connected directly." : "Connected.";
   }
 
   private showJoin(error = "", typed = ""): void {
@@ -579,12 +647,17 @@ export class Game {
     if (!code) return this.showJoin("Room codes are 5 letters and numbers.", input);
     const link = this.openLink("guest", code);
     this.screens.lobby("JOINING", `ROOM ${code}`, "Connecting to your partner…", [{ label: "Cancel", action: () => this.showCoopMenu() }]);
-    link.onOpen = () => {
-      link.send({ t: "hello", v: PROTOCOL_VERSION });
+    link.onOpen = async () => {
+      link.send({ t: "hello", v: PROTOCOL_VERSION, app: __APP_VERSION__ });
       this.sound.playCheckpoint();
-      this.screens.lobby("CONNECTED", `ROOM ${code}`, "Waiting for the host to start the game…", [
-        { label: "Leave", action: () => this.showCoopMenu() },
-      ]);
+      const show = (route: string) =>
+        this.screens.lobby("CONNECTED", `ROOM ${code}`, `${route}\nWaiting for the host to start the game…`, [
+          { label: "Leave", action: () => this.showCoopMenu() },
+        ]);
+      show("Connected.");
+      const route = await this.describeRoute(link);
+      // Only if nothing has moved on (the host may have started already).
+      if (this.link === link && this.state === "menu" && !this.run) show(route);
     };
   }
 
@@ -611,6 +684,17 @@ export class Game {
 
   private onLinkClosed(link: PeerLink, reason: string): void {
     this.link = null;
+    // Someone else's room has this code: quietly open ours under another.
+    const h = this.hosting;
+    if (reason === "id-taken" && link.role === "host" && !this.run && h && h.tries < 3) {
+      this.hostGame(h.level, h.difficulty, h.tries + 1);
+      return;
+    }
+    // The partner left the lobby before the game started: open the room again.
+    if ((reason === "left" || reason === "lost") && link.role === "host" && !this.run && h && this.state === "menu") {
+      this.hostGame(h.level, h.difficulty, 0, "Your partner left. The room is open again with a new code.\n");
+      return;
+    }
     const text = CLOSE_REASONS[reason] ?? CLOSE_REASONS.lost;
     const playing = this.run?.coop && this.state !== "menu" && this.state !== "title";
     if (!playing) {
@@ -633,10 +717,11 @@ export class Game {
   private onNet(m: NetMsg): void {
     switch (m.t) {
       case "hello":
-        if (m.v !== PROTOCOL_VERSION) this.link?.close("version");
+        if (m.v !== PROTOCOL_VERSION || m.app !== __APP_VERSION__) this.link?.close("version");
         return;
       case "start":
         if (!this.isGuest) return;
+        this.epoch = m.ep;
         if (m.fresh || !this.run) this.startCoopRun(m.level, m.difficulty);
         else {
           this.run.levelIndex = m.level;
@@ -646,11 +731,13 @@ export class Game {
         return;
       case "restart":
         if (!this.isGuest || !this.run) return;
+        this.epoch = m.ep;
         if (!m.checkpoint) this.run.checkpoint = null;
         this.startLevel();
         return;
       default:
-        this.session?.receive(m as SessionMsg);
+        // Only messages for the level attempt in progress.
+        if (m.ep === this.epoch) this.session?.receive(m);
     }
   }
 
@@ -670,7 +757,7 @@ export class Game {
     const run = this.run!;
     const retry = (checkpoint: boolean) => () => {
       if (!checkpoint) run.checkpoint = null;
-      this.link?.send({ t: "restart", checkpoint });
+      this.hostBegins({ t: "restart", checkpoint });
       this.startLevel();
     };
     return [
@@ -691,15 +778,46 @@ export class Game {
   // ------------------------------------------------------------------ loop
 
   private readonly loop = (): void => {
+    this.frame(true);
+    requestAnimationFrame(this.loop);
+  };
+
+  /** One tick of the game; `render` is false for background ticks (nobody's looking). */
+  private frame(render: boolean): void {
     const dt = this.clock.tick();
     this.input.pollGamepad();
     this.handlePadMenus(dt);
     this.step(dt);
     this.music.update(dt, this.state === "playing" ? (this.session?.threat ?? 0) : 0);
     this.input.endFrame();
-    this.engine.render();
-    requestAnimationFrame(this.loop);
-  };
+    if (render) this.engine.render();
+  }
+
+  /**
+   * Browsers stop animation frames in a background tab. In co-op that would
+   * freeze the world for the other player too (the host runs it), so while
+   * hidden a worker's timer (which browsers don't throttle as hard) keeps
+   * the game ticking 20 times a second, without drawing.
+   */
+  private onVisibilityChange(): void {
+    const hidden = document.hidden && !!this.link;
+    if (hidden && !this.backgroundTicker) {
+      try {
+        const src = "setInterval(() => postMessage(0), 50);";
+        const worker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+        worker.onmessage = () => {
+          if (document.hidden) this.frame(false);
+        };
+        this.backgroundTicker = worker;
+      } catch {
+        // No workers (or blocked): the world pauses while hidden, as before.
+      }
+    } else if (!hidden && this.backgroundTicker) {
+      this.backgroundTicker.terminate();
+      this.backgroundTicker = null;
+      this.clock.tick(); // don't count the time away as one giant frame
+    }
+  }
 
   private readCommand(dt: number): PlayerCommand {
     const active = this.input.locked || this.debug || this.input.usingPad;

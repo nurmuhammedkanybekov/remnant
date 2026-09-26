@@ -21,7 +21,7 @@ In the present day, a private mining consortium reopened Zenit to strip it for
 rare earth metals. Forty-one contractors went down. Eleven days ago the
 shafts collapsed.
 
-**You** are **Aida Serik**, a structural engineer on the consortium's survey
+**You** are **Nur Kanybekov**, a structural engineer on the consortium's survey
 crew. You wake up in the infirmary on **Sublevel 10**, the deepest level, with
 a head wound, a pistol that isn't yours and a flashlight with a dying battery.
 The only thing that works is a wall radio, and there's a voice on it.
@@ -32,7 +32,7 @@ The only thing that works is a wall radio, and there's a voice on it.
 
 | Name                | Role                                                                                                                                    |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Aida Serik**      | The player. Structural engineer. Practical, dry, stubborn. Never speaks on screen; her voice is in her notes-to-self.                   |
+| **Nur Kanybekov**   | The player. Structural engineer. Practical, dry, stubborn. Never speaks on screen; his voice is in his notes-to-self.                   |
 | **The Operator**    | A calm voice on the facility radio who claims to be a surviving shift supervisor locked in the surface control room. Guides you upward. |
 | **Dr. Lev Arkadin** | Lead researcher of the original 1980s Zenit program. Known only through his logs, which get progressively stranger.                     |
 | **Hendricks**       | Consortium security chief. Carried the Cold Storage keycard. Went into the south freezers and did not come back.                        |
@@ -77,20 +77,20 @@ Sublevel 6 a Mimic uses the exact same voice.
 
 ## Weapons
 
-| Weapon        | Where                  | Notes                                                                                                                                                    |
-| ------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sidearm**   | Carried from the start | Not Aida's. Whoever it belonged to didn't need it any more.                                                                                              |
-| **Rivet gun** | Ventilation            | A consortium construction tool. With the safety interlock off it fires across a room, almost silently. Aida is an engineer; she knows which wire to cut. |
-| **Shotgun**   | Armory                 | Consortium security issue. Devastating, and loud enough to bring the whole floor.                                                                        |
+| Weapon        | Where                  | Notes                                                                                                                                                  |
+| ------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Sidearm**   | Carried from the start | Not Nur's. Whoever it belonged to didn't need it any more.                                                                                             |
+| **Rivet gun** | Ventilation            | A consortium construction tool. With the safety interlock off it fires across a room, almost silently. Nur is an engineer; he knows which wire to cut. |
+| **Shotgun**   | Armory                 | Consortium security issue. Devastating, and loud enough to bring the whole floor.                                                                      |
 
 ---
 
 ## Endings
 
-At the top of the lift shaft the blast door opens for you. Aida has a choice:
+At the top of the lift shaft the blast door opens for you. Nur has a choice:
 
 - **Seal** — Trigger the consortium's self-destruct charges from the lift
-  controls. The shaft collapses with Aida inside. The Remnant stays buried.
+  controls. The shaft collapses with Nur inside. The Remnant stays buried.
   _"Daylight was never the point."_
 - **Leave** — Walk out into the snow. Roll credits over the mountains. After
   the credits: a short scene of the Operator's radio crackling to life in a
@@ -100,12 +100,12 @@ At the top of the lift shaft the blast door opens for you. Aida has a choice:
 
 ## Campaign
 
-Aida climbs from Sublevel 10 to the surface. Each level introduces **one new
+Nur climbs from Sublevel 10 to the surface. Each level introduces **one new
 idea** so the game keeps teaching until the end.
 
 | #   | Level                | Location    | What's new                                                                                               | Story beat                                                      |
 | --- | -------------------- | ----------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 1   | **Infirmary**        | Sublevel 10 | Tutorial: movement, flashlight, first pistol, first note. One Husk seen from safety.                     | Aida wakes up. The Operator makes contact.                      |
+| 1   | **Infirmary**        | Sublevel 10 | Tutorial: movement, flashlight, first pistol, first note. One Husk seen from safety.                     | Nur wakes up. The Operator makes contact.                       |
 | 2   | **Maintenance Wing** | Sublevel 9  | Stealth against Husks, noise meter matters.                                                              | Operator: "Stay off the main corridors."                        |
 | 3   | **Cold Storage**     | Sublevel 8  | Keycard doors, first Brute.                                                                              | Hendricks' fate. Mara's first note.                             |
 | 4   | **Pumping Station**  | Sublevel 7  | Flooded rooms: wading is loud. First **Listener**.                                                       | Arkadin log: "It hears the water. It hears everything."         |

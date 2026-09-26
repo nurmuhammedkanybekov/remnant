@@ -27,6 +27,7 @@ import { LampSystem } from "../world/lamps";
 import { buildLevel, type LevelData } from "../world/levelBuilder";
 import type { LevelDef } from "../world/levelDef";
 import { parseLevel } from "../world/levelParser";
+import { reinforcements } from "../world/reinforcements";
 import type { CheckpointState } from "./checkpoint";
 import type { Loadout, WeaponAmmo } from "./loadout";
 import { RadioChannel } from "./radio";
@@ -62,6 +63,9 @@ const BLEED_TIME = 45;
 const REVIVE_RANGE = 2;
 const REVIVE_TIME = 3;
 const REVIVE_HEALTH = 35;
+/** Co-op: more creatures, and tougher ones, for two players. */
+const COOP_EXTRA_ENEMIES = 0.4;
+const COOP_ENEMY_HEALTH = 1.3;
 /** Co-op: both players have to be this close to the exit to leave. */
 const EXIT_TOGETHER = 4.5;
 
@@ -195,10 +199,13 @@ export class LevelSession {
     this.player.onFootstep = (gait, wet) => (wet ? sound.playSplash(gait) : sound.playFootstep(gait));
     this.player.flashlight.onToggle = (on) => sound.playFlashlight(on);
 
-    this.enemies = new EnemyManager(scene, this.level, sp.enemies, {
-      health: difficulty.enemyHealth,
+    // Harder difficulties (and co-op, with two of you) bring extra creatures; co-op ones are tougher too.
+    const extras = reinforcements(this.level, difficulty.extraEnemies + (coop ? COOP_EXTRA_ENEMIES : 0));
+    this.enemies = new EnemyManager(scene, this.level, [...sp.enemies, ...extras], {
+      health: difficulty.enemyHealth * (coop ? COOP_ENEMY_HEALTH : 1),
       damage: difficulty.enemyDamage,
       perception: difficulty.enemyPerception,
+      speed: difficulty.enemySpeed,
     });
     this.projectiles = new Projectiles(scene, this.level);
     this.projectiles.onHitPlayer = (dmg, from) => this.player.health.takeDamage(dmg, from);

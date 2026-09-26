@@ -1,4 +1,4 @@
-import { aida, checkpoint, hint, objective, op, radio } from "../../game/script";
+import { nur, checkpoint, hint, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 4 — flooded halls: wading is loud, and the first Listener hears every step. */
@@ -38,21 +38,18 @@ export const PUMPING_STATION: LevelDef = {
     start: [
       radio(
         op("Seven. The pumping station. When the power went, the lower halls flooded."),
-        aida("Everything's under water. Great."),
+        nur("Everything's under water. Great."),
         op("The east stairwell is behind a security door. You'll need the pump control card.")
       ),
     ],
-    keycard: [
-      radio(aida("Mara left it here. She's alive. She's ahead of me.")),
-      objective("Open the security door to the east stairwell."),
-    ],
+    keycard: [radio(nur("Mara left it here. She's alive. She's ahead of me.")), objective("Open the security door to the east stairwell.")],
   },
   triggers: {
     a: [hint("Wading through water is slow and loud — crouch to stay quiet"), checkpoint()],
     b: [
       radio(
-        op("Aida. There's one in the flooded hall that doesn't see at all. It hears. Everything."),
-        aida("No eyes. Its head is split open like a... like an ear.")
+        op("Nur. There's one in the flooded hall that doesn't see at all. It hears. Everything."),
+        nur("No eyes. Its head is split open like a... like an ear.")
       ),
       hint("Listeners are blind — your flashlight won't give you away, but every sound will"),
     ],

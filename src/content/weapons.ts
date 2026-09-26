@@ -52,7 +52,7 @@ export const WEAPONS = {
   },
   /**
    * A consortium pneumatic rivet gun. Weak and short-ranged, but it barely
-   * makes a sound — the stealth weapon. Aida is an engineer; she knows how
+   * makes a sound — the stealth weapon. Nur is an engineer; he knows how
    * to take the safety interlock off.
    */
   rivet: {

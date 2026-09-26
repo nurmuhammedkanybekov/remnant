@@ -4,7 +4,7 @@
  * declarative and testable.
  */
 /** "echo" is the Operator's voice coming from somewhere nearby instead of the radio (a Mimic). */
-export type Speaker = "operator" | "aida" | "unknown" | "echo";
+export type Speaker = "operator" | "nur" | "unknown" | "echo";
 
 export interface RadioLine {
   speaker: Speaker;
@@ -28,7 +28,7 @@ export type ScriptAction =
 
 // Small constructors so level files read like a script.
 export const op = (text: string): RadioLine => ({ speaker: "operator", text });
-export const aida = (text: string): RadioLine => ({ speaker: "aida", text });
+export const nur = (text: string): RadioLine => ({ speaker: "nur", text });
 export const unknown = (text: string): RadioLine => ({ speaker: "unknown", text });
 export const radio = (...lines: RadioLine[]): ScriptAction => ({ type: "radio", lines });
 export const objective = (text: string): ScriptAction => ({ type: "objective", text });

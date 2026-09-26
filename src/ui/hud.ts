@@ -10,7 +10,7 @@ const ICON = {
 
 const SPEAKER_NAMES: Record<RadioLine["speaker"], string> = {
   operator: "OPERATOR — RADIO",
-  aida: "AIDA",
+  nur: "NUR",
   unknown: "??? — RADIO",
   echo: "OPERATOR — NOT ON THE RADIO",
 };

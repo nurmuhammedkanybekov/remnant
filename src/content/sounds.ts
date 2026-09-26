@@ -91,5 +91,5 @@ export const SAMPLES: Partial<Record<SampleId, SampleDef>> = {
   door: { files: ["door_1.mp3"], gain: 0.8, pitchJitter: 0.03 },
   flashlight: { files: ["flashlight_1.mp3", "flashlight_2.mp3"], gain: 0.2, pitchJitter: 0.05 },
   ammoPickup: { files: ["ammoPickup_1.mp3"], gain: 0.45, pitchJitter: 0.04 },
-  playerHurt: { files: ["playerHurt_1.mp3", "playerHurt_2.mp3"], gain: 0.45, pitchJitter: 0.04 },
+  playerHurt: { files: ["playerHurt_1.mp3", "playerHurt_2.mp3", "playerHurt_3.mp3", "playerHurt_4.mp3"], gain: 0.45, pitchJitter: 0.04 },
 };

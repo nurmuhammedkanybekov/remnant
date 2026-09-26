@@ -41,11 +41,16 @@ export function roomPeerId(code: string): string {
 // ------------------------------------------------------------------ game flow
 
 export type FlowMsg =
-  | { t: "hello"; v: number }
-  /** Host → guest: start (or move on to) a level. `fresh` = a new run, starting loadouts. */
-  | { t: "start"; level: number; difficulty: DifficultyId; fresh: boolean }
+  /** Both, on connecting: `app` is the game's version — both must run the same build. */
+  | { t: "hello"; v: number; app: string }
+  /**
+   * Host → guest: start (or move on to) a level. `fresh` = a new run, starting loadouts.
+   * `ep` numbers each level attempt; in-level messages carry it, and ones from an
+   * earlier attempt (still in flight after a retry) are dropped.
+   */
+  | { t: "start"; level: number; difficulty: DifficultyId; fresh: boolean; ep: number }
   /** Host → guest: retry the level after a wipe, from the checkpoint if `checkpoint`. */
-  | { t: "restart"; checkpoint: boolean };
+  | { t: "restart"; checkpoint: boolean; ep: number };
 
 // ------------------------------------------------------------------ in a level
 
@@ -114,7 +119,8 @@ export type SessionMsg =
   /** Host → guest: the level is done. */
   | { t: "finish"; ending: EndingId | null };
 
-export type NetMsg = FlowMsg | SessionMsg;
+/** In-level messages on the wire carry the level attempt they belong to. */
+export type NetMsg = FlowMsg | (SessionMsg & { ep?: number });
 
 /** Rounds for the wire: centimetres are plenty and keep packets small. */
 export function r2(v: number): number {
