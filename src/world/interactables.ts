@@ -35,6 +35,65 @@ function glow(color: number, size: number, opacity = 0.8): THREE.Sprite {
 
 const metal = (color: number, roughness = 0.45) => new THREE.MeshStandardMaterial({ color, metalness: 0.65, roughness });
 
+/** Hazard paint along a door's bottom edge: yellow, or red on security doors. */
+function hazardMaterial(security: boolean): THREE.MeshStandardMaterial {
+  const hazard = textures().hazard;
+  if (!hazard) return new THREE.MeshStandardMaterial({ color: security ? 0xa83a22 : 0xb88a1a, roughness: 0.8 });
+  const rep = (t: THREE.Texture | null) => {
+    if (!t) return null;
+    const c = t.clone();
+    // Keep the stripes square-ish on a 4 m × 0.22 m face.
+    c.repeat.set(CELL_SIZE / 0.5, 0.44);
+    c.needsUpdate = true;
+    return c;
+  };
+  return new THREE.MeshStandardMaterial({
+    color: security ? 0xff6a4a : 0xffffff,
+    map: rep(hazard.map),
+    normalMap: rep(hazard.normalMap),
+    roughnessMap: rep(hazard.roughnessMap),
+    metalness: 0.3,
+    roughness: 1,
+  });
+}
+
+/**
+ * Rescales a box's UVs so one texture repeat covers `tile` metres on every
+ * face — otherwise the thin edges squash a whole texture into a few centimetres.
+ */
+function metresUV(geo: THREE.BoxGeometry, tile: number): THREE.BoxGeometry {
+  const { width: w, height: h, depth: d } = geo.parameters;
+  // BoxGeometry faces, 4 vertices each: +x, -x, +y, -y, +z, -z.
+  const sizes = [
+    [d, h],
+    [d, h],
+    [w, d],
+    [w, d],
+    [w, h],
+    [w, h],
+  ];
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    const [su, sv] = sizes[Math.floor(i / 4)];
+    uv.setXY(i, (uv.getX(i) * su) / tile, (uv.getY(i) * sv) / tile);
+  }
+  return geo;
+}
+
+/** Door slabs: scuffed steel plate where the photo material is available. */
+function plated(color: number): THREE.MeshStandardMaterial {
+  const plate = textures().plate;
+  if (!plate) return metal(color);
+  return new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color).multiplyScalar(2.2),
+    map: plate.map,
+    normalMap: plate.normalMap,
+    roughnessMap: plate.roughnessMap,
+    metalness: 0.65,
+    roughness: 0.85,
+  });
+}
+
 const easeInOut = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
 
 /**
@@ -72,7 +131,10 @@ export class Door implements Interactable {
     this.group.rotation.y = spansX ? 0 : Math.PI / 2;
 
     this.slab = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, 0.3), metal(this.security ? 0x3a3530 : 0x2f3833));
+    const body = new THREE.Mesh(
+      metresUV(new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, 0.3), 2),
+      plated(this.security ? 0x3a3530 : 0x2f3833)
+    );
     body.position.y = WALL_HEIGHT / 2;
     this.slab.add(body);
     const ribMat = metal(0x1e2422, 0.6);
@@ -82,10 +144,7 @@ export class Door implements Interactable {
       this.slab.add(rib);
     }
     // Hazard stripe along the bottom edge.
-    const stripe = new THREE.Mesh(
-      new THREE.BoxGeometry(CELL_SIZE, 0.22, 0.34),
-      new THREE.MeshStandardMaterial({ color: this.security ? 0xa83a22 : 0xb88a1a, roughness: 0.8 })
-    );
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE, 0.22, 0.34), hazardMaterial(this.security));
     stripe.position.y = 0.11;
     this.slab.add(stripe);
     this.group.add(this.slab);
