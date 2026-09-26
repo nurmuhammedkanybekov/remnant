@@ -12,14 +12,14 @@ the known gaps.
 
 ## 1. Quick facts
 
-|              |                                                                                                                                                                                                                                                                                                     |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Engine       | Three.js r166 (WebGL) + its `EffectComposer` post-processing                                                                                                                                                                                                                                        |
-| Language     | TypeScript (strict)                                                                                                                                                                                                                                                                                 |
-| Build        | Vite 5                                                                                                                                                                                                                                                                                              |
-| Runtime deps | `three` only                                                                                                                                                                                                                                                                                        |
-| Assets       | Textures are painted onto `<canvas>` at startup and music and most audio are synthesized with the Web Audio API. Weapon sounds are CC0 recordings in `public/sfx/` (~550 KB, credited in `CREDITS.md`), each with a synthesized fallback. (UI fonts load from Google Fonts, with system fallbacks.) |
-| Levels       | 10 hand-authored grid maps with scripted story beats (see `STORY.md`)                                                                                                                                                                                                                               |
+|              |                                                                                                                                                                                                                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine       | Three.js r166 (WebGL) + its `EffectComposer` post-processing                                                                                                                                                                                                                                                                                |
+| Language     | TypeScript (strict)                                                                                                                                                                                                                                                                                                                         |
+| Build        | Vite 5                                                                                                                                                                                                                                                                                                                                      |
+| Runtime deps | `three` only                                                                                                                                                                                                                                                                                                                                |
+| Assets       | Textures are painted onto `<canvas>` at startup and music and most audio are synthesized with the Web Audio API. Weapon, footstep, creature, door and a few other sounds are CC0 recordings in `public/sfx/` (~1 MB, credited in `CREDITS.md`), each with a synthesized fallback. (UI fonts load from Google Fonts, with system fallbacks.) |
+| Levels       | 10 hand-authored grid maps with scripted story beats (see `STORY.md`)                                                                                                                                                                                                                                                                       |
 
 ```bash
 npm install
@@ -520,25 +520,24 @@ compressor.
   Anything without a recording (or that fails to load) falls back to the
   synthesized version: an overdriven crack and body, early reflections, a
   rumble and ear ring, the action cycling and casings bouncing.
-- **Player**: alternating footsteps per gait, flashlight click, hurt grunt,
+- **Player**: recorded boot footsteps on concrete (walking, heavier when
+  sprinting, soft when crouched) and wading splashes, a real flashlight
+  switch, a recorded pain sound under a synthesized thump when hurt,
   heartbeat below 40% health (faster as it drops), death drone.
-- **Enemies** (panned + distance-attenuated + muffled through walls):
-  clicking or wet breathing idles, a ragged throat-torn scream on alert,
-  wind-up hiss,
-  hurt screech, death groan, a choked gurgle for takedowns, a thud and
-  skitter when a Crawler drops, a Spitter's rising gurgle, acid sizzle, and
-  the Remnant's slam and many-voiced roar. Voices are pitched per creature
-  (Brutes low, rats high). Mimic lures are positioned in the world, including
-  the Operator's radio voice coming from somewhere it shouldn't.
-- **Weapons**: the pistol as before; the shotgun's boom and pump; the rivet
-  gun's pneumatic hiss and chunk; shell loading; weapon switching; melee
-  swings; the medkit injector.
+- **Enemies** (panned + distance-attenuated + muffled through walls): one
+  recorded voice for everything the Remnant has rewritten — growls when
+  idle, an angry roar on alert, attack grunts, pain and death — pitched
+  per creature (Brutes and the Remnant low, Listeners high); rats have
+  their own recorded squeaks. Synthesized: the takedown gurgle (a muffled
+  death), a thud and skitter when a Crawler drops, a Spitter's rising
+  gurgle, acid sizzle, and the Remnant's slam and many-voiced roar.
+- **World**: a recorded heavy sliding metal door (with synthesized security
+  beeps and the clunk at the top), a recorded ammo pickup; synthesized
+  generators, intercoms, radio voice, checkpoint tone and detonation.
 - **Ambience**: detuned low drone with a slow filter swell, plus random
   distant drips, metal groans and clanks.
-- **World & radio**: a synthesized radio voice (key-up click, static bed and
-  band-passed "syllables" for the length of the subtitle), door motors,
-  generator start-up and thrum, splashing footsteps, intercom chime,
-  checkpoint tone and the detonation.
+- **Radio**: a synthesized radio voice (key-up click, static bed and
+  band-passed "syllables" for the length of the subtitle).
 - Pause ducks the mix. Master and music volume are settings.
 
 ### Adaptive music (`audio/music.ts`)

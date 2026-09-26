@@ -23,7 +23,20 @@ export type SampleId =
   | "shellCasing"
   | "impactConcrete"
   | "impactFlesh"
-  | "ricochet";
+  | "ricochet"
+  | "stepWalk"
+  | "stepRun"
+  | "splash"
+  | "creatureIdle"
+  | "creatureAlert"
+  | "creatureWindup"
+  | "creatureHurt"
+  | "creatureDeath"
+  | "ratVoice"
+  | "door"
+  | "flashlight"
+  | "ammoPickup"
+  | "playerHurt";
 
 export interface SampleDef {
   /** File names inside public/sfx/. */
@@ -54,4 +67,29 @@ export const SAMPLES: Partial<Record<SampleId, SampleDef>> = {
   },
   ricochet: { files: ["ricochet_1.mp3", "ricochet_2.mp3", "ricochet_3.mp3"], gain: 0.3, pitchJitter: 0.08 },
   impactFlesh: { files: ["impactFlesh_1.mp3", "impactFlesh_2.mp3", "impactFlesh_3.mp3"], gain: 0.55, pitchJitter: 0.08 },
+  stepWalk: {
+    files: ["stepWalk_1.mp3", "stepWalk_2.mp3", "stepWalk_3.mp3", "stepWalk_4.mp3", "stepWalk_5.mp3", "stepWalk_6.mp3"],
+    gain: 0.55,
+    pitchJitter: 0.06,
+  },
+  stepRun: { files: ["stepRun_1.mp3", "stepRun_2.mp3", "stepRun_3.mp3", "stepRun_4.mp3", "stepRun_5.mp3"], gain: 0.7, pitchJitter: 0.06 },
+  splash: { files: ["splash_1.mp3", "splash_2.mp3", "splash_3.mp3", "splash_4.mp3", "splash_5.mp3"], gain: 0.6, pitchJitter: 0.08 },
+  creatureIdle: { files: ["creatureIdle_1.mp3", "creatureIdle_2.mp3", "creatureIdle_3.mp3"], gain: 0.5, pitchJitter: 0.06 },
+  creatureAlert: { files: ["creatureAlert_1.mp3", "creatureAlert_2.mp3"], gain: 0.85, pitchJitter: 0.05 },
+  creatureWindup: { files: ["creatureWindup_1.mp3", "creatureWindup_2.mp3"], gain: 0.7, pitchJitter: 0.05 },
+  creatureHurt: {
+    files: ["creatureHurt_1.mp3", "creatureHurt_2.mp3", "creatureHurt_3.mp3", "creatureHurt_4.mp3"],
+    gain: 0.7,
+    pitchJitter: 0.06,
+  },
+  creatureDeath: { files: ["creatureDeath_1.mp3", "creatureDeath_2.mp3"], gain: 0.8, pitchJitter: 0.05 },
+  ratVoice: {
+    files: ["ratVoice_1.mp3", "ratVoice_2.mp3", "ratVoice_3.mp3", "ratVoice_4.mp3", "ratVoice_5.mp3", "ratVoice_6.mp3"],
+    gain: 0.45,
+    pitchJitter: 0.1,
+  },
+  door: { files: ["door_1.mp3"], gain: 0.8, pitchJitter: 0.03 },
+  flashlight: { files: ["flashlight_1.mp3", "flashlight_2.mp3"], gain: 0.2, pitchJitter: 0.05 },
+  ammoPickup: { files: ["ammoPickup_1.mp3"], gain: 0.45, pitchJitter: 0.04 },
+  playerHurt: { files: ["playerHurt_1.mp3", "playerHurt_2.mp3"], gain: 0.45, pitchJitter: 0.04 },
 };
