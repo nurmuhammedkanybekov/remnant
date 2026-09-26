@@ -11,4 +11,6 @@ interface ImportMetaEnv {
   readonly VITE_TURN_URLS?: string;
   readonly VITE_TURN_USERNAME?: string;
   readonly VITE_TURN_CREDENTIAL?: string;
+  /** Co-op matchmaking: a Metered Realtime publishable key (pk_live_…), or "off" for the PeerJS server. */
+  readonly VITE_METERED_REALTIME_KEY?: string;
 }
