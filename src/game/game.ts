@@ -614,6 +614,23 @@ export class Game {
         [{ label: "Cancel", action: () => this.showCoopMenu() }],
         code
       );
+    // Once someone knocks, show each step of the connection.
+    let joining = false;
+    const showStep = (step: string) =>
+      this.screens.lobby(
+        "HOST",
+        "ROOM CODE",
+        `Your partner is connecting…\n(${step})`,
+        [{ label: "Cancel", action: () => this.showCoopMenu() }],
+        code
+      );
+    link.onJoining = () => {
+      joining = true;
+      showStep("setting up");
+    };
+    link.onStatus = (step) => {
+      if (joining && !link.open && this.link === link) showStep(step);
+    };
     link.onOpen = () => void this.hostReady(link, code, level, difficulty);
     return code;
   }
@@ -668,7 +685,14 @@ export class Game {
     const code = normalizeRoomCode(input);
     if (!code) return this.showJoin("Room codes are 5 letters and numbers.", input);
     const link = this.openLink("guest", code);
-    this.screens.lobby("JOINING", `ROOM ${code}`, "Connecting to your partner…", [{ label: "Cancel", action: () => this.showCoopMenu() }]);
+    const showStep = (step: string) =>
+      this.screens.lobby("JOINING", `ROOM ${code}`, `Connecting to your partner…\n(${step})`, [
+        { label: "Cancel", action: () => this.showCoopMenu() },
+      ]);
+    showStep("finding the room");
+    link.onStatus = (step) => {
+      if (!link.open && this.link === link) showStep(step);
+    };
     link.onOpen = async () => {
       link.send({ t: "hello", v: PROTOCOL_VERSION, app: __APP_VERSION__ });
       this.sound.playCheckpoint();
@@ -717,7 +741,9 @@ export class Game {
       this.hostGame(h.level, h.difficulty, 0, "Your partner left. The room is open again with a new code.\n");
       return;
     }
-    const text = describeClose(reason);
+    // For failed connections, add how far it got — a screenshot of this pins the problem down.
+    const text =
+      describeClose(reason) + (["timeout", "no-answer", "lost", "closed"].includes(reason) ? `\n(Last step: ${link.lastStep}.)` : "");
     const playing = this.run?.coop && this.state !== "menu" && this.state !== "title";
     if (!playing) {
       this.screens.lobby("CO-OP", "NOT CONNECTED", text, [{ label: "Back", primary: true, action: () => this.showCoopMenu() }]);
