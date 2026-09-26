@@ -1,5 +1,6 @@
 import { hasRelay, iceConfig, iceServers } from "./ice";
 import { roomPeerId } from "./protocol";
+import { steadyInterval } from "./timer";
 import { DEFAULT_SIGNAL_URL, Signaling, type SignalMessage } from "./signaling";
 
 /**
@@ -26,7 +27,8 @@ export const CLOSE_REASONS: Record<string, string> = {
   full: "That game already has two players.",
   unreachable: "Couldn't reach the matchmaking server. Check your connection.",
   server: "The matchmaking server refused the connection. Try again in a moment.",
-  closed: "Lost the connection to the matchmaking server.",
+  closed:
+    "Lost the connection to the matchmaking server and couldn't get it back. Check your internet connection and try again — if it keeps happening, the free server may be busy; wait a minute.",
   timeout: hasRelay()
     ? "Couldn't connect to the other player, even through the relay. Check both connections and try again."
     : "Couldn't connect to the other player. Some networks (school, office, some mobile data) block direct connections between browsers — try another network, or turn on the free relay (see the README).",
@@ -58,6 +60,7 @@ export class PeerLink {
   private pendingCandidates: RTCIceCandidateInit[] = [];
   private timers: number[] = [];
   private lastHeard = 0;
+  private stopPing: (() => void) | null = null;
   private closed = false;
   private isOpen = false;
 
@@ -69,7 +72,8 @@ export class PeerLink {
     const id = role === "host" ? roomPeerId(code) : `${roomPeerId(code)}-g${Math.random().toString(36).slice(2, 8)}`;
     this.signaling = new Signaling(id, signalUrl);
     this.signaling.onOpen = () => {
-      if (role === "guest") void this.call();
+      // A guest calls the host once; after a reconnection mid-handshake the call already under way carries on.
+      if (role === "guest" && !this.remoteId) void this.call();
     };
     this.signaling.onMessage = (m) => void this.onSignal(m);
     this.signaling.onError = (reason) => {
@@ -114,6 +118,7 @@ export class PeerLink {
     // Tell the other side straight away rather than letting it time out.
     if (reason === "left") this.send({ t: "bye" });
     this.timers.forEach((t) => window.clearTimeout(t));
+    this.stopPing?.();
     this.signaling.close();
     this.reliable?.close();
     this.fast?.close();
@@ -197,12 +202,12 @@ export class PeerLink {
     this.lastHeard = performance.now();
     // The mailbox has done its job; free the room code.
     this.signaling.close();
-    const ping = window.setInterval(() => {
-      if (this.closed) return window.clearInterval(ping);
+    // A steady timer: a hidden tab mustn't go quiet long enough to look disconnected.
+    this.stopPing = steadyInterval(PING_MS, () => {
+      if (this.closed) return;
       this.send({ t: "ping" });
       if (performance.now() - this.lastHeard > SILENCE_TIMEOUT_MS) this.close("lost");
-    }, PING_MS);
-    this.timers.push(ping);
+    });
     this.onOpen?.();
   }
 
