@@ -2,7 +2,7 @@
   "name": "remnant",
   "private": true,
   "version": "0.5.0",
-  "description": "First-person survival horror game in the browser, solo or two-player online co-op \u2014 TypeScript + Three.js.",
+  "description": "First-person survival horror game in the browser, solo or two-player online co-op — TypeScript + Three.js.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -24,6 +24,7 @@
     "vitest": "^2.1.9"
   },
   "dependencies": {
+    "@metered-ca/realtime": "^1.2.0",
     "three": "^0.166.1"
   },
   "engines": {

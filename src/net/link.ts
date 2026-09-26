@@ -1,6 +1,7 @@
 import { iceConfig, iceServers, lastRelayState } from "./ice";
 import { roomPeerId } from "./protocol";
 import { steadyInterval } from "./timer";
+import { MeteredSignaling, realtimeKey } from "./meteredSignaling";
 import { DEFAULT_SIGNAL_URL, Signaling, type SignalMessage } from "./signaling";
 
 /**
@@ -65,7 +66,7 @@ export class PeerLink {
   /** Host: someone tried to join but the connection couldn't be made. The room stays open for another try. */
   onJoinFailed: (() => void) | null = null;
 
-  private readonly signaling: Signaling;
+  private readonly signaling: Signaling | MeteredSignaling;
   private pc: RTCPeerConnection | null = null;
   /** Set as soon as a partner is chosen (before the connection exists), so a second one is turned away. */
   private remoteId: string | null = null;
@@ -81,10 +82,15 @@ export class PeerLink {
   constructor(
     readonly role: Role,
     readonly code: string,
-    signalUrl = DEFAULT_SIGNAL_URL
+    /** A PeerJS-protocol server to use instead of Metered Realtime (`?signal=`, or when no key is set). */
+    signalUrl: string | null = null
   ) {
     const id = role === "host" ? roomPeerId(code) : `${roomPeerId(code)}-g${Math.random().toString(36).slice(2, 8)}`;
-    this.signaling = new Signaling(id, signalUrl);
+    const key = realtimeKey();
+    this.signaling =
+      !signalUrl && key
+        ? new MeteredSignaling(id, roomPeerId(code), key, role === "guest")
+        : new Signaling(id, signalUrl ?? DEFAULT_SIGNAL_URL);
     this.signaling.onOpen = () => {
       // A guest calls the host once; after a reconnection mid-handshake the call already under way carries on.
       if (role === "guest" && !this.remoteId) void this.call();

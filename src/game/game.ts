@@ -14,7 +14,6 @@ import type { Enemy } from "../enemies/enemy";
 import { hasRelay, relayState } from "../net/ice";
 import { describeClose, PeerLink } from "../net/link";
 import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg } from "../net/protocol";
-import { DEFAULT_SIGNAL_URL } from "../net/signaling";
 import { buildCommand, emptyCommand, type PlayerCommand } from "../player/command";
 import { Hud } from "../ui/hud";
 import { Screens, type MenuItem } from "../ui/menu";
@@ -92,7 +91,7 @@ export class Game {
   /** Co-op: keeps the world running while this tab is in the background (browsers stop animation frames there). */
   private backgroundTicker: Worker | null = null;
   /** Matchmaking server; `?signal=wss://…` points at a self-hosted one. */
-  private readonly signalUrl = new URLSearchParams(location.search).get("signal") ?? DEFAULT_SIGNAL_URL;
+  private readonly signalUrl = new URLSearchParams(location.search).get("signal");
 
   constructor(container: HTMLElement) {
     this.container = container;

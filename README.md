@@ -130,12 +130,13 @@ In co-op:
 The two browsers connect **directly** to each other, which works on almost all
 home networks. Some strict networks (school, office, some mobile data) block
 direct connections between browsers. For those, the game falls back to a
-free **relay** once it has been set up for the site (below). The relay is
+free **relay** automatically — the matchmaking service hands one out with
+every game, and you can add your own (below) for more capacity. The relay is
 only used when a direct connection is impossible, and the lobby tells you
 which one you got.
 
 <details>
-<summary><b>Setting up the free relay (3 minutes, no credit card)</b></summary>
+<summary><b>Adding your own relay (optional, 3 minutes, no credit card)</b></summary>
 
 The relay is [Metered's Open Relay](https://www.metered.ca/tools/openrelay/),
 free for 20 GB a month. A two-player game uses roughly 30–40 MB an hour, so
@@ -274,7 +275,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     participant H as Host's game
-    participant S as Signaling server (free, public)
+    participant S as Matchmaking (Metered Realtime, free)
     participant G as Guest's game
     H->>S: register under the room code
     G->>S: offer to the room code
@@ -374,7 +375,8 @@ npm run dev        # http://localhost:5173
 Every push to `main` is checked and deployed to GitHub Pages automatically.
 Add `?debug` to the URL for test hooks on `window.game`, and
 `?signal=wss://…/peerjs` to use your own
-[PeerJS server](https://github.com/peers/peerjs-server) for co-op matchmaking.
+[PeerJS server](https://github.com/peers/peerjs-server) for co-op matchmaking
+instead of the built-in one.
 
 ## Testing
 

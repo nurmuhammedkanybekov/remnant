@@ -80,7 +80,10 @@ src/
 │   ├── projectiles.ts         Lobbed acid
 │   └── enemyManager.ts        Spawning (incl. mid-level), noise, hit tests, threat
 ├── net/                       Co-op networking
-│   ├── signaling.ts           WebSocket client for a PeerJS-protocol matchmaking server
+│   ├── meteredSignaling.ts    Matchmaking over Metered Realtime (the default)
+│   ├── signaling.ts           Matchmaking over a PeerJS-protocol server (tests, self-hosting)
+│   ├── ice.ts                 STUN/TURN servers and the relay's state
+│   ├── timer.ts               A keep-alive timer background tabs don't throttle
 │   ├── link.ts                WebRTC connection: reliable + fast data channels, timeouts
 │   └── protocol.ts            Room codes and every message the two games exchange
 ├── items/pickup.ts            Pickup meshes and animation
@@ -649,13 +652,20 @@ Two players, online, through the whole campaign. Main menu → **Co-op** →
 five-character room code; the partner picks **Join a Game** and types it.
 
 **Connecting.** Browsers talk directly over WebRTC data channels. To find
-each other they use a signaling server — by default the free public PeerJS
-server (`wss://0.peerjs.com/peerjs`), used only as a mailbox for the
+each other they use a signaling service, only as a mailbox for the
 connection offer, answer and ICE candidates; nothing about the game goes
-through it, and the connection is closed once the players are linked. The
-host registers as `remnant-v<protocol>-<code>`, so different versions never
-meet. `?signal=wss://your-server/peerjs` points the game at a self-hosted
-PeerJS server instead. Room codes use 31 characters with no look-alikes
+through it, and it's closed once the players are linked
+(`net/meteredSignaling.ts`). It's **Metered Realtime** (free: 100,000
+messages a month; a connection takes a few dozen): each room is a pub/sub
+channel named `remnant-v<protocol>-<code>` (so different versions never
+meet), messages carry `src`/`dst` ids, and the channel's presence list tells
+a guest within seconds when nobody hosts that code. The game ships with a
+publishable key (`pk_live_…`, made for browser code); `VITE_METERED_REALTIME_KEY`
+replaces it. Its welcome also carries TURN credentials, which join the relay
+list — so the relay works without any further setup. The game used the free
+public PeerJS server at first, but that server stopped forwarding offers
+(it disconnects whoever sends one); `net/signaling.ts` still speaks the
+PeerJS protocol for tests and self-hosting: `?signal=wss://your-server/peerjs`. Room codes use 31 characters with no look-alikes
 (no 0/O, 1/I/L); if a code is somehow taken, the host silently opens the
 room under another.
 
@@ -726,8 +736,10 @@ footsteps are spatial (`playGunshotAt`, `playFootstepAt`).
 
 **Testing.** Unit tests cover target choice, the Watcher and either torch,
 puppets copying a creature to its death, the boss's shared phase, and room
-codes. An end-to-end check runs two real browsers against a local PeerJS
-server (`?signal=ws://127.0.0.1:9000/peerjs`), clicking through the actual
+codes, relay settings, and the Metered matchmaking client against an
+in-memory stand-in (addressing, empty rooms, handed-out relays). An
+end-to-end check runs two real browsers — against the real Metered service,
+or a local PeerJS server (`?signal=ws://127.0.0.1:9000/peerjs`) — clicking through the actual
 menus, and verifies: intercom and door use by the guest, pickups, the
 guest's shots killing the host's creature, down and revive, wipe and
 retry, leaving together, moving to the next level, and a partner leaving
@@ -784,10 +796,10 @@ See [`ROADMAP.md`](ROADMAP.md) for the full plan.
    readable in the dark, but a proper model pipeline (see the roadmap's
    asset rule) would be the next step up.
 5. **No touch input.** Touch-only devices are told so on the title screen.
-6. **Co-op** needs a relay to be configured (free, see the README) to
-   connect across the few networks that block direct browser-to-browser
-   connections, and depends on the free public PeerJS signaling server
-   being up (or a self-hosted one via `?signal=`). Joining needs a keyboard
+6. **Co-op** depends on free third-party services: Metered Realtime for
+   matchmaking (with the relay it hands out) and, optionally, Metered's
+   TURN relay; if they're down, players can't find each other (a
+   self-hosted PeerJS server via `?signal=` is the fallback). Joining needs a keyboard
    to type the code. There's no host migration: if the host leaves, the
    guest's game ends.
 7. **Performance** hasn't been profiled on real low-end GPUs; the Low
