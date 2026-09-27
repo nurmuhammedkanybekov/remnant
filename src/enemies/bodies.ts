@@ -83,6 +83,34 @@ function glowSprite(color: number, size: number): THREE.Sprite {
 
 const FLASH = new THREE.Color(1, 0.25, 0.1);
 
+/**
+ * Glowing eyes are only frightening up close: seen from across a room they
+ * give the creature away, and in the dark two red dots aren't scary, they're
+ * a marker. So eyes fade with distance from the camera — fully lit within
+ * EYE_NEAR, gone by EYE_FAR — reaching a little further when it's hunting.
+ */
+const EYE_NEAR = 3.5;
+const EYE_FAR = 9;
+const eyeTmp = new THREE.Vector3();
+const camTmp = new THREE.Vector3();
+
+export function eyeFade(distance: number, agitation: number): number {
+  const near = EYE_NEAR + agitation * 1.5;
+  const far = EYE_FAR + agitation * 3;
+  return THREE.MathUtils.clamp((far - distance) / (far - near), 0, 1);
+}
+
+/** Makes an eye sprite fade with distance. Its brightness is set through `userData.base` / `userData.agitation`. */
+function fadingEye(glow: THREE.Sprite): THREE.Sprite {
+  glow.userData.base = 0.4;
+  glow.userData.agitation = 0;
+  glow.onBeforeRender = (_r, _s, camera) => {
+    const d = camera.getWorldPosition(camTmp).distanceTo(glow.getWorldPosition(eyeTmp));
+    glow.material.opacity = glow.userData.base * eyeFade(d, glow.userData.agitation);
+  };
+  return glow;
+}
+
 /** A small repeatable random stream, so every creature of a kind grows the same way. */
 function seeded(key: string): () => number {
   let h = 2166136261;
@@ -138,6 +166,7 @@ class HumanoidBody implements CreatureBody {
   private readonly shinR: THREE.Group;
   private readonly eyes: THREE.Mesh[] = [];
   private readonly eyeGlow: THREE.Sprite[] = [];
+  private eyeAgitation = 0;
   private readonly petals: THREE.Mesh[] = [];
   private readonly sac: THREE.Mesh | null = null;
   private readonly chest: THREE.Mesh;
@@ -368,10 +397,18 @@ class HumanoidBody implements CreatureBody {
       const x = side * (0.045 + row * 0.02);
       const y = 0.0 + row * 0.045;
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018 - row * 0.003, 8, 6), eyeMat);
+      // The pinprick itself dims with distance too (only the first eye needs to set the shared material).
+      if (i === 0) {
+        const lit = new THREE.Color(0xff4a2a);
+        eye.onBeforeRender = (_r, _s, camera) => {
+          const d = camera.getWorldPosition(camTmp).distanceTo(eye.getWorldPosition(eyeTmp));
+          eyeMat.color.copy(lit).multiplyScalar(0.15 + 0.85 * eyeFade(d, this.eyeAgitation));
+        };
+      }
       eye.position.set(x, y, 0.145 - row * 0.012);
       this.head.add(eye);
       this.eyes.push(eye);
-      const glow = glowSprite(def.light === "freezes" ? 0xd8f0ff : 0xff3a1a, 0.11 - row * 0.02);
+      const glow = fadingEye(glowSprite(def.light === "freezes" ? 0xd8f0ff : 0xff3a1a, 0.11 - row * 0.02));
       glow.userData.size = 0.11 - row * 0.02;
       // A sunken socket around each eye.
       const socket = new THREE.Mesh(new THREE.SphereGeometry(0.03 - row * 0.004, 8, 6), dark);
@@ -423,8 +460,11 @@ class HumanoidBody implements CreatureBody {
   glow(flash: number, agitation: number, time: number): void {
     applyGlow(this.skin, this.veinColor, flash, agitation, time);
     const pulse = 0.6 + 0.4 * Math.sin(time * (agitation > 0.5 ? 12 : 3));
+    this.eyeAgitation = agitation;
     for (const g of this.eyeGlow) {
-      g.material.opacity = (0.6 + agitation * 0.4) * pulse;
+      // Dim while it's unaware; the fade with distance is applied as it's drawn.
+      g.userData.base = (0.35 + agitation * 0.65) * pulse;
+      g.userData.agitation = agitation;
       // Eyes flare when it has you.
       g.scale.setScalar(g.userData.size * (1 + agitation * 0.6));
     }
@@ -596,7 +636,7 @@ class RatBody implements CreatureBody {
     snout.position.z = 0.05;
     this.head.add(snout);
     for (const x of [-0.03, 0.03]) {
-      const glow = glowSprite(0xff3a1a, 0.07);
+      const glow = fadingEye(glowSprite(0xff3a1a, 0.07));
       glow.position.set(x, 0.03, 0.03);
       this.head.add(glow);
       this.eyeGlow.push(glow);
@@ -641,6 +681,10 @@ class RatBody implements CreatureBody {
 
   glow(flash: number, agitation: number, time: number): void {
     applyGlow(this.skin, this.veinColor, flash, agitation, time);
+    for (const g of this.eyeGlow) {
+      g.userData.base = 0.35 + agitation * 0.55;
+      g.userData.agitation = agitation;
+    }
   }
 
   pose(p: Pose): void {

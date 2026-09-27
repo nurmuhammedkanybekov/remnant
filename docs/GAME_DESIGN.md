@@ -347,7 +347,7 @@ to 72%. The HUD noise meter shows your current level.
 
 **Flashlight** (F): spotlight held low-right with beam sway that lags your
 aim. Battery 100, drains 1.7/s (~60 s). While off it trickles back to at
-most 25; beyond that you need battery pickups (+45). Flickers below 20.
+most 30; beyond that you need battery pickups (+45). Flickers below 20.
 With it on, enemies can see you from 15 units instead of 6.
 
 ---
@@ -512,7 +512,9 @@ Each creature type has its own rig, all from primitives:
 
 Skin is a procedural flesh texture tinted per creature, with the Remnant's
 **veins** as an emissive map that pulses faster when the creature is
-agitated. A hit flashes the whole body. Procedural walk cycles are driven by
+agitated. Eyes stay dark beyond about 9 units and brighten as a creature
+closes in (further when it is hunting), so a shape in the dark gives nothing
+away until it is near. A hit flashes the whole body. Procedural walk cycles are driven by
 actual speed, with wind-up and strike poses, hit flinches, and a collapse on
 death (a Crawler killed on the ceiling falls first).
 
