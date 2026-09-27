@@ -3,7 +3,7 @@ import * as THREE from "three";
 export const MAX_BATTERY = 100;
 const DRAIN_PER_SEC = 1.7; // ~60s of light from full
 const RECHARGE_PER_SEC = 0.8; // passive trickle while off...
-const RECHARGE_CAP = 25; // ...but only up to this — real charge comes from batteries
+const RECHARGE_CAP = 30; // ...but only up to this — real charge comes from batteries
 const LOW_BATTERY_THRESHOLD = 20;
 const FULL_INTENSITY = 22;
 const BEAM_SWAY = 1.15; // beam offset per radian of look change
