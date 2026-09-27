@@ -1,3 +1,4 @@
+import { currentCharacter } from "../content/characters";
 import type { RadioLine } from "../game/script";
 import { injectStyles } from "./styles";
 
@@ -7,6 +8,11 @@ const ICON = {
   torch: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2h10v5l-3 4v11h-4V11L7 7V2zm2 2v2h6V4H9z"/></svg>`,
   eye: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 10C7 3 12 1 18 1s11 2 16 9c-5 7-10 9-16 9S7 17 2 10z"/><circle cx="18" cy="10" r="4" fill="currentColor"/></svg>`,
 };
+
+/** The name shown over a line: your own lines carry your character's name. */
+export function speakerName(speaker: RadioLine["speaker"]): string {
+  return speaker === "nur" ? currentCharacter().firstName.toUpperCase() : SPEAKER_NAMES[speaker];
+}
 
 export const SPEAKER_NAMES: Record<RadioLine["speaker"], string> = {
   operator: "OPERATOR — RADIO",
@@ -84,7 +90,7 @@ export class Hud {
         <div class="vrow battery" data-k="batRow">${ICON.torch}<div class="vbar"><b class="fill" data-k="bat"></b></div><div class="vnum" data-k="batNum"></div></div>
         <div class="medkits" data-k="med"><b>✚</b><span data-k="medNum"></span><kbd data-k="medKey"></kbd></div>
         <div class="keycard" data-k="key">▣ KEYCARD</div>
-        <div class="partner" data-k="partner"><span>PARTNER</span><div class="pbar"><b data-k="partnerHp"></b></div><span data-k="partnerTxt"></span></div>
+        <div class="partner" data-k="partner"><span data-k="partnerName">PARTNER</span><div class="pbar"><b data-k="partnerHp"></b></div><span data-k="partnerTxt"></span></div>
       </div>
       <div class="boss" data-k="boss"><div class="name" data-k="bossName"></div><div class="bar"><b class="lag" data-k="bossLag"></b><b class="fill" data-k="bossHp"></b></div></div>
       <div class="noise"><div class="bars" data-k="noiseBars"></div><div class="lbl">NOISE</div></div>
@@ -112,10 +118,12 @@ export class Hud {
   }
 
   /** Co-op: the other player's health and state, or null to hide it. */
-  partner(info: { hp: number; down: boolean; bleed: number } | null): void {
+  partner(info: { hp: number; down: boolean; bleed: number; name?: string } | null): void {
     const el = this.el.partner;
     el.classList.toggle("show", info !== null);
     if (!info) return;
+    const name = (info.name ?? "PARTNER").toUpperCase();
+    if (this.el.partnerName.textContent !== name) this.el.partnerName.textContent = name;
     el.classList.toggle("down", info.down);
     this.el.partnerHp.style.width = `${Math.round(info.hp * 100)}%`;
     const txt = info.down ? `DOWN ${info.bleed}s` : "";
@@ -307,7 +315,7 @@ export class Hud {
       return;
     }
     el.className = `subtitle show ${line.speaker}`;
-    this.el.subWho.textContent = SPEAKER_NAMES[line.speaker];
+    this.el.subWho.textContent = speakerName(line.speaker);
     this.el.subLine.textContent = line.text;
   }
 

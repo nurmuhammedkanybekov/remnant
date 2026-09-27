@@ -1,3 +1,4 @@
+import { currentCharacter } from "../content/characters";
 import type { SampleId } from "../content/sounds";
 import type { VocalKind } from "../enemies/enemy";
 import { SampleBank } from "./samples";
@@ -104,6 +105,12 @@ export class SoundManager {
   setPaused(paused: boolean): void {
     if (!this.ctx) return;
     this.master.gain.setTargetAtTime(paused ? this.volume * 0.25 : this.volume, this.ctx.currentTime, 0.1);
+  }
+
+  /** Everything fades to silence (the title screen after Exit); `setPaused(false)` brings it back. */
+  silence(): void {
+    if (!this.ctx) return;
+    this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.15);
   }
 
   private makeImpulse(seconds: number, decay: number): AudioBuffer {
@@ -528,7 +535,8 @@ export class SoundManager {
     const o = this.out(CENTER, 1, 0.3)!;
     this.tone(o, "sine", 150, 45, t, 0.3, 0.9);
     // Nur's voice, if there's a recording; otherwise a breathy grunt.
-    if (!this.sample("playerHurt", t + 0.02, CENTER, 1, 0.2)) this.burst(o, "bandpass", 900, 1.5, t, 0.25, 0.35, 0.02);
+    if (!this.sample("playerHurt", t + 0.02, CENTER, 1, 0.2, currentCharacter().voice))
+      this.burst(o, "bandpass", 900, 1.5, t, 0.25, 0.35, 0.02);
   }
 
   playDeath(): void {

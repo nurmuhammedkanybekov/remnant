@@ -66,7 +66,7 @@ export function reinforcements(level: ParsedLevel, amount: number): EnemySpawn[]
 }
 
 /** Walking distance in cells from the start to every reachable floor cell (doors count as open). */
-function walkingDistances(level: ParsedLevel): (number | undefined)[] {
+export function walkingDistances(level: ParsedLevel): (number | undefined)[] {
   const dist: (number | undefined)[] = new Array(level.cols * level.rows);
   const s = level.startCell;
   const queue = [s];
@@ -90,13 +90,13 @@ function walkingDistances(level: ParsedLevel): (number | undefined)[] {
   return dist;
 }
 
-function hash(s: string): number {
+export function hash(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return h >>> 0;
 }
 
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -107,7 +107,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-function shuffle<T>(list: T[], rand: () => number): void {
+export function shuffle<T>(list: T[], rand: () => number): void {
   for (let i = list.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
     [list[i], list[j]] = [list[j], list[i]];
