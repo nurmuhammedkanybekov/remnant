@@ -197,7 +197,7 @@ function describe(e: unknown): string {
   if (code === "auth/operation-not-allowed" || code === "auth/configuration-not-found")
     return "Google sign-in isn't switched on in the cloud project yet.";
   if (typeof code === "string" && code.startsWith("auth/") && code.includes("api-key"))
-    return "The cloud save settings in this build are wrong.";
+    return "Cloud saves are misconfigured on this site: the Firebase API key isn't valid.";
   if (code === "auth/internal-error") return "Couldn't reach the sign-in service. Check your connection and try again.";
   if (code === "auth/network-request-failed" || e instanceof TypeError)
     return "Couldn't reach the cloud. Your progress is still saved on this device.";

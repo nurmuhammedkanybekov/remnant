@@ -4,21 +4,34 @@
 
 # REMNANT
 
-**A first-person survival horror game that runs in the browser, solo or in two-player online co-op.**
+A first-person survival horror game that runs in the browser. Play it alone, or online with a friend.
 
-Climb 2.4 km out of a buried Soviet research station, past things that hunt by sound.
-
-[![Play in your browser](https://img.shields.io/badge/Play_now-in_your_browser-d8432f?style=for-the-badge)](https://nurmuhammedkanybekov.github.io/remnant/)
+**[Play it here](https://nurmuhammedkanybekov.github.io/remnant/)**
 
 [![Build and deploy](https://github.com/nurmuhammedkanybekov/remnant/actions/workflows/deploy.yml/badge.svg)](https://github.com/nurmuhammedkanybekov/remnant/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![Three.js](https://img.shields.io/badge/Three.js-r166-black?logo=threedotjs)
-![Co-op](https://img.shields.io/badge/co--op-2_players_online-5a9e5a)
-
-Desktop browser with a keyboard and mouse, or a gamepad. Headphones recommended.
 
 </div>
+
+## About
+
+In 1991 the Soviet deep-drilling station Object 9 "Zenit" was sealed and
+forgotten under the Tian Shan mountains. Eleven days ago a mining crew opened
+it again, and the shafts collapsed behind them.
+
+You play as Nur Kanybekov, a structural engineer who wakes up on the deepest
+sublevel with a pistol that isn't his and a flashlight that is almost dead.
+The radio still works, and a calm voice on it offers to guide you to the
+surface, 2.4 km above. The things down there are blind, but they hear
+everything.
+
+I built REMNANT from scratch in TypeScript and Three.js as a way to learn the
+parts of software I don't touch in backend work: real-time rendering, game AI,
+3D audio, networking and performance. There is no game engine underneath, and
+almost everything you see and hear (the creatures, the characters, the music,
+most of the sound) is generated in code.
 
 <table>
   <tr>
@@ -26,413 +39,257 @@ Desktop browser with a keyboard and mouse, or a gamepad. Headphones recommended.
     <td width="50%"><img src="docs/screenshots/creature.jpg" alt="A Brute in the armory, caught in the flashlight"></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/characters.jpg" alt="The three character looks, as your co-op partner sees you"></td>
+    <td><img src="docs/screenshots/characters.jpg" alt="The three character looks"></td>
     <td><img src="docs/screenshots/boss.jpg" alt="The Remnant, the boss of Sublevel 2"></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/water.jpg" alt="The flooded pumping station"></td>
-    <td><img src="docs/screenshots/infirmary.jpg" alt="A ward in the infirmary, Sublevel 10"></td>
+    <td><img src="docs/screenshots/infirmary.jpg" alt="A ward in the infirmary"></td>
   </tr>
 </table>
 
-> **Object 9 "Zenit"**, a Soviet deep-drilling station buried in the Tian Shan
-> mountains, was sealed in 1991. Eleven days ago a mining crew reopened it,
-> and the shafts collapsed behind them.
->
-> You are **Nur Kanybekov**, a structural engineer. You wake up on the deepest
-> sublevel with a pistol that isn't yours and a flashlight with a dying
-> battery. The only thing that still works is the radio, and there is a calm
-> voice on it telling you the way up.
->
-> The things in the dark can't see. They don't need to.
-
 ## Contents
 
-1. [Overview](#overview)
-2. [Playing](#playing)
-3. [Online co-op](#online-co-op)
-4. [Saves and cloud sync](#saves-and-cloud-sync)
-5. [Game systems](#game-systems)
-6. [Architecture](#architecture)
-7. [Development](#development)
-8. [Credits](#credits)
-9. [Roadmap](#roadmap)
-10. [License and author](#license-and-author)
+- [What's in the game](#whats-in-the-game)
+- [How to play](#how-to-play)
+- [Co-op](#co-op)
+- [Saves](#saves)
+- [How it works](#how-it-works)
+- [Running it yourself](#running-it-yourself)
+- [Credits and license](#credits-and-license)
 
-## Overview
+## What's in the game
 
-| Area                   | Summary                                                                                                                                                  |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Campaign**           | Ten hand-built levels, a story told over the radio, notes left by survivors, two endings, a three-phase boss.                                            |
-| **Online co-op**       | Two players join with a five-character room code. No accounts, no install, no game server.                                                               |
-| **Stealth**            | Every step makes noise and the flashlight gives you away. Nine creature types, each designed to break a habit.                                           |
-| **Difficulty**         | Five modes, from Story to **Aizi**: more creatures, less ammunition and one life.                                                                        |
-| **Sound**              | Recorded weapons and creatures, 3D positioning, walls that muffle, and adaptive music that tightens as they close in.                                    |
-| **Built from scratch** | TypeScript and Three.js, with only a matchmaking client and Firebase sign-in besides. Creatures, characters, music and most sound are generated in code. |
-| **Saves**              | Automatic local saves, optional Google sign-in with cloud sync, and save files to move progress by hand.                                                 |
-| **Tested**             | 179 unit tests, every level machine-checked to be completable, a bot that plays the campaign, a two-browser co-op test.                                  |
+- A campaign of ten hand-built levels with a story told over the radio,
+  notes from the people who were there before you, a three-phase boss and two
+  endings.
+- Stealth that actually matters. Every step makes noise, sprinting and wading
+  make more, and your flashlight lets creatures spot you from twice as far.
+- Nine kinds of creature, each designed to break a habit the previous one
+  taught you: one that only hears, one that freezes in your light, one that
+  waits on the ceiling, one that imitates the voice on the radio.
+- Three weapons, silent takedowns from behind, and medkits you carry and use
+  when you choose.
+- Online co-op for two players with a room code. No accounts or installs.
+- An inventory with your gear, a journal of every note you've found, and a
+  log of the radio.
+- Three character looks, five difficulty modes, cloud saves, full gamepad
+  support, rebindable controls and accessibility options.
 
-## Playing
+## How to play
 
-**[Open the game](https://nurmuhammedkanybekov.github.io/remnant/)**, press any key and choose **New Game**.
+Open the game in a desktop browser, press any key and choose New Game.
+Headphones help a lot, because most threats are heard before they are seen.
 
-The goal is to climb from Sublevel 10 to the surface: find keycards, restore
-power and follow the radio, without believing everything it says. Killing
-creatures is optional, and often a bad idea.
+| Action                | Keyboard and mouse | Gamepad  |
+| --------------------- | ------------------ | -------- |
+| Move / look           | WASD / mouse       | Sticks   |
+| Fire / reload         | Left click / R     | RT / X   |
+| Sprint / crouch       | Shift / C          | LT / B   |
+| Flashlight            | F                  | LB       |
+| Use, hold to revive   | E                  | A        |
+| Melee or takedown     | V or right click   | RB       |
+| Medkit                | H                  | D-pad up |
+| Switch weapon         | 1 2 3, Q or wheel  | Y        |
+| Inventory and journal | Tab or I           | View     |
+| Pause                 | Esc                | Menu     |
 
-### Controls
-
-| Action                | Keyboard and mouse | Gamepad     |
-| --------------------- | ------------------ | ----------- |
-| Move                  | W A S D / arrows   | Left stick  |
-| Look                  | Mouse              | Right stick |
-| Fire                  | Left click         | RT          |
-| Reload                | R                  | X           |
-| Sprint (loud)         | Shift              | LT          |
-| Crouch (quiet)        | C / Ctrl           | B           |
-| Flashlight            | F                  | LB          |
-| Use / hold to revive  | E                  | A           |
-| Melee / takedown      | V / right click    | RB          |
-| Use a medkit          | H                  | D-pad up    |
-| Switch weapon         | 1 2 3 / Q / wheel  | Y           |
-| Inventory and journal | Tab / I            | View        |
-| Pause                 | Esc                | Menu        |
-
-Every keyboard and mouse action can be rebound under **Controls**.
+All keyboard and mouse controls can be rebound in the Controls menu.
 
 ### Difficulty
 
-| Mode          | For                                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------------- |
-| **Story**     | The plot. The fewest creatures, slow to notice you, soft hits.                                          |
-| **Normal**    | The intended experience. Extra creatures on every level; they hit hard and run fast once they find you. |
-| **Nightmare** | More than twice the creatures, sharper senses, scarce supplies.                                         |
-| **Ironman**   | Normal balance with one life for the whole campaign.                                                    |
-| **Aizi**      | Beyond Nightmare on every axis, the fewest supplies, and one life. Death ends the run.                  |
+- **Story**: for the plot. Few creatures, and they are slow to notice you.
+- **Normal**: how I meant it to be played. More creatures, and they hit hard.
+- **Nightmare**: more than twice the creatures, sharper senses, scarce ammo.
+- **Ironman**: Normal, but with one life for the whole campaign.
+- **Aizi**: harder than Nightmare in every way, the fewest supplies, and one
+  life. If you die, the run is over.
 
-The exact numbers are in [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md#difficulty-contentdifficultyts).
+The exact numbers for each mode are in the
+[design document](docs/GAME_DESIGN.md#difficulty-contentdifficultyts).
 
-### Inventory
+### Inventory and character
 
-<img src="docs/screenshots/inventory.jpg" alt="The inventory's journal tab, showing a recovered note" width="100%">
+<img src="docs/screenshots/inventory.jpg" alt="The journal in the inventory" width="100%">
 
-**Tab** (or **I**) opens the inventory. It has three tabs:
+Tab opens the inventory. The Equipment tab shows your health, battery,
+medkits, keycard and ammo for each weapon. The Journal keeps every note you
+have picked up, across all your runs, and the Radio log has everything said
+on the current level.
 
-- **Equipment:** health, flashlight battery, medkits, the keycard, every
-  weapon with its magazine and reserve ammunition, and the current
-  objective. A medkit can be used from here.
-- **Journal:** every note you have found, across all your runs, to read
-  again at any time.
-- **Radio log:** everything said on the radio on this level.
+In Settings you can pick how you look: a light-skinned man, a dark-skinned
+man or a woman. It changes your hands in first person, and it is how your
+partner sees you in co-op.
 
-The game pauses while the inventory is open, except in co-op, where the
-world keeps going.
+## Co-op
 
-### Character
+<img src="docs/screenshots/coop-lobby.jpg" alt="The co-op lobby showing a room code" width="100%">
 
-Under **Settings → Character**, choose how you look: a light-skinned man, a
-dark-skinned man or a woman. The look is cosmetic. It sets the skin tone of
-your own hands, and in co-op it is how your partner sees you.
+One player opens Co-op, chooses Host a Game and gets a five-letter room code.
+The other chooses Join a Game and types it in. That's all.
 
-## Online co-op
+When you play together, both of you are hunted, and there are more creatures
+than in solo play. If your health runs out you go down instead of dying, and
+your partner has 45 seconds to reach you and hold E to revive you. Keycards,
+doors, generators and checkpoints are shared, and you leave each level
+together. If one of you leaves, the host keeps playing.
 
-<img src="docs/screenshots/coop-lobby.jpg" alt="The co-op lobby with a room code" width="100%">
-
-1. **The host** opens **Co-op → Host a Game**, picks a sublevel and a
-   difficulty, and gets a five-character **room code**.
-2. **The partner** opens **Co-op → Join a Game** and types the code.
-3. The host presses **Start**.
-
-What changes in co-op:
-
-- **The creatures hunt you both.** There are more of them and they are
-  tougher. Each goes after whoever is closest and hears both of you, and
-  either flashlight freezes a Watcher.
-- **Nobody dies alone.** At zero health you go **down**, and your partner has
-  45 seconds to reach you and **hold E** to get you back up. If you are both
-  down, the level restarts for both from the last checkpoint.
-- **Progress is shared.** One keycard opens the doors for both of you.
-  Generators, intercoms, story events and checkpoints happen for both, and
-  you leave each level together.
-- **Your partner is really there**, in their chosen look, with a headlamp
-  that lights the corridor for you. Their gunshots and footsteps come from
-  where they are, and their health is on your HUD.
-- If your partner leaves, the host carries on alone.
-
-### Connection
-
-The two browsers find each other through a free matchmaking service
-([Metered Realtime](https://www.metered.ca/)) and then connect **directly**,
-which works on almost all home networks. Some strict networks (school,
-office, some mobile data) block direct connections between browsers. For
-those, the game falls back automatically to a free **relay** that the
-matchmaking service provides. The lobby shows which kind of connection you
-got, and every co-op screen shows the build number, so both players can
-confirm they are on the same version.
-
-| Message                                 | What to do                                                                     |
-| --------------------------------------- | ------------------------------------------------------------------------------ |
-| _No game with that code_                | Check the code with the host. Codes never contain 0, O, 1, I or L.             |
-| _A different version of REMNANT_        | Both players refresh the page; one of you has an older copy cached.            |
-| _That game already has two players_     | Ask the host to open a new room.                                               |
-| _Couldn't reach the matchmaking server_ | Check your connection and try again.                                           |
-| _Couldn't connect to the other player_  | The screen lists the last connection steps; try again, or add a relay (below). |
+The browsers find each other through a free matchmaking service and then
+connect directly. On networks that block direct connections (some schools,
+offices and mobile carriers) the game switches to a relay automatically.
 
 <details>
-<summary><b>Adding your own relay (optional, about 3 minutes, no credit card)</b></summary>
+<summary>Troubleshooting and adding your own relay</summary>
 
-The relay is [Metered's Open Relay](https://www.metered.ca/tools/openrelay/),
-free for 20 GB a month. A two-player game uses roughly 30 to 40 MB an hour.
+| You see                                | Try this                                                               |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| "No game with that code"               | Check the code. Codes never use 0, O, 1, I or L.                       |
+| "A different version of REMNANT"       | Both players refresh the page. The build number is on every screen.    |
+| "That game already has two players"    | The host opens a new room.                                             |
+| "Couldn't connect to the other player" | The screen shows the last connection steps. Try again, or add a relay. |
 
-1. Sign up at [metered.ca/tools/openrelay](https://www.metered.ca/tools/openrelay/).
-   Your app gets a domain such as `remnant.metered.live`.
-2. In the Metered dashboard, open your TURN project, choose
-   **Manage TURN Credentials → Add Credential**, then **Show API Key** next to
-   the new credential and copy it. Other keys in the dashboard (the
-   `pk_live_` key or the secret key) are refused by the relay.
-3. In this repository on GitHub, open **Settings → Secrets and variables →
-   Actions → Variables → New repository variable** and add:
-   - `METERED_APP`: your app domain, for example `remnant.metered.live`
-   - `METERED_API_KEY`: the credential's API key from step 2
+The game already gets a relay from the matchmaking service. If you want your
+own, [Metered's Open Relay](https://www.metered.ca/tools/openrelay/) is free
+for 20 GB a month, which is hundreds of hours of play:
 
-   Saving them as **Secrets** also works.
+1. Sign up and create a TURN project. Your app gets a domain such as
+   `remnant.metered.live`.
+2. Under Manage TURN Credentials, add a credential and copy its API key.
+   (The `pk_live_` key and the secret key won't work for this.)
+3. In the GitHub repository, go to Settings, Secrets and variables, Actions,
+   Variables, and add `METERED_APP` (the domain) and `METERED_API_KEY`.
+4. Re-run the Deploy to GitHub Pages workflow. The co-op menu will say
+   "Relay: on".
 
-4. Re-run the deployment: **Actions → Deploy to GitHub Pages → Run workflow**.
-5. Open **Co-op** in the game. It checks the relay and shows **Relay: on**
-   when the key works, or **Relay: key refused** when it does not.
-
-Any other TURN server also works: set `TURN_URLS` (comma-separated),
-`TURN_USERNAME` and `TURN_CREDENTIAL` instead.
+Any other TURN server works too, through `TURN_URLS`, `TURN_USERNAME` and
+`TURN_CREDENTIAL`.
 
 </details>
 
-## Saves and cloud sync
+## Saves
 
-Progress is saved in the browser automatically: at the start of every level,
-at checkpoints, and whenever you find a note or set a best time. The
-**Saves** screen on the main menu adds two ways to take it elsewhere:
+The game saves in your browser at the start of every level and at
+checkpoints. From the Saves screen on the main menu you can also:
 
-- **Cloud sync.** Sign in with Google, and your progress follows you to any
-  browser. Every change uploads a few seconds later, and signing in on a
-  new computer brings your run with it. Nothing is ever lost when two copies
-  meet: unlocks, finished modes, endings and journal notes are combined, each
-  level keeps its best time, and the most recent run is the one you continue.
-  Offline, the game keeps saving locally and catches up later.
-- **Save files.** Export your progress as a small `.json` file and import it
-  on another computer. This works without any account.
+- **Sign in with Google** to keep your progress in the cloud and continue on
+  another computer. Changes upload a few seconds after they happen. When two
+  copies meet, nothing is lost: unlocks, endings and notes are combined, and
+  you continue whichever run you played most recently.
+- **Export and import a save file**, which works without any account.
 
 <details>
-<summary><b>Setting up cloud sync for your copy (free, about 10 minutes, no credit card)</b></summary>
+<summary>Setting up cloud saves on your own copy (free, about 10 minutes)</summary>
 
-Cloud sync runs on [Firebase](https://firebase.google.com/)'s free Spark
-plan: its Google sign-in and one small document per player in its Firestore
-database. A save is a few kilobytes, so the free limits (1 GB stored, 20,000
-writes and 50,000 reads a day) are far beyond what the game needs. It is a
-separate service from any Supabase project you may have.
+Cloud saves use Firebase's free Spark plan, which needs no credit card. A
+save is a few kilobytes, so the free limits are far more than enough.
 
-1. Open the [Firebase console](https://console.firebase.google.com/),
-   choose **Create a project**, give it a name (for example `remnant`), and
-   turn Google Analytics off. The project starts on the free Spark plan.
-2. **Build → Authentication → Get started → Sign-in method → Google →
-   Enable**, pick a support email, and **Save**.
-3. **Authentication → Settings → Authorized domains → Add domain**:
-   `nurmuhammedkanybekov.github.io` (your GitHub Pages domain).
-4. **Build → Firestore Database → Create database**. Pick a location near
-   you and start in **production mode**.
-5. In Firestore, open **Rules**, replace everything with the contents of
-   [`firebase/firestore.rules`](firebase/firestore.rules), and **Publish**.
-   These rules let each player read and write only their own save.
-6. **Project settings** (the gear icon) **→ General → Your apps → Web
-   (`</>`)**. Register an app called `remnant` (no Firebase Hosting needed)
-   and copy two values from the config it shows: `apiKey` and `projectId`.
-7. In this repository on GitHub: **Settings → Secrets and variables →
-   Actions → Variables → New repository variable**. Add
-   `FIREBASE_API_KEY` and `FIREBASE_PROJECT_ID` with those values.
-8. **Actions → Deploy to GitHub Pages → Run workflow**. When it finishes,
-   the Saves screen shows **Sign In with Google**.
+1. In the [Firebase console](https://console.firebase.google.com/), create a
+   project and turn Google Analytics off.
+2. Authentication, Sign-in method: enable **Google**.
+3. Authentication, Settings, Authorized domains: add your GitHub Pages
+   domain, for example `nurmuhammedkanybekov.github.io`.
+4. Firestore Database: create a database in production mode.
+5. Firestore, Rules: paste in [`firebase/firestore.rules`](firebase/firestore.rules)
+   and publish. Each player can then read and write only their own save.
+6. Project settings, General, Your apps: add a Web app and copy `apiKey` and
+   `projectId` from its config. Copy the key exactly; it starts with `AIza`.
+7. In the GitHub repository, add the variables `FIREBASE_API_KEY` and
+   `FIREBASE_PROJECT_ID`, then re-run the Deploy to GitHub Pages workflow.
 
-The web `apiKey` is not a secret: Firebase designs it to ship in the page,
-and the database rules are what protect the data.
+The web API key is meant to be public. The database rules are what protect
+the data.
 
 </details>
 
-## Game systems
+## How it works
 
-### Stealth and survival
-
-- **Everything makes noise.** Walking, sprinting, crouching and wading each
-  carry a different distance, and a HUD meter shows how loud you are.
-  Gunshots carry through walls.
-- **The flashlight is a trade-off.** You see more, but creatures spot you
-  from more than twice as far away. The battery drains, and only pickups
-  recharge it properly.
-- **Scarcity.** No health regeneration, limited ammunition and stamina, and
-  your loadout carries over between levels.
-
-### Creatures
-
-| Creature        | Behaviour                                                                            |
-| --------------- | ------------------------------------------------------------------------------------ |
-| **Husk**        | Fast, fragile hunter.                                                                |
-| **Brute**       | Slow, tough, hits hard. Can't be taken down quietly.                                 |
-| **Listener**    | Blind. The flashlight means nothing to it; every footstep does.                      |
-| **Watcher**     | Freezes while a flashlight is on it, and is extremely fast when it isn't.            |
-| **Crawler**     | Clings upside down to the ceiling and drops on you.                                  |
-| **Spitter**     | Keeps its distance and lobs acid you can sidestep.                                   |
-| **Swarm**       | A pack of rewritten rats: fast, weak, everywhere.                                    |
-| **Mimic**       | Hides and imitates footsteps, pickups and the Operator's voice.                      |
-| **The Remnant** | A three-phase boss with an armoured hide and a core that opens only when it attacks. |
-
-They patrol, investigate what they hear, chase you, lose you and search for
-you. Suspicion builds while you are in view, attacks have a wind-up you can
-dodge, and a quiet melee strike from behind kills outright. Up close they
-show teeth, sunken glowing eyes and bone through the skin; they breathe,
-their jaws chatter while they hunt, and their necks spasm.
-
-### Combat
-
-- **Three weapons:** a sidearm, a nearly silent **rivet gun**, and a pump
-  **shotgun** that loads shell by shell.
-- **Takedowns and shoves:** melee from behind an unaware creature is a
-  silent kill; from the front it buys you a second.
-- **Medkits are carried** (up to three) and used when you choose, which
-  takes time you might not have.
-
-### Campaign
-
-- **Ten levels**, from the infirmary on Sublevel 10 to the surface, each
-  introducing something new: flooded halls, keycard doors, a maze of ducts,
-  generators that draw every creature on the floor, the hive.
-- **A story told over the radio**, with subtitles and a synthesized radio
-  voice, and notes from survivors collected in the journal. **Two endings.**
-- **Checkpoints**, saves, chapter select and best times per level.
-
-### Presentation
-
-- **Photo-scanned materials** (concrete, steel, hazard paint, wood, ceiling
-  tiles) with normal and roughness maps, and the facility's details painted
-  over them in code: panel seams, rivets, kick plates, water damage, blood.
-- **Lighting:** a real flashlight, flickering and dying ceiling lamps,
-  emergency lights, ACES tone mapping, and a post-processing pass with film
-  grain, vignette and damage effects.
-- **Audio:** recorded weapons, footsteps, doors and creature voices, placed in
-  3D with distance falloff, wall muffling and reverb; an ambient drone, a
-  heartbeat at low health, and adaptive music that swells and fades with the
-  danger you are in.
-
-### Options and accessibility
-
-Fully rebindable controls, gamepad support for play and every menu,
-Low/Medium/High graphics, subtitle size, HUD size, a colour-blind friendly
-HUD, reduced camera shake, field of view, sensitivity, invert Y, and separate
-music and master volume.
-
-## Architecture
+The game is a static website with no server of its own. `Game` owns the
+renderer, audio, menus and saves, and runs the main loop. Each attempt at a
+level is a fresh `LevelSession`, so nothing can leak from one attempt into the
+next. Player input is turned into a `PlayerCommand` before it reaches the
+simulation, which is why the same code can be driven by a keyboard, a
+gamepad, a test script or the network.
 
 ```mermaid
 flowchart LR
-    Input["Keyboard, mouse, gamepad"] -- buildCommand --> Cmd["PlayerCommand"]
-    Cmd --> Session
-    subgraph Game["Game (app shell)"]
-        direction TB
-        Menus["Menus, saves, campaign and co-op flow"]
-        Session["LevelSession (one level of gameplay)"]
-    end
-    Content["content/: creatures, weapons, items, difficulty, looks"] --> Session
-    Levels["Text level maps"] -- parseLevel --> Session
-    Session --> World["world/grid: collision, sight, raycasts, paths"]
-    Session --> Services["Renderer, audio, HUD"]
-    Session <-- "WebRTC data channels" --> Partner["Partner's game"]
+    Input["Keyboard, mouse, gamepad"] --> Cmd["PlayerCommand"]
+    Cmd --> Session["LevelSession"]
+    Content["content/ data"] --> Session
+    Levels["Text level maps"] --> Session
+    Session --> World["Collision, sight, pathfinding"]
+    Session --> Output["Renderer, audio, HUD"]
+    Session <--> Partner["Partner's game (WebRTC)"]
 ```
-
-- **`Game`** owns the long-lived services (renderer, audio, UI, saves), runs
-  the main loop and moves between menus, levels and co-op lobbies.
-- **`LevelSession`** is one attempt at one level. It is created fresh every
-  time and discarded afterwards, so no state leaks between levels or retries.
-- **`PlayerCommand`** is the only way player intent reaches the simulation,
-  whether it comes from the keyboard, a gamepad or the headless test harness.
-- **`content/`** is data. Adding a creature means adding a definition; its
-  map glyph works in levels immediately.
 
 ### Co-op networking
 
 ```mermaid
 sequenceDiagram
-    participant H as Host's game
-    participant S as Matchmaking (Metered Realtime)
-    participant G as Guest's game
-    H->>S: join the room's channel
-    G->>S: join; is anyone hosting?
-    G->>S: connection offer (all routes gathered)
-    S->>H: offer
-    H->>S: answer
-    S->>G: answer
-    H-->G: direct WebRTC connection, or through the relay
-    Note over H,G: from here the games talk peer to peer
-    G->>H: my position 20 times a second, actions as requests
-    H->>G: my position, creature snapshots 15 times a second, events
+    participant H as Host
+    participant S as Matchmaking
+    participant G as Guest
+    H->>S: Join the room's channel
+    G->>S: Join and check that a host is there
+    G->>S: Connection offer
+    S->>H: Offer
+    H->>S: Answer
+    S->>G: Answer
+    H-->>G: Direct WebRTC connection, or relay if blocked
+    G->>H: Position 20 times a second, actions as requests
+    H->>G: Position, creature snapshots and events
 ```
 
-The **host runs the world**: creatures, doors, generators, the boss and the
-end of the level. Each player moves their **own** character locally, so
-movement never waits on the network. The guest's creatures are puppets that
-follow the host's snapshots, and the guest's actions go to the host as
-requests. Events travel on a reliable channel and positions on a fast, lossy
-one, where a late packet is worthless anyway.
+The host runs the world: creatures, doors, generators, the boss and the end
+of each level. Each player moves their own character locally, so movement
+never waits for the network. The guest's creatures follow the host's
+snapshots. Events go over a reliable channel and positions over a fast one,
+where a late packet is simply dropped.
 
-The connection is built to survive real networks: the offer and answer are
-re-sent until acknowledged, keep-alive timers run in a worker so background
-tabs are not throttled, every level attempt is numbered so messages from
-before a retry are dropped, and mismatched builds refuse to connect rather
-than drift apart. When a connection fails, the screen shows the last steps
-of the handshake.
+Getting this to work on real home networks took more effort than the rest of
+co-op put together. The handshake is re-sent until it is answered,
+keep-alive timers run in a Web Worker so background tabs don't stall them,
+every level attempt is numbered so old messages can't leak into a retry, and
+two different builds refuse to connect instead of drifting apart.
 
-### Engineering notes
+### A few details I'm happy with
 
-- **A fixed light budget.** Changing the number of lights forces shader
-  recompiles (visible stutter), so a pool of lamp lights is reassigned each
-  frame to the lamps nearest the player, and lights that come and go (muzzle
-  flash, your partner's headlamp) exist from the start at zero intensity.
-- **One grid, many uses.** The same text map drives geometry, circle-versus-
-  grid collision, line of sight, a DDA raycast for bullets and BFS
-  pathfinding.
-- **Levels are verified, not trusted.** A lock-aware validator flood-fills
-  every map and fails the build if an exit, keycard, generator or pickup is
-  unreachable, or a keycard sits behind the door it opens.
-- **Deterministic extra creatures.** Harder difficulties and co-op add
-  creatures by seeded placement (far from the start, spread out, only kinds
-  the story has already introduced), so both co-op players get the same ones.
-- **Saves that can't brick the game.** The save is versioned and validated
-  field by field: old versions are migrated, corrupt values are repaired, and
-  the game runs even when browser storage is blocked.
-- **Logic that runs without a GPU.** Parsing is separate from geometry and
-  the simulation runs on commands, so almost everything is testable in Node.
+- Changing the number of lights in Three.js recompiles shaders and causes a
+  stutter, so the level uses a fixed pool of lights that is reassigned to the
+  lamps nearest the player every frame.
+- One text grid drives the level geometry, collision, line of sight, bullet
+  raycasts and pathfinding.
+- Every level is checked by a validator that fails the build if an exit,
+  keycard or generator can't be reached.
+- Extra creatures on harder difficulties are placed by a seeded algorithm, so
+  both co-op players get exactly the same ones.
+- Saves are versioned and validated field by field. Old saves are migrated,
+  broken values are repaired, and the game still runs if storage is blocked.
 
 ### Project layout
 
 ```
 src/
-├── game/       app shell, level session, co-op partner and its model, saves, loadout, stats
-├── net/        co-op: matchmaking, WebRTC link, relay settings, message protocol, timers
-├── content/    creature, weapon, item, difficulty, character and sound definitions
-├── world/      level format, parser, validator, builder, grid, pathfinding, extra creatures
-├── enemies/    AI state machine, creature bodies, boss, projectiles
-├── player/     commands, movement, flashlight, health
-├── weapons/    weapon logic, first-person viewmodel
-├── core/       renderer, input, gamepad, actions and bindings, settings, quality
-├── fx/         textures, particles
-├── audio/      sound engine, recorded samples, adaptive music
-└── ui/         HUD, menus, inventory, styles
+  game/      app shell, level session, co-op partner, saves
+  net/       matchmaking, WebRTC link, relay, cloud saves, protocol
+  content/   creatures, weapons, items, difficulty, characters
+  world/     level format, parser, validator, builder, grid, pathfinding
+  enemies/   AI, creature bodies, boss, projectiles
+  player/    input commands, movement, flashlight, health
+  weapons/   weapon logic, first-person models
+  core/      renderer, input, gamepad, settings
+  fx/        textures, particles
+  audio/     sound engine, samples, adaptive music
+  ui/        HUD, menus, inventory
 ```
 
-A level is a text map plus a small script:
+Levels are plain text maps with a small script attached:
 
 ```ts
 map: [
   "############",
   "#S.a.D..L.A#", // S start, a trigger, D door, L lamp, A ammo
   "#.####.###.#",
-  "#.Y..E.K.=X#", // Y intercom, E husk, K keycard, = security door, X exit
+  "#.Y..E.K.=X#", // Y intercom, E creature, K keycard, = locked door, X exit
   "############",
 ],
 triggers: {
@@ -440,100 +297,49 @@ triggers: {
 },
 ```
 
-Every system and its tuning values are documented in
-[`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md).
+Every system and its tuning values are written up in
+[docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), the plan and its history in
+[docs/ROADMAP.md](docs/ROADMAP.md), and the story in
+[docs/STORY.md](docs/STORY.md).
 
-## Development
+## Running it yourself
 
-Requires Node.js 18 or newer.
+You need Node.js 18 or newer.
 
 ```bash
 git clone https://github.com/nurmuhammedkanybekov/remnant.git
 cd remnant
 npm install
-npm run dev        # http://localhost:5173
+npm run dev
 ```
 
-| Script             | Description                                        |
-| ------------------ | -------------------------------------------------- |
-| `npm run dev`      | Development server with hot reload                 |
-| `npm run build`    | Typecheck and build a static site into `dist/`     |
-| `npm run preview`  | Serve the production build                         |
-| `npm test`         | Unit tests                                         |
-| `npm run check`    | Typecheck, formatting and tests (what CI runs)     |
-| `npm run format`   | Format everything with Prettier                    |
-| `npm run playtest` | A bot plays the campaign and reports on each level |
+The game is then at http://localhost:5173. Other useful commands:
 
-### Configuration
+- `npm run check` runs the type checker, the formatting check and the tests.
+  CI runs the same thing, and a failure blocks deployment.
+- `npm run build` builds the static site into `dist/`.
+- `npm run playtest` lets a bot play the campaign and report on each level.
+- `node tools/coop/run.mjs` opens two browsers and plays through a co-op
+  session: joining with a code, shared doors and pickups, reviving, retrying,
+  finishing a level together and leaving.
 
-The deployed build reads these optional GitHub repository variables (or
-secrets). None are required.
+There are 179 unit tests covering level validation, collision, pathfinding,
+movement, weapons, creature AI, co-op, save merging and cloud sync, settings
+and more. Adding `?debug` to the URL exposes test hooks on `window.game`.
 
-| Variable                                        | Purpose                                                                     |
-| ----------------------------------------------- | --------------------------------------------------------------------------- |
-| `METERED_APP`, `METERED_API_KEY`                | Your own Metered relay (see [Online co-op](#online-co-op)).                 |
-| `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` | Any other TURN relay.                                                       |
-| `METERED_REALTIME_KEY`                          | A different matchmaking key; `off` uses a PeerJS server instead.            |
-| `FIREBASE_API_KEY`, `FIREBASE_PROJECT_ID`       | Cloud saves (see [Saves and cloud sync](#saves-and-cloud-sync)).            |
-| `FIREBASE_AUTH_DOMAIN`                          | Only if sign-in should use a domain other than `<project>.firebaseapp.com`. |
+Every push to `main` is checked and deployed to GitHub Pages. The optional
+repository variables are the relay and cloud save settings described above.
 
-For testing, `?debug` exposes test hooks on `window.game`, and
-`?signal=wss://…/peerjs` uses your own
-[PeerJS server](https://github.com/peers/peerjs-server) for matchmaking.
+## Credits and license
 
-### Testing
+Recorded sound effects come from [Freesound](https://freesound.org) and
+surface textures from [ambientCG](https://ambientcg.com), all released into
+the public domain (CC0). The full lists are in
+[public/sfx/CREDITS.md](public/sfx/CREDITS.md) and
+[public/textures/CREDITS.md](public/textures/CREDITS.md). Thanks to everyone
+who shares their work for free.
 
-- **Unit tests** (Vitest, 179): level parsing and validation, collision,
-  raycasts, pathfinding, movement, weapons, creature AI run headlessly
-  (blindness, light-freezing, ceiling drops, spitting, lures, takedowns, the
-  boss's phases), co-op targeting and snapshots, extra creature placement,
-  matchmaking against a fake service, cloud sync against a fake cloud, save merging, room codes, relay settings, loadouts,
-  the inventory, bindings, settings and save migration. **Every level is
-  checked to be completable.**
-- **Playtest bot** (`npm run playtest`): plays the campaign in a real browser
-  and reports time, deaths, damage, kills and ammunition per level.
-- **Co-op end to end** (`tools/coop/run.mjs`): two real browsers go through
-  the menus with a room code and check shared doors and pickups, the guest's
-  shots killing the host's creature, character looks, down and revive, wipe
-  and retry, leaving together and a partner leaving, directly or through a
-  relay.
-- **CI** runs the typecheck, formatting check and tests on every push; a
-  failing check blocks deployment to GitHub Pages.
+The code is released under the [MIT License](LICENSE).
 
-## Credits
-
-Creatures, characters, levels, music and most sound effects are generated in
-code. Two kinds of recorded material are used where code can't match them,
-both public domain (CC0) and each with a generated fallback:
-
-- **Sound effects** (weapons, footsteps, doors, voices) from
-  [Freesound](https://freesound.org) contributors; see
-  [`public/sfx/CREDITS.md`](public/sfx/CREDITS.md).
-- **Surface materials** (concrete, steel, wood, ceiling tiles) from
-  [ambientCG](https://ambientcg.com); see
-  [`public/textures/CREDITS.md`](public/textures/CREDITS.md).
-
-## Roadmap
-
-| Phase                                                           | Status |
-| --------------------------------------------------------------- | ------ |
-| 1. Foundations                                                  | Done   |
-| 2. Campaign: ten levels, radio dialogue, endings                | Done   |
-| 3. Creatures, melee, more weapons                               | Done   |
-| 4. Adaptive music, interface, gamepad                           | Done   |
-| 5. Cloud saves (Google sign-in) and save files                  | Done   |
-| 6. Two-player online co-op                                      | Done   |
-| 7. Aizi mode, inventory and journal, character looks, creatures | Done   |
-
-Details are in [`docs/ROADMAP.md`](docs/ROADMAP.md); the story bible is
-[`docs/STORY.md`](docs/STORY.md).
-
-## License and author
-
-Released under the [MIT License](LICENSE). The CC0 sounds and textures are in
-the public domain.
-
-**Nurmuhammed Kanybekov**, Computer Science student at ELTE (Eötvös Loránd
-University), Budapest. REMNANT is a project to go beyond backend work into
-real-time rendering, game AI, audio, networking and performance, in one
-codebase built from scratch.
+Made by **Nurmuhammed Kanybekov**, a Computer Science student at ELTE (Eötvös
+Loránd University) in Budapest.
