@@ -21,9 +21,10 @@ In 1991 the Soviet deep-drilling station Object 9 "Zenit" was sealed and
 forgotten under the Tian Shan mountains. Eleven days ago a mining crew opened
 it again, and the shafts collapsed behind them.
 
-You play as Nur Kanybekov, a structural engineer who wakes up on the deepest
-sublevel with a pistol that isn't his and a flashlight that is almost dead.
-The radio still works, and a calm voice on it offers to guide you to the
+You are one of three survivors of the crew: Nur Kanybekov, a structural
+engineer; Raiymbek Asanov, a drilling foreman; or Nuraiza Temirbekova, a field
+geologist. You wake up on the deepest sublevel with a pistol that isn't yours
+and a flashlight that is almost dead. The radio still works, and a calm voice on it offers to guide you to the
 surface, 2.4 km above. The things down there are blind, but they hear
 everything.
 
@@ -73,8 +74,12 @@ most of the sound) is generated in code.
 - Online co-op for two players with a room code. No accounts or installs.
 - An inventory with your gear, a journal of every note you've found, and a
   log of the radio.
-- Three character looks, five difficulty modes, cloud saves, full gamepad
-  support, rebindable controls and accessibility options.
+- Three characters to play as. The radio and the notes call you by your own
+  name, and your partner sees you as you are.
+- Five difficulty modes that change how many creatures there are, how hard
+  they hit, and how much ammunition, medicine and battery you find.
+- Cloud saves with Google sign-in, full gamepad support, rebindable controls
+  and accessibility options.
 
 ## How to play
 
@@ -105,10 +110,12 @@ All keyboard and mouse controls can be rebound in the Controls menu.
 - **Aizi**: harder than Nightmare in every way, the fewest supplies, and one
   life. If you die, the run is over.
 
-The exact numbers for each mode are in the
+Harder modes also leave less lying around: Story has about 40% more
+ammunition, medkits and batteries than Normal, Aizi almost half as many, and
+each pickup gives less too. The exact numbers for each mode are in the
 [design document](docs/GAME_DESIGN.md#difficulty-contentdifficultyts).
 
-### Inventory and character
+### Characters and inventory
 
 <img src="docs/screenshots/inventory.jpg" alt="The journal in the inventory" width="100%">
 
@@ -117,9 +124,17 @@ medkits, keycard and ammo for each weapon. The Journal keeps every note you
 have picked up, across all your runs, and the Radio log has everything said
 on the current level.
 
-In Settings you can pick how you look: a light-skinned man, a dark-skinned
-man or a woman. It changes your hands in first person, and it is how your
-partner sees you in co-op.
+You choose who you play when you start a new game (or in the co-op menu):
+
+| Character               | Who they are                                                             |
+| ----------------------- | ------------------------------------------------------------------------ |
+| **Nur Kanybekov**       | Structural engineer on the survey team. Practical, dry, stubborn.        |
+| **Raiymbek Asanov**     | Drilling foreman. Twenty years underground, the calmest man in a crisis. |
+| **Nuraiza Temirbekova** | Field geologist. She mapped these tunnels before anyone else went down.  |
+
+The story is the same for all three, but the voice on the radio, the notes
+and the subtitles use your character's name. Your partner in co-op sees your
+character and their name is on your HUD.
 
 ## Co-op
 
@@ -198,6 +213,42 @@ save is a few kilobytes, so the free limits are far more than enough.
 
 The web API key is meant to be public. The database rules are what protect
 the data.
+
+</details>
+
+<details>
+<summary>Backing up the cloud saves (free, automatic)</summary>
+
+Firestore's own scheduled backups need a paid plan, so the repository backs
+the saves up itself. The [Back up cloud saves](.github/workflows/backup.yml)
+workflow runs every day, reads every save, encrypts the file with a
+passphrase only you know, and keeps it for 90 days as a download on that
+workflow run. The repository is public, and the encryption is what keeps
+players' saves private.
+
+To switch it on:
+
+1. Firebase console, Project settings, **Service accounts**, **Generate new
+   private key**. This downloads a JSON file. Keep it secret.
+2. In the GitHub repository, add two **secrets** (not variables):
+   `FIREBASE_SERVICE_ACCOUNT` with the whole contents of that JSON file, and
+   `BACKUP_PASSPHRASE` with a long passphrase. Write the passphrase down
+   somewhere safe; without it the backups can't be opened.
+3. Actions, **Back up cloud saves**, **Run workflow** to take the first
+   backup straight away. After that it runs every night by itself.
+
+To use a backup, download the artifact from a workflow run, unzip it, and:
+
+```bash
+export BACKUP_PASSPHRASE="your passphrase"
+node tools/backup/firestore.mjs decrypt remnant-saves-2026-09-27.enc.json > saves.json
+
+# put every save back into Firestore (needs FIREBASE_SERVICE_ACCOUNT too)
+node tools/backup/firestore.mjs restore remnant-saves-2026-09-27.enc.json --yes
+```
+
+Players also keep their own copy: the save in their browser, and any save
+file they export.
 
 </details>
 
@@ -323,7 +374,7 @@ The game is then at http://localhost:5173. Other useful commands:
   session: joining with a code, shared doors and pickups, reviving, retrying,
   finishing a level together and leaving.
 
-There are 179 unit tests covering level validation, collision, pathfinding,
+There are 195 unit tests covering level validation, collision, pathfinding,
 movement, weapons, creature AI, co-op, save merging and cloud sync, settings
 and more. Adding `?debug` to the URL exposes test hooks on `window.game`.
 

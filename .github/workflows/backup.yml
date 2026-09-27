@@ -1,0 +1,34 @@
+name: Back up cloud saves
+
+# Firestore's own backups need a paid plan; this does it for free. Once a day
+# it reads every cloud save, encrypts the file with BACKUP_PASSPHRASE, and
+# keeps it as an artifact of this run for 90 days. Until the two secrets
+# below are set, it does nothing. See README, "Backing up the cloud saves".
+on:
+  schedule:
+    - cron: "17 3 * * *" # every day at 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Read and encrypt every save
+        run: node tools/backup/firestore.mjs backup
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      - name: Keep the backup for 90 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: remnant-saves-${{ github.run_id }}
+          path: backups/
+          retention-days: 90
+          if-no-files-found: ignore

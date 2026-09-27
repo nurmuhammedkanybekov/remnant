@@ -21,8 +21,11 @@ In the present day, a private mining consortium reopened Zenit to strip it for
 rare earth metals. Forty-one contractors went down. Eleven days ago the
 shafts collapsed.
 
-**You** are **Nur Kanybekov**, a structural engineer on the consortium's survey
-crew. You wake up in the infirmary on **Sublevel 10**, the deepest level, with
+**You** are one of three survivors of the consortium's crew, chosen when a
+game starts: **Nur Kanybekov**, a structural engineer on the survey team;
+**Raiymbek Asanov**, a drilling foreman; or **Nuraiza Temirbekova**, a field
+geologist. The script is written for Nur, and every line, note and subtitle
+is told to whoever is playing (`personalise` in `content/characters.ts`). You wake up in the infirmary on **Sublevel 10**, the deepest level, with
 a head wound, a pistol that isn't yours and a flashlight with a dying battery.
 The only thing that works is a wall radio, and there's a voice on it.
 
@@ -30,13 +33,15 @@ The only thing that works is a wall radio, and there's a voice on it.
 
 ## Characters
 
-| Name                | Role                                                                                                                                    |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Nur Kanybekov**   | The player. Structural engineer. Practical, dry, stubborn. Never speaks on screen; his voice is in his notes-to-self.                   |
-| **The Operator**    | A calm voice on the facility radio who claims to be a surviving shift supervisor locked in the surface control room. Guides you upward. |
-| **Dr. Lev Arkadin** | Lead researcher of the original 1980s Zenit program. Known only through his logs, which get progressively stranger.                     |
-| **Hendricks**       | Consortium security chief. Carried the Cold Storage keycard. Went into the south freezers and did not come back.                        |
-| **Mara Voss**       | Consortium medic. Leaves notes for anyone following her, always one level ahead of you.                                                 |
+| Name                    | Role                                                                                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Nur Kanybekov**       | A player character. Structural engineer. Practical, dry, stubborn. Speaks only in thoughts, shown as subtitles.                         |
+| **Raiymbek Asanov**     | A player character. Drilling foreman, twenty years underground, the calmest man in any crisis.                                          |
+| **Nuraiza Temirbekova** | A player character. Field geologist who mapped these tunnels before anyone else went down.                                              |
+| **The Operator**        | A calm voice on the facility radio who claims to be a surviving shift supervisor locked in the surface control room. Guides you upward. |
+| **Dr. Lev Arkadin**     | Lead researcher of the original 1980s Zenit program. Known only through his logs, which get progressively stranger.                     |
+| **Hendricks**           | Consortium security chief. Carried the Cold Storage keycard. Went into the south freezers and did not come back.                        |
+| **Mara Voss**           | Consortium medic. Leaves notes for anyone following her, always one level ahead of you.                                                 |
 
 ---
 
