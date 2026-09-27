@@ -295,8 +295,9 @@ and floor tint and lamp colour per level.
 | 10  | Surface — Lift Shaft          | husk, crawler, brute                                   | The choice: leave, or trigger the charges       |
 
 **Part Two, The Valley** (levels 11–17, `src/world/levels/part2/`). New
-Game offers it once Part One has been finished (or reached); finishing
-Part One can also continue straight into it with the same run. Each level
+Game always offers both parts (Part Two is suggested once Part One is done),
+chapter select always has the first level of each part, and finishing Part
+One can continue straight into Part Two with the same run. Each level
 has more creature health to get past than the one before (checked by a
 test), and its own prologue and endings:
 
