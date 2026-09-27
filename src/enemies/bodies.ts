@@ -111,6 +111,22 @@ function fadingEye(glow: THREE.Sprite): THREE.Sprite {
   return glow;
 }
 
+/**
+ * The same fade for a body's own glow (veins, growths, the Spitter's sac):
+ * in the dark it would show the creature from across the room, so it only
+ * shows up close. Measured as the body is drawn, so it lags one frame.
+ */
+class ViewFade {
+  value = 0;
+  agitation = 0;
+
+  constructor(mesh: THREE.Mesh) {
+    mesh.onBeforeRender = (_r, _s, camera) => {
+      this.value = eyeFade(camera.getWorldPosition(camTmp).distanceTo(mesh.getWorldPosition(eyeTmp)), this.agitation);
+    };
+  }
+}
+
 /** A small repeatable random stream, so every creature of a kind grows the same way. */
 function seeded(key: string): () => number {
   let h = 2166136261;
@@ -122,11 +138,11 @@ function seeded(key: string): () => number {
   };
 }
 
-/** Shared vein pulse + hit flash for any flesh material. */
-function applyGlow(skin: THREE.MeshStandardMaterial, veins: THREE.Color, flash: number, agitation: number, time: number): void {
+/** Shared vein pulse + hit flash for any flesh material. `fade` dims the veins (not the hit flash) with distance. */
+function applyGlow(skin: THREE.MeshStandardMaterial, veins: THREE.Color, flash: number, agitation: number, time: number, fade = 1): void {
   const pulse = 0.5 + 0.5 * Math.sin(time * (2 + agitation * 7));
   skin.emissive.copy(veins).lerp(FLASH, flash);
-  skin.emissiveIntensity = 0.05 + agitation * 0.18 + pulse * (0.04 + agitation * 0.2) + flash * 3;
+  skin.emissiveIntensity = (0.05 + agitation * 0.18 + pulse * (0.04 + agitation * 0.2)) * fade + flash * 3;
 }
 
 function limb(parent: THREE.Object3D, mat: THREE.Material, len: number, radius: number, y: number, x = 0): THREE.Group {
@@ -169,6 +185,8 @@ class HumanoidBody implements CreatureBody {
   private eyeAgitation = 0;
   private readonly petals: THREE.Mesh[] = [];
   private readonly sac: THREE.Mesh | null = null;
+  private readonly sacMat: THREE.MeshStandardMaterial | null = null;
+  private readonly viewFade: ViewFade;
   private readonly chest: THREE.Mesh;
   private readonly growths: THREE.MeshStandardMaterial;
   /** Each creature spasms on its own rhythm. */
@@ -231,6 +249,7 @@ class HumanoidBody implements CreatureBody {
     chest.scale.set(1.15 * look.build, 1, 0.75 * Math.sqrt(look.build));
     this.torso.add(chest);
     this.chest = chest;
+    this.viewFade = new ViewFade(chest);
     // Shoulder blades pushing through the skin, and a knotted spine.
     for (const x of [-1, 1]) {
       const blade = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 4), bone);
@@ -310,6 +329,7 @@ class HumanoidBody implements CreatureBody {
       sac.position.set(0, 0.62, 0.17);
       this.torso.add(sac);
       this.sac = sac;
+      this.sacMat = sacMat;
     }
 
     // Head juts forward on a long neck
@@ -458,7 +478,10 @@ class HumanoidBody implements CreatureBody {
   }
 
   glow(flash: number, agitation: number, time: number): void {
-    applyGlow(this.skin, this.veinColor, flash, agitation, time);
+    const fade = this.viewFade.value;
+    this.viewFade.agitation = agitation;
+    applyGlow(this.skin, this.veinColor, flash, agitation, time, fade);
+    if (this.sacMat) this.sacMat.emissiveIntensity = 0.4 * fade;
     const pulse = 0.6 + 0.4 * Math.sin(time * (agitation > 0.5 ? 12 : 3));
     this.eyeAgitation = agitation;
     for (const g of this.eyeGlow) {
@@ -468,7 +491,7 @@ class HumanoidBody implements CreatureBody {
       // Eyes flare when it has you.
       g.scale.setScalar(g.userData.size * (1 + agitation * 0.6));
     }
-    this.growths.emissiveIntensity = 0.25 + agitation * 0.5 + Math.sin(time * 2.1 + this.seed) * 0.12 + flash;
+    this.growths.emissiveIntensity = (0.25 + agitation * 0.5 + Math.sin(time * 2.1 + this.seed) * 0.12) * fade + flash;
   }
 
   pose(p: Pose): void {
@@ -609,6 +632,7 @@ class RatBody implements CreatureBody {
   private readonly legs: THREE.Group[] = [];
   private readonly tail: THREE.Group[] = [];
   private readonly eyeGlow: THREE.Sprite[] = [];
+  private readonly viewFade: ViewFade;
 
   constructor(def: EnemyDef) {
     this.veinColor = new THREE.Color(def.look.veins);
@@ -621,6 +645,7 @@ class RatBody implements CreatureBody {
     body.rotation.x = Math.PI / 2;
     body.scale.set(1, 1, 0.85);
     this.torso.add(body);
+    this.viewFade = new ViewFade(body);
     // Spines where the Remnant has pushed through.
     for (let i = 0; i < 4; i++) {
       const spike = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.07, 4), dark);
@@ -680,7 +705,8 @@ class RatBody implements CreatureBody {
   }
 
   glow(flash: number, agitation: number, time: number): void {
-    applyGlow(this.skin, this.veinColor, flash, agitation, time);
+    this.viewFade.agitation = agitation;
+    applyGlow(this.skin, this.veinColor, flash, agitation, time, this.viewFade.value);
     for (const g of this.eyeGlow) {
       g.userData.base = 0.35 + agitation * 0.55;
       g.userData.agitation = agitation;
