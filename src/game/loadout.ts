@@ -39,11 +39,23 @@ export function startingLoadout(difficulty: DifficultyDef, levelIds: readonly st
 /** The loadout for the next level: what you finished with, plus a breather so a bad run isn't unwinnable. */
 export function carryOver(end: Loadout, difficulty: DifficultyDef): Loadout {
   return {
-    ...end,
-    weapons: cloneWeapons(end.weapons),
+    ...withAmmoFloor(end, difficulty),
     health: Math.max(end.health, difficulty.carryHealthFloor),
     battery: Math.max(end.battery, difficulty.carryBatteryFloor),
   };
+}
+
+/**
+ * Tops the pistol up to the difficulty's floor (magazine + reserve), so an
+ * empty gun at a level's start or a checkpoint can't lock a run into dying
+ * over and over. Never lowers anything.
+ */
+export function withAmmoFloor(l: Loadout, difficulty: DifficultyDef): Loadout {
+  const weapons = cloneWeapons(l.weapons);
+  const pistol = (weapons.pistol ??= { mag: 0, reserve: 0 });
+  const missing = difficulty.carryAmmoFloor - pistol.mag - pistol.reserve;
+  if (missing > 0) pistol.reserve = Math.min(WEAPONS.pistol.reserveMax, pistol.reserve + missing);
+  return { ...l, weapons };
 }
 
 export function cloneLoadout(l: Loadout): Loadout {

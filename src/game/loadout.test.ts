@@ -3,7 +3,7 @@ import { DIFFICULTIES, DIFFICULTY_ORDER } from "../content/difficulty";
 import { MAX_MEDKITS } from "../content/items";
 import { WEAPONS } from "../content/weapons";
 import { LEVELS } from "../world/levels";
-import { carryOver, parseLoadout, startingLoadout, upgradeLegacyLoadout, type Loadout } from "./loadout";
+import { carryOver, parseLoadout, startingLoadout, upgradeLegacyLoadout, withAmmoFloor, type Loadout } from "./loadout";
 
 const ids = LEVELS.map((l) => l.id);
 
@@ -30,11 +30,26 @@ describe("loadout", () => {
     const d = DIFFICULTIES.normal;
     const base: Loadout = { health: 5, battery: 0, medkits: 1, weapons: { pistol: { mag: 3, reserve: 4 } }, current: "pistol" };
     const low = carryOver(base, d);
-    expect(low).toEqual({ ...base, health: d.carryHealthFloor, battery: d.carryBatteryFloor });
+    expect(low).toEqual({
+      ...base,
+      health: d.carryHealthFloor,
+      battery: d.carryBatteryFloor,
+      weapons: { pistol: { mag: 3, reserve: d.carryAmmoFloor - 3 } },
+    });
     expect(low.weapons).not.toBe(base.weapons);
     const high = carryOver({ ...base, health: 90, battery: 80 }, d);
     expect(high.health).toBe(90);
     expect(high.battery).toBe(80);
+  });
+
+  it("tops the pistol up to the difficulty's floor, but never lowers it", () => {
+    const d = DIFFICULTIES.nightmare;
+    const empty: Loadout = { health: 50, battery: 50, medkits: 0, weapons: { pistol: { mag: 0, reserve: 0 } }, current: "pistol" };
+    const topped = withAmmoFloor(empty, d);
+    expect(topped.weapons.pistol).toEqual({ mag: 0, reserve: d.carryAmmoFloor });
+    expect(empty.weapons.pistol!.reserve).toBe(0);
+    const full = { ...empty, weapons: { pistol: { mag: 8, reserve: 30 } } };
+    expect(withAmmoFloor(full, d).weapons.pistol).toEqual({ mag: 8, reserve: 30 });
   });
 
   it("difficulties get harder in order", () => {
@@ -48,7 +63,8 @@ describe("loadout", () => {
     expect(aizi.permadeath).toBe(true);
     for (const k of ["enemyHealth", "enemyDamage", "enemyPerception", "enemySpeed", "extraEnemies", "batteryDrain"] as const)
       expect(aizi[k]).toBeGreaterThan(nightmare[k]);
-    for (const k of ["pickupMultiplier", "startingReserve", "carryHealthFloor"] as const) expect(aizi[k]).toBeLessThan(nightmare[k]);
+    for (const k of ["pickupMultiplier", "startingReserve", "carryHealthFloor", "carryAmmoFloor"] as const)
+      expect(aizi[k]).toBeLessThan(nightmare[k]);
   });
 });
 

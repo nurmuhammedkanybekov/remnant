@@ -30,7 +30,7 @@ import { parseLevel } from "../world/levelParser";
 import { lootFor } from "../world/loot";
 import { reinforcements } from "../world/reinforcements";
 import type { CheckpointState } from "./checkpoint";
-import type { Loadout, WeaponAmmo } from "./loadout";
+import { withAmmoFloor, type Loadout, type WeaponAmmo } from "./loadout";
 import { RadioChannel } from "./radio";
 import type { RadioLine, ScriptAction } from "./script";
 import { isCharacterLook, LOOKS, personalise, type CharacterLook } from "../content/characters";
@@ -195,8 +195,9 @@ export class LevelSession {
     this.radio = new RadioChannel(hud, sound);
     this.objective = def.objective;
 
-    // A checkpoint carries the loadout from the moment it was reached.
-    const start = restore?.loadout ?? loadout;
+    // A checkpoint carries the loadout from the moment it was reached, with
+    // the pistol topped up to the difficulty's floor (a retry after a death).
+    const start = restore ? withAmmoFloor(restore.loadout, difficulty) : loadout;
     this.player = new PlayerController(
       camera,
       this.level,

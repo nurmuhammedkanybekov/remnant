@@ -27,6 +27,8 @@ export interface DifficultyDef {
   /** Health and battery are topped up to at least these between levels. */
   carryHealthFloor: number;
   carryBatteryFloor: number;
+  /** Pistol rounds (magazine + reserve) topped up to at least this between levels and when retrying after a death. */
+  carryAmmoFloor: number;
   /** One life for the whole campaign: death ends the run and deletes the save. */
   permadeath: boolean;
 }
@@ -50,6 +52,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     startingMedkits: 2,
     carryHealthFloor: 70,
     carryBatteryFloor: 50,
+    carryAmmoFloor: 32,
     permadeath: false,
   },
   normal: {
@@ -68,6 +71,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     startingMedkits: 1,
     carryHealthFloor: 40,
     carryBatteryFloor: 30,
+    carryAmmoFloor: 24,
     permadeath: false,
   },
   nightmare: {
@@ -79,13 +83,14 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     enemyPerception: 1.3,
     enemySpeed: 1.2,
     extraEnemies: 1.3,
-    pickupMultiplier: 0.85,
-    lootSupply: 0.85,
+    pickupMultiplier: 1,
+    lootSupply: 1,
     batteryDrain: 1.3,
     startingReserve: 12,
     startingMedkits: 0,
     carryHealthFloor: 25,
     carryBatteryFloor: 20,
+    carryAmmoFloor: 16,
     permadeath: false,
   },
   ironman: {
@@ -104,6 +109,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     startingMedkits: 1,
     carryHealthFloor: 40,
     carryBatteryFloor: 30,
+    carryAmmoFloor: 24,
     permadeath: true,
   },
   aizi: {
@@ -122,6 +128,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     startingMedkits: 0,
     carryHealthFloor: 15,
     carryBatteryFloor: 15,
+    carryAmmoFloor: 8,
     permadeath: true,
   },
 };
