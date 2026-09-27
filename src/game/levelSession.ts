@@ -70,6 +70,12 @@ const REVIVE_HEALTH = 35;
 /** Co-op: more creatures, and tougher ones, for two players. */
 const COOP_EXTRA_ENEMIES = 0.4;
 const COOP_ENEMY_HEALTH = 1.3;
+/**
+ * Co-op: supply pickups (ammo, medkits, batteries) are shared — whoever takes
+ * one, it's gone for both — while there are more, tougher creatures. So a
+ * co-op level has this many times the supplies (seeded, same for both).
+ */
+const COOP_LOOT = 1.8;
 /** Co-op: both players have to be this close to the exit to leave. */
 const EXIT_TOGETHER = 4.5;
 
@@ -226,7 +232,7 @@ export class LevelSession {
     this.boss = this.enemies.boss;
 
     this.pickups = [
-      ...lootFor(this.level, difficulty.lootSupply).map((i) => new Pickup(scene, i.type, i.pos)),
+      ...lootFor(this.level, difficulty.lootSupply * (coop ? COOP_LOOT : 1)).map((i) => new Pickup(scene, i.type, i.pos)),
       ...sp.notes.map((n) => new Pickup(scene, "note", n.pos, n.text, n.key)),
     ];
 
