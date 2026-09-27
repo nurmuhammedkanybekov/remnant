@@ -414,6 +414,16 @@ export class Screens {
     );
   }
 
+  /** Cloud sync, and moving progress with a save file. */
+  saves(tag: string, text: string, items: MenuItem[]): void {
+    this.render(`<h2>SAVES</h2><div class="tag">${esc(tag)}</div><div class="sub">${esc(text)}</div>`, items, true, false, "saves");
+  }
+
+  /** Whether the screen showing is the given one (for screens that refresh themselves). */
+  showing(variant: string): boolean {
+    return this.visible && this.root.classList.contains(variant);
+  }
+
   /** Type in a partner's room code. */
   joinForm(onJoin: (code: string) => void, back: () => void, error = "", value = ""): void {
     this.render(

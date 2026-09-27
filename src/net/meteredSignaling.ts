@@ -72,7 +72,7 @@ export class MeteredSignaling {
   private client: RealtimeClient | null = null;
   private closed = false;
   private everOpened = false;
-  private presenceTimer = 0;
+  private presenceTimer: ReturnType<typeof setTimeout> | 0 = 0;
 
   constructor(
     readonly id: string,

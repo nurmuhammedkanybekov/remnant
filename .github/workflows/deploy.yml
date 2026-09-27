@@ -41,6 +41,10 @@ jobs:
           VITE_TURN_CREDENTIAL: ${{ vars.TURN_CREDENTIAL || secrets.TURN_CREDENTIAL }}
           # Optional: your own Metered Realtime publishable key for matchmaking (the game ships with one).
           VITE_METERED_REALTIME_KEY: ${{ vars.METERED_REALTIME_KEY || secrets.METERED_REALTIME_KEY }}
+          # Cloud saves (optional; see README "Cloud saves").
+          VITE_FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY || secrets.FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID || secrets.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN || secrets.FIREBASE_AUTH_DOMAIN }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
