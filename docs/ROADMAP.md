@@ -153,7 +153,7 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] The Howler: screams when it finds you and calls everything nearby
 - [x] The Choir: the final boss, larger and tougher than the Remnant
 - [x] Its own prologue and two endings; continue into it straight from
-      Part One's ending, or start it from New Game once Part One is done
+      Part One's ending, or start it any time from New Game
 - [x] Saves from the first release keep working; Part One's level indices
       never move
 - [x] Ammunition balanced against Part One (just under it, never starved)

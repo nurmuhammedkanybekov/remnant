@@ -230,7 +230,7 @@ export class Game {
     }
     items.push(
       { label: "New Game", primary: !saved, action: () => this.confirmReplaceRun(() => this.showNewGame()) },
-      { label: "Chapters", disabled: this.save.progress.unlockedLevel === 0, action: () => this.showChapters() },
+      { label: "Chapters", action: () => this.showChapters() },
       { label: "Co-op", detail: "Two players, online", action: () => this.showCoopMenu() },
       {
         label: "Saves",
@@ -345,25 +345,26 @@ export class Game {
     );
   }
 
-  /** Part Two opens once Part One has been finished (or reached) — or always, in ?debug. */
-  private get partTwoOpen(): boolean {
+  /** Has this player finished Part One (or got past it) before? Only changes which part is suggested. */
+  private get partOneDone(): boolean {
     const p = this.save.progress;
-    return this.debug || p.completed.length > 0 || p.unlockedLevel >= PARTS[1].first;
+    return p.completed.length > 0 || p.unlockedLevel >= PARTS[1].first;
   }
 
-  /** New Game: which part (once Part Two is open), then difficulty, character, prologue. */
+  /** New Game: which part, then difficulty, character, prologue. Both parts are always open; Part Two is suggested once Part One is done. */
   private showNewGame(): void {
-    if (!this.partTwoOpen) return this.showDifficulty(0);
+    const done = this.partOneDone;
     this.screens.lobby("NEW GAME", "WHICH STORY", "", [
       {
         label: `${PARTS[0].title}: ${PARTS[0].name}`,
+        primary: !done,
         detail: "The mountain. Sublevel 10 to the surface",
         action: () => this.showDifficulty(0),
       },
       {
         label: `${PARTS[1].title}: ${PARTS[1].name}`,
-        primary: true,
-        detail: "Three weeks later. Seven levels, each worse than the last",
+        primary: done,
+        detail: done ? "Three weeks later. Seven levels, each worse than the last" : "Three weeks later. Best played after Part One",
         action: () => this.showDifficulty(PARTS[1].first),
       },
       { label: "Back", action: () => this.showMainMenu() },
@@ -378,9 +379,9 @@ export class Game {
     );
   }
 
-  /** Can this level be picked in chapter select? Reached before, or the start of an open Part Two. */
+  /** Can this level be picked in chapter select? Reached before, or the start of either part. */
   private chapterOpen(i: number): boolean {
-    return i <= this.save.progress.unlockedLevel || (i === PARTS[1].first && this.partTwoOpen);
+    return i <= this.save.progress.unlockedLevel || PARTS.some((p) => p.first === i);
   }
 
   /** New game: who you play, then the prologue (or the chosen chapter). */
