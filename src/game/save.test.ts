@@ -22,7 +22,14 @@ describe("parseSave", () => {
     const data = {
       version: SAVE_VERSION,
       campaign: { ...campaign, updatedAt: 5 },
-      progress: { unlockedLevel: 1, completed: ["story"], bestTimes: { a: 12 }, endings: ["seal"], notes: ["infirmary:1"] },
+      progress: {
+        unlockedLevel: 1,
+        completed: ["story"],
+        completedTwo: [],
+        bestTimes: { a: 12 },
+        endings: ["seal"],
+        notes: ["infirmary:1"],
+      },
       savedAt: 77,
     };
     expect(parseSave(JSON.parse(JSON.stringify(data)), LEVELS)).toEqual(data);
@@ -59,7 +66,7 @@ describe("parseSave", () => {
     const v1 = {
       version: 1,
       campaign: { ...campaign, loadout: { health: 80, battery: 50, mag: 8, reserve: 16 }, levelIndex: 1, checkpoint: undefined },
-      progress: { unlockedLevel: 1, completed: [], bestTimes: { "sublevel-3": 90, "sublevel-2": 120 } },
+      progress: { unlockedLevel: 1, completed: [], completedTwo: [], bestTimes: { "sublevel-3": 90, "sublevel-2": 120 } },
     };
     const s = parseSave(v1, 10);
     expect(s.campaign!.levelIndex).toBe(2);
@@ -77,7 +84,7 @@ describe("parseSave", () => {
         loadout: { health: 70, battery: 40, mag: 5, reserve: 20 },
         checkpoint: { x: 1, z: 2, yaw: 0, loadout: { health: 70, battery: 40, mag: 5, reserve: 20 }, objective: "Go." },
       },
-      progress: { unlockedLevel: 4, completed: [], bestTimes: {}, endings: [], notes: [] },
+      progress: { unlockedLevel: 4, completed: [], completedTwo: [], bestTimes: {}, endings: [], notes: [] },
     };
     const s = parseSave(v2, 10);
     expect(s.version).toBe(SAVE_VERSION);
@@ -193,13 +200,21 @@ describe("merging two copies of a save (cloud sync, imported files)", () => {
   it("never loses progress: unlocks, finished modes, endings, notes, best times", () => {
     const a = {
       ...emptySave(),
-      progress: { unlockedLevel: 3, completed: ["story" as const], bestTimes: { x: 50, y: 20 }, endings: [], notes: ["a:1"] },
+      progress: {
+        unlockedLevel: 3,
+        completed: ["story" as const],
+        completedTwo: [],
+        bestTimes: { x: 50, y: 20 },
+        endings: [],
+        notes: ["a:1"],
+      },
     };
     const b = {
       ...emptySave(),
       progress: {
         unlockedLevel: 5,
         completed: ["aizi" as const],
+        completedTwo: ["nightmare" as const],
         bestTimes: { x: 40, y: 30 },
         endings: ["seal" as const],
         notes: ["a:1", "b:2"],
@@ -209,6 +224,7 @@ describe("merging two copies of a save (cloud sync, imported files)", () => {
     expect(m.progress).toEqual({
       unlockedLevel: 5,
       completed: ["story", "aizi"],
+      completedTwo: ["nightmare"],
       bestTimes: { x: 40, y: 20 },
       endings: ["seal"],
       notes: ["a:1", "b:2"],
@@ -239,5 +255,25 @@ describe("merging two copies of a save (cloud sync, imported files)", () => {
     expect(other.progress.notes).toEqual(["infirmary:1"]);
     // ...and it was written through, so a reload keeps it.
     expect(new SaveStore(LEVELS).campaign!.levelIndex).toBe(2);
+  });
+
+  it("reads a save from before Part Two, and records Part Two finishes separately", () => {
+    // Exactly what a player of the first release has in their browser: no completedTwo, Part One endings.
+    const old = {
+      version: SAVE_VERSION,
+      campaign: { ...campaign, updatedAt: 5 },
+      progress: { unlockedLevel: 1, completed: ["normal"], bestTimes: { a: 12 }, endings: ["leave"], notes: [] },
+    };
+    const parsed = parseSave(JSON.parse(JSON.stringify(old)), LEVELS);
+    expect(parsed.progress.completedTwo).toEqual([]);
+    expect(parsed.progress.completed).toEqual(["normal"]);
+    expect(parsed.campaign?.levelIndex).toBe(1);
+    // Part Two's endings are valid endings; nonsense isn't.
+    const withTwo = parseSave(
+      { ...old, progress: { ...old.progress, completedTwo: ["aizi"], endings: ["leave", "dawn", "silence", "bogus"] } },
+      LEVELS
+    );
+    expect(withTwo.progress.endings).toEqual(["leave", "dawn", "silence"]);
+    expect(withTwo.progress.completedTwo).toEqual(["aizi"]);
   });
 });

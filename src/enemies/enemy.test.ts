@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { ENEMIES, type EnemyKind } from "../content/enemies";
+import { ENEMIES, enemyDef, type EnemyKind } from "../content/enemies";
 import { cellCenter, type LevelGrid } from "../world/grid";
 import type { CreatureBody } from "./bodies";
 import { RemnantBoss } from "./boss";
@@ -38,7 +38,7 @@ const level = room();
 const scene = new THREE.Scene();
 
 function spawn(kind: EnemyKind, col: number, row = 2): Enemy {
-  const Cls = kind === "remnant" ? RemnantBoss : Enemy;
+  const Cls = enemyDef(kind).behaviour === "boss" ? RemnantBoss : Enemy;
   return new Cls(scene, cellCenter(col, row), kind, NO_MODIFIERS, stubBody());
 }
 
@@ -123,6 +123,32 @@ describe("ranged and ambush creatures", () => {
     expect(shots.length).toBeGreaterThan(0);
     expect(shots[0].x).toBeCloseTo(cellCenter(4, 2).x);
     expect(Math.abs(e.position2D.x - start)).toBeLessThan(1);
+  });
+
+  it("a Howler screams once when it finds you, then not again for a while", () => {
+    const h = spawn("howler", 3);
+    let howls = 0;
+    h.onHowl = () => howls++;
+    // It hears you, turns, sees you: found.
+    run(h, perceive(6, { torchOn: true, playerNoise: 12 }), 3);
+    expect(h.state === "chase" || h.state === "attack").toBe(true);
+    expect(howls).toBe(1);
+    expect(h.lastKnownPosition.distanceTo(cellCenter(6, 2))).toBeLessThan(0.5);
+    // Lose it, find it again soon after: no second scream yet.
+    run(h, perceive(10, { playerDead: true }), 3);
+    run(h, perceive(6, { torchOn: true, playerNoise: 12 }), 3);
+    expect(howls).toBe(1);
+    // ...but a while later it screams again.
+    run(h, perceive(10, { playerDead: true }), 10);
+    run(h, perceive(6, { torchOn: true, playerNoise: 12 }), 3);
+    expect(howls).toBe(2);
+  });
+
+  it("the Choir is a boss like the Remnant, only tougher", () => {
+    const c = spawn("choir", 6);
+    expect(c).toBeInstanceOf(RemnantBoss);
+    expect(ENEMIES.choir.health).toBeGreaterThan(ENEMIES.remnant.health);
+    expect(c.canBeTakenDown(cellCenter(9, 2))).toBe(false);
   });
 
   it("a Mimic stays hidden and lures, then ambushes up close", () => {

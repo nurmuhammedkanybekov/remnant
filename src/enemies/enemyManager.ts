@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { EnemyKind } from "../content/enemies";
+import { enemyDef, type EnemyKind } from "../content/enemies";
 import { RemnantBoss } from "./boss";
 import { Enemy, NO_MODIFIERS, type EnemyModifiers, type Perception } from "./enemy";
 import { hasLineOfSight, type LevelGrid } from "../world/grid";
@@ -28,7 +28,9 @@ export class EnemyManager {
 
   private add(kind: EnemyKind, pos: THREE.Vector2): Enemy {
     const e =
-      kind === "remnant" ? new RemnantBoss(this.scene, pos, kind, this.modifiers) : new Enemy(this.scene, pos, kind, this.modifiers);
+      enemyDef(kind).behaviour === "boss"
+        ? new RemnantBoss(this.scene, pos, kind, this.modifiers)
+        : new Enemy(this.scene, pos, kind, this.modifiers);
     this.enemies.push(e);
     return e;
   }

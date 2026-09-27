@@ -26,9 +26,11 @@ export interface DepthEntry {
 }
 
 export interface LevelCard {
-  /** 0-based position in the campaign. */
+  /** 0-based position within its part (for the gauge). */
   index: number;
   name: string;
+  /** The big number on the card; defaults to the number in the name ("Sublevel 10"). */
+  number?: number;
   subtitle: string;
   tagline: string;
   objective: string;
@@ -218,7 +220,7 @@ export class Screens {
   levelCard(card: LevelCard, onBegin: () => void): void {
     this.render(
       `<div class="card-body">
-         <div class="depth-no">${(card.name.match(/\d+/)?.[0] ?? "0").padStart(2, "0")}</div>
+         <div class="depth-no">${String(card.number ?? card.name.match(/\d+/)?.[0] ?? "0").padStart(2, "0")}</div>
          <div class="card-text">
            <div class="card-name">${esc(card.name.toUpperCase())}</div>
            <div class="card-sub">${esc(card.subtitle.toUpperCase())}</div>
