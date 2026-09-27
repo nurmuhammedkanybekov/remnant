@@ -65,9 +65,14 @@ export function reinforcements(level: ParsedLevel, amount: number): EnemySpawn[]
   return out;
 }
 
-/** Walking distance in cells from the start to every reachable floor cell (doors count as open). */
+/**
+ * Walking distance in cells from the start to every reachable floor cell.
+ * Doors count as open (in the grid a closed door is solid, which would stop
+ * the search at the first one and pile everything up near the start).
+ */
 export function walkingDistances(level: ParsedLevel): (number | undefined)[] {
   const dist: (number | undefined)[] = new Array(level.cols * level.rows);
+  const doors = new Set(level.spawns.doors.map((d) => d.cell.row * level.cols + d.cell.col));
   const s = level.startCell;
   const queue = [s];
   dist[s.row * level.cols + s.col] = 0;
@@ -82,7 +87,8 @@ export function walkingDistances(level: ParsedLevel): (number | undefined)[] {
     ]) {
       const n = { col: c.col + dc, row: c.row + dr };
       const i = n.row * level.cols + n.col;
-      if (isSolid(level, n.col, n.row) || dist[i] !== undefined) continue;
+      const inside = n.col >= 0 && n.row >= 0 && n.col < level.cols && n.row < level.rows;
+      if (!inside || (isSolid(level, n.col, n.row) && !doors.has(i)) || dist[i] !== undefined) continue;
       dist[i] = d + 1;
       queue.push(n);
     }

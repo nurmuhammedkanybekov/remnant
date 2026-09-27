@@ -391,7 +391,7 @@ The game is then at http://localhost:5173. Other useful commands:
   session: joining with a code, shared doors and pickups, reviving, retrying,
   finishing a level together and leaving.
 
-There are 195 unit tests covering level validation, collision, pathfinding,
+There are 196 unit tests covering level validation, collision, pathfinding,
 movement, weapons, creature AI, co-op, save merging and cloud sync, settings
 and more. Adding `?debug` to the URL exposes test hooks on `window.game`.
 
