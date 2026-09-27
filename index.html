@@ -24,6 +24,15 @@
         background: #000;
         overflow: hidden;
         font-family: "Share Tech Mono", "Courier New", monospace;
+        /* A game, not a page: no text selection, no long-press menus, no dragging images out. */
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      img,
+      canvas {
+        -webkit-user-drag: none;
       }
       #app {
         width: 100vw;
