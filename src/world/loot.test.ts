@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { DIFFICULTIES, DIFFICULTY_ORDER } from "../content/difficulty";
-import { findPath } from "./pathfinding";
 import { isSolid, worldToCell } from "./grid";
 import { parseLevel } from "./levelParser";
 import { LEVELS } from "./levels";
 import { lootFor } from "./loot";
+import { walkingDistances } from "./reinforcements";
 
 const SUPPLY = new Set(["ammo", "shells", "rivets", "medkit", "battery"]);
 const count = (items: { type: string }[], pred: (t: string) => boolean) => items.filter((i) => pred(i.type)).length;
@@ -27,6 +27,7 @@ describe("loot by difficulty", () => {
 
   for (const def of LEVELS) {
     const level = parseLevel(def);
+    const dist = walkingDistances(level);
     it(`${def.id}: keeps keycards, weapons and one of every kind; extras sit on reachable floor`, () => {
       const own = level.spawns.items;
       for (const supply of [0.55, 0.75, 1, 1.4]) {
@@ -37,9 +38,7 @@ describe("loot by difficulty", () => {
         for (const i of items) {
           const c = worldToCell(i.pos.x, i.pos.y);
           expect(isSolid(level, c.col, c.row)).toBe(false);
-          const start = level.spawns.playerStart;
-          if (!own.includes(i) && !own.some((o) => o.pos.equals(i.pos)))
-            expect(findPath(level, start.x, start.y, i.pos.x, i.pos.y).length).toBeGreaterThan(0);
+          if (!own.some((o) => o.pos.equals(i.pos))) expect(dist[c.row * level.cols + c.col]).toBeDefined();
         }
       }
     });
