@@ -134,3 +134,14 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
       your partner in co-op and in your own hands
 - [x] Scarier creatures: teeth and gullet, sunken glowing eyes, bone through
       the skin, growths, claws, breathing, neck spasms, jaw chatter
+
+## Phase 8 — Characters, supplies, backups (done)
+
+- [x] Three named characters (Nur Kanybekov, Raiymbek Asanov, Nuraiza
+      Temirbekova), chosen at New Game or in the co-op menu; the story,
+      notes and subtitles use your name, and your partner's name is on the HUD
+- [x] Supplies on each level depend on the difficulty, not just what each
+      pickup gives
+- [x] Exit on the main menu, back to the silent title screen
+- [x] Free daily encrypted backups of the cloud saves through GitHub Actions,
+      with a restore script
