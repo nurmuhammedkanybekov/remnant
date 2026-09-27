@@ -50,7 +50,7 @@ src/
 │   ├── weapons.ts             Weapon definitions
 │   ├── items.ts               Pickup amounts and glow colours
 │   ├── difficulty.ts          Difficulty modes
-│   └── characters.ts          Character looks (cosmetic)
+│   └── characters.ts          The three player characters: names, looks, voice
 ├── core/
 │   ├── engine.ts              Renderer, tone mapping, post-processing, world + viewmodel scenes
 │   ├── input.ts               Raw keyboard / mouse / wheel / gamepad / pointer-lock state
@@ -182,6 +182,7 @@ Per playing frame, `Game` builds a `PlayerCommand` and calls
 | Enemy sight & hearing                 | ×0.75   | ×1.1    | ×1.3      | ×1.1    | ×1.5    |
 | Enemy chase speed                     | ×0.9    | ×1.1    | ×1.2      | ×1.1    | ×1.3    |
 | Pickup amounts                        | ×1.5    | ×1      | ×0.75     | ×1      | ×0.6    |
+| Supply pickups on each level          | ×1.4    | ×1      | ×0.75     | ×1      | ×0.55   |
 | Flashlight drain                      | ×0.6    | ×1      | ×1.3      | ×1      | ×1.5    |
 | Starting reserve ammo                 | 32      | 16      | 8         | 16      | 6       |
 | Starting medkits                      | 2       | 1       | 0         | 1       | 0       |
@@ -653,12 +654,17 @@ become orange/blue). All validated field by field on load.
 Resolution and film effects apply at once; lights, bump maps and dust from
 the next level loaded.
 
-**Character look** (`content/characters.ts`, Settings → Character): a
-light-skinned man, a dark-skinned man or a woman. Purely cosmetic. It sets
-the skin tone of your own first-person hands, and in co-op it travels with
-your position updates, so your partner sees you as you chose
+**Character** (`content/characters.ts`; chosen at New Game, in the co-op
+menu, or Settings → Playing as): Nur Kanybekov, Raiymbek Asanov or Nuraiza
+Temirbekova. It changes nothing about how the game plays. `personalise()`
+rewrites every radio line, note, the prologue and the menu's intercepted
+transmissions for the chosen character (whole words only: "Nur Kanybekov",
+"structural engineer", "Nur"), your own subtitles carry your first name,
+and recorded pain sounds are pitched to the character's voice. It sets the
+skin tone of your first-person hands, and in co-op it travels with your
+position updates, so your partner sees your character
 (`game/characterModel.ts` builds the figure: face, hair, beard, build,
-coverall colour).
+coverall colour) with your name on their HUD.
 
 ### Gamepad
 
@@ -797,6 +803,21 @@ document and to a save-sized string.
 
 **Save files** (Saves → Export / Import): the save as JSON tagged
 `"game": "REMNANT"`; importing merges it in with the file's run taking over.
+
+**Supplies by difficulty** (`world/loot.ts`): the ammunition, medkit and
+battery pickups on a map are thinned out (Nightmare, Aizi) or added to
+(Story) by the difficulty's `lootSupply`. Removal keeps at least one of each
+kind a level has; additions use the level's own mix, on reachable floor away
+from the start, doors, water and other items. Seeded by level and amount,
+so both co-op players and every checkpoint see the same list. Keycards,
+weapons and notes are never touched. Over the campaign that is 71 / 50 / 46
+/ 37 supply pickups on Story / Normal / Nightmare / Aizi.
+
+**Backups** (`tools/backup/firestore.mjs`, `.github/workflows/backup.yml`):
+once a day a GitHub Action signs in as a Firebase service account, reads
+every document in `saves`, encrypts the file (AES-256-GCM, key from the
+`BACKUP_PASSPHRASE` via scrypt) and keeps it as a 90-day artifact. The same
+script decrypts a backup and restores it.
 
 ## 13. Debug hooks (`?debug`)
 
