@@ -18,6 +18,9 @@ concurrency:
 
 jobs:
   build:
+    # Only main is the live game. A manual run from any other branch (v2 is
+    # tested before release) must never replace what players are playing.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

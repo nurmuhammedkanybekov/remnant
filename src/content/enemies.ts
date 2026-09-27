@@ -33,7 +33,7 @@ export interface EnemyDef {
    */
   light: "sees" | "ignores" | "freezes";
   /** Special behaviour on top of the shared hunt logic. */
-  behaviour?: "ceiling" | "ranged" | "lurker" | "boss";
+  behaviour?: "ceiling" | "ranged" | "lurker" | "howler" | "boss";
   /** Spitters and the boss: a lobbed, dodgeable projectile. */
   ranged?: RangedAttack;
   /** One glyph places this many (swarms). */
@@ -302,6 +302,57 @@ export const ENEMIES = {
     stride: 1,
     voicePitch: 0.4,
     look: { rig: "mass", veins: 0xff6a3a },
+  },
+  howler: {
+    id: "howler",
+    name: "Howler",
+    glyph: "N",
+    health: 70,
+    scale: 1.05,
+    tint: 0x3a2a18,
+    patrolSpeed: 0.9,
+    investigateSpeed: 2.0,
+    chaseSpeed: 3.3,
+    attackRange: 1.35,
+    attackDamage: 14,
+    windup: 0.5,
+    recover: 0.9,
+    hearing: 1.1,
+    sight: 1.25,
+    light: "sees",
+    // The moment it finds you it screams, and everything within earshot comes running.
+    behaviour: "howler",
+    takedown: true,
+    radius: 0.35,
+    stride: 3.4,
+    voicePitch: 1.35,
+    look: { rig: "humanoid", veins: 0xffc23a, build: 0.8, arms: 1.2, legs: 1.1, eyes: 4, skull: "split", hunch: 0.3, sac: true },
+  },
+  choir: {
+    id: "choir",
+    name: "The Choir",
+    glyph: "&",
+    health: 1700,
+    scale: 1.2,
+    tint: 0x3a2240,
+    patrolSpeed: 0,
+    investigateSpeed: 0,
+    chaseSpeed: 0,
+    attackRange: 6.5,
+    attackDamage: 36,
+    windup: 0.85,
+    recover: 1,
+    hearing: 2.2,
+    sight: 1.6,
+    light: "ignores",
+    behaviour: "boss",
+    ranged: { range: 26, minRange: 0, speed: 13, damage: 18, cooldown: 2.8 },
+    takedown: false,
+    armor: 0.3,
+    radius: 2.4,
+    stride: 1,
+    voicePitch: 0.33,
+    look: { rig: "mass", veins: 0xa86aff },
   },
 } as const satisfies Record<string, EnemyDef>;
 
