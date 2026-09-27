@@ -22,7 +22,7 @@ forgotten under the Tian Shan mountains. Eleven days ago a mining crew opened
 it again, and the shafts collapsed behind them.
 
 You are one of three survivors of the crew: Nur Kanybekov, a structural
-engineer; Raiymbek Asanov, a drilling foreman; or Nuraiza Temirbekova, a field
+engineer; Raiymbek Asanov, a drilling foreman; or Nuraiza Akylbek, a field
 geologist. You wake up on the deepest sublevel with a pistol that isn't yours
 and a flashlight that is almost dead. The radio still works, and a calm voice on it offers to guide you to the
 surface, 2.4 km above. The things down there are blind, but they hear
@@ -126,11 +126,11 @@ on the current level.
 
 You choose who you play when you start a new game (or in the co-op menu):
 
-| Character               | Who they are                                                             |
-| ----------------------- | ------------------------------------------------------------------------ |
-| **Nur Kanybekov**       | Structural engineer on the survey team. Practical, dry, stubborn.        |
-| **Raiymbek Asanov**     | Drilling foreman. Twenty years underground, the calmest man in a crisis. |
-| **Nuraiza Temirbekova** | Field geologist. She mapped these tunnels before anyone else went down.  |
+| Character           | Who they are                                                             |
+| ------------------- | ------------------------------------------------------------------------ |
+| **Nur Kanybekov**   | Structural engineer on the survey team. Practical, dry, stubborn.        |
+| **Raiymbek Asanov** | Drilling foreman. Twenty years underground, the calmest man in a crisis. |
+| **Nuraiza Akylbek** | Field geologist. She mapped these tunnels before anyone else went down.  |
 
 The story is the same for all three, but the voice on the radio, the notes
 and the subtitles use your character's name. Your partner in co-op sees your

@@ -60,7 +60,7 @@ export const LOOKS: Record<CharacterLook, LookDef> = {
   woman: {
     id: "woman",
     firstName: "Nuraiza",
-    lastName: "Temirbekova",
+    lastName: "Akylbek",
     role: "field geologist",
     bio: "Field geologist. She mapped these tunnels before anyone else went down.",
     skin: 0xc8957a,
