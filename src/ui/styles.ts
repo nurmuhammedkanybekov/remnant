@@ -149,6 +149,12 @@ const CSS = /* css */ `
 .subtitle.unknown .line { color: #f0c8c0; letter-spacing: 1px; }
 .subtitle.echo .who { color: #d88ab0; }
 .subtitle.echo .line { color: #e8d0dc; font-style: italic; }
+/* ---- no text selection in the game UI (the page-wide rule is in index.html) ---- */
+.screen, .hud { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; cursor: default; }
+/* ...except where copying is the point: typing a room code, and the host's code to send to a friend. */
+.screen input, .screen textarea, .room-code { -webkit-user-select: text; user-select: text; }
+.screen button { -webkit-user-select: none; user-select: none; }
+
 /* ---- screens (menus) ---- */
 .screen { position: absolute; inset: 0; z-index: 10; display: none; flex-direction: column; align-items: center; justify-content: safe center;
   overflow-y: auto; padding: 24px 16px; box-sizing: border-box;
