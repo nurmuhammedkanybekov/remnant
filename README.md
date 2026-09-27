@@ -61,12 +61,16 @@ most of the sound) is generated in code.
 
 ## What's in the game
 
-- A campaign of ten hand-built levels with a story told over the radio,
-  notes from the people who were there before you, a three-phase boss and two
-  endings.
+- A campaign in two parts, 17 hand-built levels in all, with a story told
+  over the radio and notes from the people who were there before you.
+  **Part One, Object 9** climbs the mountain in ten levels to a three-phase
+  boss and two endings. **Part Two, The Valley** follows the Remnant down
+  into the village below and back into the mountain from underneath: seven
+  levels, each harder than the last, a new creature, a final boss and two
+  more endings.
 - Stealth that actually matters. Every step makes noise, sprinting and wading
   make more, and your flashlight lets creatures spot you from twice as far.
-- Nine kinds of creature, each designed to break a habit the previous one
+- Eleven kinds of creature, each designed to break a habit the previous one
   taught you: one that only hears, one that freezes in your light, one that
   waits on the ceiling, one that imitates the voice on the radio.
 - Three weapons, silent takedowns from behind, and medkits you carry and use
