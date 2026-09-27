@@ -40,7 +40,7 @@ most of the sound) is generated in code.
     <td width="50%"><img src="docs/screenshots/creature.jpg" alt="A Brute in the armory, caught in the flashlight"></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/characters.jpg" alt="The three character looks"></td>
+    <td><img src="docs/screenshots/characters.jpg" alt="Nur, Raiymbek and Nuraiza, the three playable characters"></td>
     <td><img src="docs/screenshots/boss.jpg" alt="The Remnant, the boss of Sublevel 2"></td>
   </tr>
   <tr>
@@ -237,15 +237,32 @@ To switch it on:
 3. Actions, **Back up cloud saves**, **Run workflow** to take the first
    backup straight away. After that it runs every night by itself.
 
-To use a backup, download the artifact from a workflow run, unzip it, and:
+There is nothing to do day to day. Once a month it is worth downloading the
+latest backup and keeping it somewhere of your own, because GitHub deletes
+them after 90 days: Actions, Back up cloud saves, the latest run, and the
+file under Artifacts. The file stays encrypted, so it is safe to store
+anywhere.
+
+You only restore if saves are actually lost. From the repository folder,
+with the backup file and the service account key at hand:
 
 ```bash
 export BACKUP_PASSPHRASE="your passphrase"
-node tools/backup/firestore.mjs decrypt remnant-saves-2026-09-27.enc.json > saves.json
+export FIREBASE_SERVICE_ACCOUNT="$(cat path/to/service-account.json)"
 
-# put every save back into Firestore (needs FIREBASE_SERVICE_ACCOUNT too)
+# see what the backup holds (writes nothing)
+node tools/backup/firestore.mjs restore remnant-saves-2026-09-27.enc.json
+
+# write every save back into Firestore
 node tools/backup/firestore.mjs restore remnant-saves-2026-09-27.enc.json --yes
+
+# or just read it as plain JSON (delete the file afterwards)
+node tools/backup/firestore.mjs decrypt remnant-saves-2026-09-27.enc.json > saves.json
 ```
+
+On Windows PowerShell, set the two values with
+`$env:BACKUP_PASSPHRASE = "..."` and
+`$env:FIREBASE_SERVICE_ACCOUNT = Get-Content path\to\service-account.json -Raw`.
 
 Players also keep their own copy: the save in their browser, and any save
 file they export.
