@@ -162,8 +162,10 @@ playing ──health 0──► dead ──Retry──► playing (same level, s
   the single pistol into a multi-weapon loadout and dropped mid-level
   checkpoints, whose indices no longer matched the redesigned levels).
 - **Carry-over**: health, battery, weapons, ammo and medkits carry into the
-  next level, with health and battery topped up to the difficulty's floors so
-  a bad run isn't unwinnable. Starting from a later chapter hands you the
+  next level, with health, battery and pistol ammo topped up to the
+  difficulty's floors so a bad run isn't unwinnable. Retrying from a
+  checkpoint after a death tops the pistol up to the same floor, so an empty
+  gun can't trap you in a loop of deaths. Starting from a later chapter hands you the
   weapons you would have found on the way.
 - If pointer lock is refused (browsers block re-locking right after Esc), the
   HUD shows "CLICK TO RESUME" and clicking the view re-locks.
@@ -174,20 +176,21 @@ Per playing frame, `Game` builds a `PlayerCommand` and calls
 
 ### Difficulty (`content/difficulty.ts`)
 
-|                                       | Story   | Normal  | Nightmare | Ironman | Aizi    |
-| ------------------------------------- | ------- | ------- | --------- | ------- | ------- |
-| Extra creatures per level             | —       | +80%    | +130%     | +80%    | +180%   |
-| Enemy health                          | ×0.7    | ×1      | ×1.35     | ×1      | ×1.6    |
-| Enemy damage                          | ×0.5    | ×1.25   | ×1.75     | ×1.25   | ×2.2    |
-| Enemy sight & hearing                 | ×0.75   | ×1.1    | ×1.3      | ×1.1    | ×1.5    |
-| Enemy chase speed                     | ×0.9    | ×1.1    | ×1.2      | ×1.1    | ×1.3    |
-| Pickup amounts                        | ×1.5    | ×1      | ×0.85     | ×1      | ×0.7    |
-| Supply pickups on each level          | ×1.4    | ×1      | ×0.85     | ×1      | ×0.65   |
-| Flashlight drain                      | ×0.6    | ×1      | ×1.3      | ×1      | ×1.5    |
-| Starting reserve ammo                 | 32      | 16      | 12        | 16      | 8       |
-| Starting medkits                      | 2       | 1       | 0         | 1       | 0       |
-| Health / battery floor between levels | 70 / 50 | 40 / 30 | 25 / 20   | 40 / 30 | 15 / 15 |
-| Lives                                 | ∞       | ∞       | ∞         | **1**   | **1**   |
+|                                        | Story   | Normal  | Nightmare | Ironman | Aizi    |
+| -------------------------------------- | ------- | ------- | --------- | ------- | ------- |
+| Extra creatures per level              | —       | +80%    | +130%     | +80%    | +180%   |
+| Enemy health                           | ×0.7    | ×1      | ×1.35     | ×1      | ×1.6    |
+| Enemy damage                           | ×0.5    | ×1.25   | ×1.75     | ×1.25   | ×2.2    |
+| Enemy sight & hearing                  | ×0.75   | ×1.1    | ×1.3      | ×1.1    | ×1.5    |
+| Enemy chase speed                      | ×0.9    | ×1.1    | ×1.2      | ×1.1    | ×1.3    |
+| Pickup amounts                         | ×1.5    | ×1      | ×1        | ×1      | ×0.7    |
+| Supply pickups on each level           | ×1.4    | ×1      | ×1        | ×1      | ×0.65   |
+| Flashlight drain                       | ×0.6    | ×1      | ×1.3      | ×1      | ×1.5    |
+| Starting reserve ammo                  | 32      | 16      | 12        | 16      | 8       |
+| Starting medkits                       | 2       | 1       | 0         | 1       | 0       |
+| Health / battery floor between levels  | 70 / 50 | 40 / 30 | 25 / 20   | 40 / 30 | 15 / 15 |
+| Pistol ammo floor (levels and retries) | 32      | 24      | 16        | 24      | 8       |
+| Lives                                  | ∞       | ∞       | ∞         | **1**   | **1**   |
 
 **Extra creatures** (`world/reinforcements.ts`) come on top of each level's
 hand-placed ones: that fraction of its own count, a small level counting as four (at most 14 more), plus
