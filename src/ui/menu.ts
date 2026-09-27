@@ -2,7 +2,7 @@ import { ACTIONS, ACTION_LABELS, RESERVED_CODES, keyLabel, rebind, type Action, 
 import { PAD_LAYOUT } from "../core/gamepad";
 import { QUALITY, QUALITY_ORDER } from "../core/quality";
 import { SUBTITLE_SIZES, type Settings } from "../core/settings";
-import { LOOK_ORDER, LOOKS, type CharacterLook } from "../content/characters";
+import { fullName, LOOK_ORDER, LOOKS, type CharacterLook } from "../content/characters";
 import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyId } from "../content/difficulty";
 import type { Ending } from "../content/story";
 import { accuracy, type RunStats } from "../game/stats";
@@ -414,6 +414,23 @@ export class Screens {
     );
   }
 
+  /** Who you play: the three survivors, the current one first in focus. */
+  character(current: CharacterLook, onPick: (look: CharacterLook) => void, back: () => void): void {
+    this.render(
+      `<h2>WHO ARE YOU?</h2><div class="tag">THREE OF THE FORTY-ONE ARE STILL BREATHING</div>`,
+      [
+        ...LOOK_ORDER.map((id) => ({
+          label: fullName(id),
+          detail: LOOKS[id].bio,
+          primary: id === current,
+          action: () => onPick(id),
+        })),
+        { label: "Back", action: back },
+      ],
+      true
+    );
+  }
+
   /** Cloud sync, and moving progress with a save file. */
   saves(tag: string, text: string, items: MenuItem[]): void {
     this.render(`<h2>SAVES</h2><div class="tag">${esc(tag)}</div><div class="sub">${esc(text)}</div>`, items, true, false, "saves");
@@ -474,7 +491,7 @@ export class Screens {
            ${slider("GAMEPAD LOOK SPEED", "padSensitivity", 0.2, 3, 0.05)}
            ${toggle("INVERT LOOK Y", "invertY")}
            <div class="group">CHARACTER</div>
-           ${cycle("YOUR LOOK", "look")}
+           ${cycle("PLAYING AS", "look")}
            <div class="group">AUDIO</div>
            ${slider("VOLUME", "volume", 0, 1, 0.05)}
            ${slider("MUSIC", "musicVolume", 0, 1, 0.05)}
@@ -490,7 +507,7 @@ export class Screens {
            ${toggle("COLOUR-BLIND FRIENDLY HUD", "colorBlind")}
          </section>
        </div>
-       <div class="note-line">Graphics quality fully applies from the next level you load. Your look is what your co-op partner sees.</div>`,
+       <div class="note-line">Graphics quality fully applies from the next level you load. The radio calls you by your character's name, and your co-op partner sees them.</div>`,
       [{ label: "Back", action: back, primary: true }],
       false,
       false,
@@ -518,7 +535,7 @@ export class Screens {
     const cycles: Record<CycleKey, { values: string[]; label: (v: string) => string }> = {
       quality: { values: QUALITY_ORDER, label: (v) => QUALITY[v as keyof typeof QUALITY].name },
       subtitleSize: { values: SUBTITLE_SIZES, label: (v) => v[0].toUpperCase() + v.slice(1) },
-      look: { values: LOOK_ORDER, label: (v) => LOOKS[v as CharacterLook].label },
+      look: { values: LOOK_ORDER, label: (v) => fullName(v as CharacterLook) },
     };
     this.root.querySelectorAll<HTMLButtonElement>("button.cycle").forEach((btn) => {
       const key = btn.dataset.c as CycleKey;

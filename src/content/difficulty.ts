@@ -14,8 +14,10 @@ export interface DifficultyDef {
   enemySpeed: number;
   /** Extra creatures on each level, as a fraction of its own (0.8 = 80% more). See `world/reinforcements.ts`. */
   extraEnemies: number;
-  /** Scales ammo, medkit and battery pickups. */
+  /** Scales what each ammo, medkit and battery pickup gives. */
   pickupMultiplier: number;
+  /** How many ammo, medkit and battery pickups a level has, relative to its map (0.55 = 45% fewer). See `world/loot.ts`. */
+  lootSupply: number;
   /** Scales how fast the flashlight drains. */
   batteryDrain: number;
   /** Reserve ammo at the start of a new campaign. */
@@ -42,6 +44,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     enemySpeed: 0.9,
     extraEnemies: 0,
     pickupMultiplier: 1.5,
+    lootSupply: 1.4,
     batteryDrain: 0.6,
     startingReserve: 32,
     startingMedkits: 2,
@@ -59,6 +62,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     enemySpeed: 1.1,
     extraEnemies: 0.8,
     pickupMultiplier: 1,
+    lootSupply: 1,
     batteryDrain: 1,
     startingReserve: 16,
     startingMedkits: 1,
@@ -76,6 +80,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     enemySpeed: 1.2,
     extraEnemies: 1.3,
     pickupMultiplier: 0.75,
+    lootSupply: 0.75,
     batteryDrain: 1.3,
     startingReserve: 8,
     startingMedkits: 0,
@@ -93,6 +98,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     enemySpeed: 1.1,
     extraEnemies: 0.8,
     pickupMultiplier: 1,
+    lootSupply: 1,
     batteryDrain: 1,
     startingReserve: 16,
     startingMedkits: 1,
@@ -110,6 +116,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
     enemySpeed: 1.3,
     extraEnemies: 1.8,
     pickupMultiplier: 0.6,
+    lootSupply: 0.55,
     batteryDrain: 1.5,
     startingReserve: 6,
     startingMedkits: 0,

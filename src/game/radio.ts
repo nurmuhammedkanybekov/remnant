@@ -1,5 +1,6 @@
 import type { SoundManager, Spatial } from "../audio/soundManager";
 import type { Hud } from "../ui/hud";
+import { personalise } from "../content/characters";
 import { lineDuration, type RadioLine } from "./script";
 
 const GAP = 0.35; // pause between lines
@@ -47,7 +48,9 @@ export class RadioChannel {
     }
     const next = this.queue.shift();
     if (!next) return;
-    const { line, from } = next;
+    const { from } = next;
+    // Written for Nur; spoken to whoever is playing.
+    const line = { ...next.line, text: personalise(next.line.text) };
     this.current = line;
     this.remaining = lineDuration(line.text);
     this.hud.subtitle(line);

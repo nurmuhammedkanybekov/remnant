@@ -27,12 +27,13 @@ import { LampSystem } from "../world/lamps";
 import { buildLevel, type LevelData } from "../world/levelBuilder";
 import type { LevelDef } from "../world/levelDef";
 import { parseLevel } from "../world/levelParser";
+import { lootFor } from "../world/loot";
 import { reinforcements } from "../world/reinforcements";
 import type { CheckpointState } from "./checkpoint";
 import type { Loadout, WeaponAmmo } from "./loadout";
 import { RadioChannel } from "./radio";
 import type { RadioLine, ScriptAction } from "./script";
-import type { CharacterLook } from "../content/characters";
+import { isCharacterLook, LOOKS, personalise, type CharacterLook } from "../content/characters";
 import { RemotePlayer } from "./remotePlayer";
 import { freshStats, type RunStats } from "./stats";
 
@@ -225,7 +226,7 @@ export class LevelSession {
     this.boss = this.enemies.boss;
 
     this.pickups = [
-      ...sp.items.map((i) => new Pickup(scene, i.type, i.pos)),
+      ...lootFor(this.level, difficulty.lootSupply).map((i) => new Pickup(scene, i.type, i.pos)),
       ...sp.notes.map((n) => new Pickup(scene, "note", n.pos, n.text, n.key)),
     ];
 
@@ -1041,7 +1042,7 @@ export class LevelSession {
           this.gotKeycard("KEYCARD ACQUIRED");
           break;
         case "note":
-          if (p.noteText) hud.showNote(p.noteText);
+          if (p.noteText) hud.showNote(personalise(p.noteText));
           if (p.noteKey) {
             this.notesFound.add(p.noteKey);
             this.services.noteRead?.(p.noteKey);
@@ -1449,7 +1450,7 @@ export class LevelSession {
       hasKeycard: this.hasKeycard,
     });
     const r = this.partnerHere ? this.remote?.state : null;
-    hud.partner(r ? { hp: r.hp, down: r.down, bleed: r.bleed } : null);
+    hud.partner(r ? { hp: r.hp, down: r.down, bleed: r.bleed, name: isCharacterLook(r.look) ? LOOKS[r.look].firstName : undefined } : null);
   }
 
   private updateBossBar(): void {

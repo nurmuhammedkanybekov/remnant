@@ -18,11 +18,11 @@ import { firebaseBackend, firebaseConfig } from "../net/firebaseBackend";
 import { describeClose, PeerLink } from "../net/link";
 import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg } from "../net/protocol";
 import { buildCommand, emptyCommand, type PlayerCommand } from "../player/command";
-import { LOOKS } from "../content/characters";
+import { fullName, LOOKS, personalise, setCharacter } from "../content/characters";
 import { MAX_MEDKITS } from "../content/items";
 import { WEAPON_ORDER, WEAPONS } from "../content/weapons";
 import { MAX_BATTERY } from "../player/flashlight";
-import { Hud, SPEAKER_NAMES } from "../ui/hud";
+import { Hud, speakerName } from "../ui/hud";
 import type { InventoryView } from "../ui/inventory";
 import { Screens, type MenuItem } from "../ui/menu";
 import { Viewmodel } from "../weapons/viewmodel";
@@ -180,6 +180,7 @@ export class Game {
 
   /** Settings that change how the HUD and camera behave. */
   private applyDisplaySettings(): void {
+    setCharacter(this.settings.look);
     this.viewmodel.setSkin(LOOKS[this.settings.look].skin);
     this.hud.applyDisplay(this.settings.hudScale, this.settings.subtitleSize);
     this.container.classList.toggle("cb", this.settings.colorBlind);
@@ -196,6 +197,7 @@ export class Game {
     const prompt = this.input.usingPad ? "PRESS A" : touchOnly ? "NEEDS A KEYBOARD AND MOUSE, OR A GAMEPAD" : "PRESS ANY KEY";
     this.screens.title(prompt, () => {
       this.sound.init();
+      this.sound.setPaused(false);
       this.music.setMode("silent");
       this.showMainMenu();
     });
@@ -239,14 +241,15 @@ export class Game {
         },
       },
       { label: "Settings", action: () => this.showSettings(() => this.showMainMenu()) },
-      { label: "Controls", action: () => this.showControls(() => this.showMainMenu()) }
+      { label: "Controls", action: () => this.showControls(() => this.showMainMenu()) },
+      { label: "Exit", detail: "Back to the title screen", action: () => this.exitToTitle() }
     );
     const reached = this.save.progress.unlockedLevel;
     this.screens.main(
       items,
       __APP_VERSION__,
       LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, reached: i <= reached })),
-      TRANSMISSIONS[Math.floor(Math.random() * TRANSMISSIONS.length)]
+      personalise(TRANSMISSIONS[Math.floor(Math.random() * TRANSMISSIONS.length)])
     );
   }
 
@@ -315,6 +318,15 @@ export class Game {
     input.click();
   }
 
+  /** Leave the menus for the silent title screen (a browser tab can't close itself). Progress is already saved. */
+  private exitToTitle(): void {
+    this.coopMenuToken++;
+    this.endCoop();
+    this.music.setMode("silent");
+    this.sound.silence();
+    this.showTitle();
+  }
+
   /** Starting a new run replaces the saved one — ask first. */
   private confirmReplaceRun(proceed: () => void): void {
     if (!this.save.campaign) return proceed();
@@ -329,16 +341,33 @@ export class Game {
 
   private showDifficulty(levelIndex: number): void {
     this.screens.difficulty(
-      (id) => (levelIndex === 0 ? this.showPrologue(id) : this.startCampaign(id, levelIndex)),
+      (id) => this.showCharacter(id, levelIndex),
       () => this.showMainMenu(),
       this.save.progress.completed
     );
   }
 
+  /** New game: who you play, then the prologue (or the chosen chapter). */
+  private showCharacter(difficulty: DifficultyId, levelIndex: number): void {
+    this.screens.character(
+      this.settings.look,
+      (look) => {
+        this.settings.look = look;
+        saveSettings(this.settings);
+        this.applyDisplaySettings();
+        if (levelIndex === 0) this.showPrologue(difficulty);
+        else this.startCampaign(difficulty, levelIndex);
+      },
+      () => this.showDifficulty(levelIndex)
+    );
+  }
+
   private showPrologue(difficulty: DifficultyId): void {
-    this.screens.story(PROLOGUE.title, PROLOGUE.lines, [
-      { label: "Begin", primary: true, action: () => this.startCampaign(difficulty, 0) },
-    ]);
+    this.screens.story(
+      PROLOGUE.title,
+      PROLOGUE.lines.map((l) => personalise(l)),
+      [{ label: "Begin", primary: true, action: () => this.startCampaign(difficulty, 0) }]
+    );
   }
 
   private showChapters(): void {
@@ -442,7 +471,7 @@ export class Game {
       const def = byId.get(levelId);
       const text = def?.notes[ch];
       return def && text
-        ? [{ place: `${def.name} · ${def.subtitle}`, text, fresh: s.notesFound.has(key), order: LEVELS.indexOf(def) }]
+        ? [{ place: `${def.name} · ${def.subtitle}`, text: personalise(text), fresh: s.notesFound.has(key), order: LEVELS.indexOf(def) }]
         : [];
     });
     // Newest level first, so this level's notes are at the top.
@@ -473,7 +502,7 @@ export class Game {
         };
       }),
       notes,
-      radio: [...s.radioLog].reverse().map((l) => ({ who: SPEAKER_NAMES[l.speaker], speaker: l.speaker, text: l.text })),
+      radio: [...s.radioLog].reverse().map((l) => ({ who: speakerName(l.speaker), speaker: l.speaker, text: l.text })),
       healKey: this.services.keyFor("heal"),
       closeKey: this.services.keyFor("inventory"),
       live: this.run!.coop,
@@ -727,6 +756,21 @@ export class Game {
         [
           { label: "Host a Game", primary: true, action: () => this.showCoopChapters() },
           { label: "Join a Game", action: () => this.showJoin() },
+          {
+            label: `Playing as ${fullName(this.settings.look)}`,
+            detail: "Change character",
+            action: () =>
+              this.screens.character(
+                this.settings.look,
+                (look) => {
+                  this.settings.look = look;
+                  saveSettings(this.settings);
+                  this.applyDisplaySettings();
+                  this.showCoopMenu();
+                },
+                () => this.showCoopMenu()
+              ),
+          },
           { label: "Back", action: () => this.showMainMenu() },
         ]
       );
