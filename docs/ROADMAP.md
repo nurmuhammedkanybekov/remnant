@@ -145,3 +145,17 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] Exit on the main menu, back to the silent title screen
 - [x] Free daily encrypted backups of the cloud saves through GitHub Actions,
       with a restore script
+
+## Phase 9 — Part Two: The Valley (in testing on the `v2` branch)
+
+- [x] Seven new levels (11–17) after the mountain, each with more creature
+      health to get past than the one before
+- [x] The Howler: screams when it finds you and calls everything nearby
+- [x] The Choir: the final boss, larger and tougher than the Remnant
+- [x] Its own prologue and two endings; continue into it straight from
+      Part One's ending, or start it from New Game once Part One is done
+- [x] Saves from the first release keep working; Part One's level indices
+      never move
+- [x] Ammunition balanced against Part One (just under it, never starved)
+- [ ] Real outdoor visuals for the valley levels (sky, snow, timber)
+- [ ] Release: merge `v2` into `main` once it has been played through
