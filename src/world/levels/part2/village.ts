@@ -10,14 +10,15 @@ export const VILLAGE: LevelDef = {
   tagline: "Every door is open. Every house is warm.",
   objective: "Find the key to the bus garage.",
   spawnYaw: -Math.PI / 2,
+  // Timber houses and a muddy square under a snow-grey sky: warmer and browner than anything in the mountain.
   theme: {
-    fog: 0x0b0e14,
-    fogDensity: 0.05,
-    wallTint: 0xdcd0bc,
-    floorTint: 0xcfc6b4,
-    lampColor: 0xffd49a,
-    skyLight: 0x707c8c,
-    groundLight: 0x18140e,
+    fog: 0x10141a,
+    fogDensity: 0.045,
+    wallTint: 0xb08a68,
+    floorTint: 0x8f8270,
+    lampColor: 0xffc27a,
+    skyLight: 0x7c8898,
+    groundLight: 0x1a140c,
   },
   map: [
     "##################################",

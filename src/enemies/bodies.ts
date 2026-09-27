@@ -693,8 +693,11 @@ export class MassBody implements CreatureBody {
   open = 0;
   /** Heaves harder as the fight goes on. */
   rage = 0;
+  /** The Choir is the same kind of mass as the Remnant, only bigger. */
+  private readonly size: number;
 
   constructor(def: EnemyDef) {
+    this.size = def.scale;
     this.veinColor = new THREE.Color(def.look.veins);
     this.skin = fleshMaterial(def.tint, def.look.veins);
     this.skin.roughness = 0.35;
@@ -784,14 +787,18 @@ export class MassBody implements CreatureBody {
       parent.add(tip);
       this.tendrils.push({ root, segs, angle, front: Math.abs(angle) < 0.7 });
     }
+    this.group.scale.setScalar(this.size);
   }
 
   hitVolumes(): { head: THREE.Sphere; body: THREE.Sphere[] } {
     return {
-      head: new THREE.Sphere(this.core.getWorldPosition(new THREE.Vector3()), 0.5),
+      head: new THREE.Sphere(this.core.getWorldPosition(new THREE.Vector3()), 0.5 * this.size),
       body: this.lumps
         .slice(0, 4)
-        .map((l) => new THREE.Sphere(l.getWorldPosition(new THREE.Vector3()), (l.geometry as THREE.SphereGeometry).parameters.radius)),
+        .map(
+          (l) =>
+            new THREE.Sphere(l.getWorldPosition(new THREE.Vector3()), (l.geometry as THREE.SphereGeometry).parameters.radius * this.size)
+        ),
     };
   }
 
@@ -839,7 +846,8 @@ export class MassBody implements CreatureBody {
 
   die(k: number): void {
     this.group.position.y = -k * 1.6;
-    this.group.scale.set(1 + k * 0.2, 1 - k * 0.5, 1 + k * 0.2);
+    const s = this.size;
+    this.group.scale.set(s * (1 + k * 0.2), s * (1 - k * 0.5), s * (1 + k * 0.2));
     this.open = 1 - k;
     this.skin.emissiveIntensity = 0.8 * (1 - k);
     this.coreMat.emissiveIntensity = 3 * (1 - k);

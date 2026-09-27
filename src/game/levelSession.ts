@@ -71,7 +71,7 @@ const REVIVE_HEALTH = 35;
 const COOP_EXTRA_ENEMIES = 0.4;
 const COOP_ENEMY_HEALTH = 1.3;
 /** Every creature this close to a Howler's scream comes looking. */
-const HOWL_RADIUS = 24;
+const HOWL_RADIUS = 40;
 /**
  * Co-op: supply pickups (ammo, medkits, batteries) are shared — whoever takes
  * one, it's gone for both — while there are more, tougher creatures. So a
