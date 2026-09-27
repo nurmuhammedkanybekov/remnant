@@ -656,7 +656,7 @@ the next level loaded.
 
 **Character** (`content/characters.ts`; chosen at New Game, in the co-op
 menu, or Settings → Playing as): Nur Kanybekov, Raiymbek Asanov or Nuraiza
-Temirbekova. It changes nothing about how the game plays. `personalise()`
+Akylbek. It changes nothing about how the game plays. `personalise()`
 rewrites every radio line, note, the prologue and the menu's intercepted
 transmissions for the chosen character (whole words only: "Nur Kanybekov",
 "structural engineer", "Nur"), your own subtitles carry your first name,
