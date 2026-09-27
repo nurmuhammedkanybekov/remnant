@@ -13,6 +13,8 @@ import { SaveStore } from "./save";
 import { loadSettings, saveSettings, type Settings } from "../core/settings";
 import type { Enemy } from "../enemies/enemy";
 import { hasRelay, relayState } from "../net/ice";
+import { CloudSync } from "../net/cloud";
+import { firebaseBackend, firebaseConfig } from "../net/firebaseBackend";
 import { describeClose, PeerLink } from "../net/link";
 import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg } from "../net/protocol";
 import { buildCommand, emptyCommand, type PlayerCommand } from "../player/command";
@@ -76,6 +78,9 @@ export class Game {
   private readonly services: SessionServices;
   private readonly settings: Settings = loadSettings();
   private readonly save = new SaveStore(LEVELS.length);
+  private readonly cloud: CloudSync;
+  /** A one-off line for the saves screen ("Save file loaded."). */
+  private savesNote = "";
   private readonly debug = new URLSearchParams(location.search).has("debug");
 
   private state: GameState = "title";
@@ -104,6 +109,15 @@ export class Game {
 
   constructor(container: HTMLElement) {
     this.container = container;
+    const fb = firebaseConfig();
+    this.cloud = new CloudSync(this.save, LEVELS.length, fb ? () => firebaseBackend(fb) : null);
+    this.cloud.onStatus = () => {
+      if (this.screens?.showing("saves")) this.showSaves();
+    };
+    // A run or unlocks arrived from another device: show them.
+    this.cloud.onMerged = () => {
+      if (this.state === "menu" && this.screens.showing("main-menu")) this.showMainMenu();
+    };
     this.engine = new Engine(container);
     this.engine.setFov(this.settings.fov);
     this.engine.setQuality(QUALITY[this.settings.quality]);
@@ -160,6 +174,7 @@ export class Game {
     this.backdrop = new MenuBackdrop(this.engine, LEVELS[1], QUALITY[this.settings.quality]);
     document.getElementById("boot")?.remove();
     this.showTitle();
+    this.cloud.start();
     requestAnimationFrame(this.loop);
   }
 
@@ -215,6 +230,14 @@ export class Game {
       { label: "New Game", primary: !saved, action: () => this.confirmReplaceRun(() => this.showDifficulty(0)) },
       { label: "Chapters", disabled: this.save.progress.unlockedLevel === 0, action: () => this.showChapters() },
       { label: "Co-op", detail: "Two players, online", action: () => this.showCoopMenu() },
+      {
+        label: "Saves",
+        detail: this.cloud.user ? `Cloud: ${this.cloud.user.name}` : this.cloud.available ? "Cloud sync, save files" : "Save files",
+        action: () => {
+          this.savesNote = "";
+          this.showSaves();
+        },
+      },
       { label: "Settings", action: () => this.showSettings(() => this.showMainMenu()) },
       { label: "Controls", action: () => this.showControls(() => this.showMainMenu()) }
     );
@@ -225,6 +248,71 @@ export class Game {
       LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, reached: i <= reached })),
       TRANSMISSIONS[Math.floor(Math.random() * TRANSMISSIONS.length)]
     );
+  }
+
+  /** Cloud sign-in and sync, and exporting / importing a save file. */
+  private showSaves(): void {
+    const c = this.cloud;
+    const lines: string[] = [];
+    const items: MenuItem[] = [];
+    let tag = "ON THIS DEVICE";
+    if (!c.available) {
+      lines.push("Your progress is saved in this browser. To move it to another computer, export a save file and import it there.");
+    } else if (!c.user) {
+      tag = c.status === "connecting" ? "SIGNING IN…" : "NOT SIGNED IN";
+      lines.push(
+        "Sign in to keep your progress in the cloud and carry on from any computer. Your progress is saved in this browser either way."
+      );
+      items.push({ label: "Sign In with Google", primary: true, disabled: c.status === "connecting", action: () => void c.signIn() });
+    } else {
+      tag = `SIGNED IN · ${c.user.name.toUpperCase()}`;
+      lines.push(
+        c.status === "syncing"
+          ? "Syncing…"
+          : c.status === "synced"
+            ? `Saved to the cloud at ${new Date(c.lastSynced).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Every change uploads by itself.`
+            : "Not synced yet. Your progress is safe in this browser and uploads when the cloud is reachable."
+      );
+      items.push(
+        { label: "Sync Now", primary: true, disabled: c.status === "syncing", action: () => void c.syncNow() },
+        { label: "Sign Out", detail: "Progress stays on this device", action: () => void c.signOut() }
+      );
+    }
+    if (c.problem) lines.push(c.problem);
+    if (this.savesNote) lines.push(this.savesNote);
+    items.push(
+      { label: "Export Save File", detail: "Download your progress", action: () => this.exportSave() },
+      { label: "Import Save File", detail: "Load progress from a file", action: () => this.importSave() },
+      { label: "Back", action: () => this.showMainMenu() }
+    );
+    this.screens.saves(tag, lines.join("\n\n"), items);
+  }
+
+  private exportSave(): void {
+    const url = URL.createObjectURL(new Blob([this.save.exportJson()], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `remnant-save-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.savesNote = "Save file downloaded.";
+    this.showSaves();
+  }
+
+  private importSave(): void {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const text = file.size < 1_000_000 ? await file.text().catch(() => "") : "";
+      this.savesNote = this.save.importJson(text)
+        ? "Save file loaded: its run is now yours to continue, and its progress is added to yours."
+        : "That file isn't a REMNANT save.";
+      if (this.screens.showing("saves")) this.showSaves();
+    };
+    input.click();
   }
 
   /** Starting a new run replaces the saved one — ask first. */

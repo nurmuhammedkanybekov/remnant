@@ -15,6 +15,8 @@ export interface SaveData {
   /** The run in progress, checkpointed at the start of each level. */
   campaign: CampaignSave | null;
   progress: Progress;
+  /** When this save last changed (epoch ms; 0 = never). Decides whose run wins when two copies are merged. */
+  savedAt: number;
 }
 
 export interface CampaignSave {
@@ -47,7 +49,12 @@ export const SAVE_VERSION = 3;
 const KEY = "remnant.save";
 
 export function emptySave(): SaveData {
-  return { version: SAVE_VERSION, campaign: null, progress: { unlockedLevel: 0, completed: [], bestTimes: {}, endings: [], notes: [] } };
+  return {
+    version: SAVE_VERSION,
+    campaign: null,
+    progress: { unlockedLevel: 0, completed: [], bestTimes: {}, endings: [], notes: [] },
+    savedAt: 0,
+  };
 }
 
 const num = (v: unknown, fallback = 0) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
@@ -79,6 +86,7 @@ export function parseSave(raw: unknown, levelCount: number): SaveData {
     }
   }
 
+  save.savedAt = Math.max(0, num(root.savedAt, 0));
   const c = obj(root.campaign);
   const loadout = parseLoadout(c?.loadout);
   if (c && loadout && isDifficultyId(c.difficulty)) {
@@ -99,6 +107,32 @@ export function parseSave(raw: unknown, levelCount: number): SaveData {
     }
   }
   return save;
+}
+
+/**
+ * Combines two copies of a save (this device's and the cloud's, or an
+ * imported file). Progress is never lost: unlocks, finished difficulties,
+ * endings and journal notes are joined, and each level keeps its best time.
+ * The run in progress comes from whichever copy changed last — including
+ * "no run", when the newer copy finished or lost it.
+ */
+export function mergeSaves(a: SaveData, b: SaveData): SaveData {
+  const newer = b.savedAt > a.savedAt ? b : a;
+  const union = <T>(x: readonly T[], y: readonly T[]) => [...new Set([...x, ...y])];
+  const bestTimes = { ...a.progress.bestTimes };
+  for (const [id, t] of Object.entries(b.progress.bestTimes)) if (bestTimes[id] === undefined || t < bestTimes[id]) bestTimes[id] = t;
+  return {
+    version: SAVE_VERSION,
+    campaign: newer.campaign ? structuredClone(newer.campaign) : null,
+    progress: {
+      unlockedLevel: Math.max(a.progress.unlockedLevel, b.progress.unlockedLevel),
+      completed: union(a.progress.completed, b.progress.completed),
+      bestTimes,
+      endings: union(a.progress.endings, b.progress.endings),
+      notes: union(a.progress.notes, b.progress.notes),
+    },
+    savedAt: Math.max(a.savedAt, b.savedAt),
+  };
 }
 
 /**
@@ -153,6 +187,8 @@ function migrateV2(v2: Record<string, unknown>): Record<string, unknown> {
 /** Load/save wrapper the game talks to. Every mutation is written through immediately. */
 export class SaveStore {
   private data: SaveData;
+  /** After every change (the cloud sync listens). */
+  onChange: ((data: SaveData) => void) | null = null;
 
   constructor(private readonly levelCount: number) {
     this.data = parseSave(readJson(KEY), levelCount);
@@ -212,7 +248,50 @@ export class SaveStore {
     removeKey(KEY);
   }
 
-  private write(): void {
+  /** A copy of everything, for uploading or exporting. */
+  snapshot(): SaveData {
+    return structuredClone(this.data);
+  }
+
+  /**
+   * Folds another copy of the save into this one (see `mergeSaves`) and keeps
+   * the result. Returns true if anything changed here.
+   */
+  merge(other: SaveData): boolean {
+    const merged = mergeSaves(this.data, other);
+    if (JSON.stringify(merged) === JSON.stringify(this.data)) return false;
+    this.data = merged;
     writeJson(KEY, this.data);
+    return true;
+  }
+
+  /** The save as a file's contents. */
+  exportJson(): string {
+    return JSON.stringify({ ...this.data, game: "REMNANT" }, null, 1);
+  }
+
+  /**
+   * Reads a save file and merges it in, the file's run taking over. Returns
+   * false if it isn't a REMNANT save.
+   */
+  importJson(text: string): boolean {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      return false;
+    }
+    if (!raw || typeof raw !== "object" || (raw as { game?: unknown }).game !== "REMNANT") return false;
+    const incoming = parseSave(raw, this.levelCount);
+    incoming.savedAt = Date.now();
+    this.merge(incoming);
+    this.onChange?.(this.snapshot());
+    return true;
+  }
+
+  private write(): void {
+    this.data.savedAt = Date.now();
+    writeJson(KEY, this.data);
+    this.onChange?.(this.snapshot());
   }
 }

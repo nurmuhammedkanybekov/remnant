@@ -15,4 +15,8 @@ interface ImportMetaEnv {
   readonly VITE_TURN_CREDENTIAL?: string;
   /** Co-op matchmaking: a Metered Realtime publishable key (pk_live_…), or "off" for the PeerJS server. */
   readonly VITE_METERED_REALTIME_KEY?: string;
+  /** Cloud saves (optional): a Firebase web app's API key and project id (auth domain defaults to <project>.firebaseapp.com). */
+  readonly VITE_FIREBASE_API_KEY?: string;
+  readonly VITE_FIREBASE_PROJECT_ID?: string;
+  readonly VITE_FIREBASE_AUTH_DOMAIN?: string;
 }

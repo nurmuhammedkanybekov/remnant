@@ -51,24 +51,26 @@ Desktop browser with a keyboard and mouse, or a gamepad. Headphones recommended.
 1. [Overview](#overview)
 2. [Playing](#playing)
 3. [Online co-op](#online-co-op)
-4. [Game systems](#game-systems)
-5. [Architecture](#architecture)
-6. [Development](#development)
-7. [Credits](#credits)
-8. [Roadmap](#roadmap)
-9. [License and author](#license-and-author)
+4. [Saves and cloud sync](#saves-and-cloud-sync)
+5. [Game systems](#game-systems)
+6. [Architecture](#architecture)
+7. [Development](#development)
+8. [Credits](#credits)
+9. [Roadmap](#roadmap)
+10. [License and author](#license-and-author)
 
 ## Overview
 
-| Area                   | Summary                                                                                                                   |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Campaign**           | Ten hand-built levels, a story told over the radio, notes left by survivors, two endings, a three-phase boss.             |
-| **Online co-op**       | Two players join with a five-character room code. No accounts, no install, no game server.                                |
-| **Stealth**            | Every step makes noise and the flashlight gives you away. Nine creature types, each designed to break a habit.            |
-| **Difficulty**         | Five modes, from Story to **Aizi**: more creatures, less ammunition and one life.                                         |
-| **Sound**              | Recorded weapons and creatures, 3D positioning, walls that muffle, and adaptive music that tightens as they close in.     |
-| **Built from scratch** | TypeScript and Three.js with two runtime dependencies. Creatures, characters, music and most sound are generated in code. |
-| **Tested**             | 170 unit tests, every level machine-checked to be completable, a bot that plays the campaign, a two-browser co-op test.   |
+| Area                   | Summary                                                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Campaign**           | Ten hand-built levels, a story told over the radio, notes left by survivors, two endings, a three-phase boss.                                            |
+| **Online co-op**       | Two players join with a five-character room code. No accounts, no install, no game server.                                                               |
+| **Stealth**            | Every step makes noise and the flashlight gives you away. Nine creature types, each designed to break a habit.                                           |
+| **Difficulty**         | Five modes, from Story to **Aizi**: more creatures, less ammunition and one life.                                                                        |
+| **Sound**              | Recorded weapons and creatures, 3D positioning, walls that muffle, and adaptive music that tightens as they close in.                                    |
+| **Built from scratch** | TypeScript and Three.js, with only a matchmaking client and Firebase sign-in besides. Creatures, characters, music and most sound are generated in code. |
+| **Saves**              | Automatic local saves, optional Google sign-in with cloud sync, and save files to move progress by hand.                                                 |
+| **Tested**             | 179 unit tests, every level machine-checked to be completable, a bot that plays the campaign, a two-browser co-op test.                                  |
 
 ## Playing
 
@@ -201,6 +203,56 @@ free for 20 GB a month. A two-player game uses roughly 30 to 40 MB an hour.
 
 Any other TURN server also works: set `TURN_URLS` (comma-separated),
 `TURN_USERNAME` and `TURN_CREDENTIAL` instead.
+
+</details>
+
+## Saves and cloud sync
+
+Progress is saved in the browser automatically: at the start of every level,
+at checkpoints, and whenever you find a note or set a best time. The
+**Saves** screen on the main menu adds two ways to take it elsewhere:
+
+- **Cloud sync.** Sign in with Google, and your progress follows you to any
+  browser. Every change uploads a few seconds later, and signing in on a
+  new computer brings your run with it. Nothing is ever lost when two copies
+  meet: unlocks, finished modes, endings and journal notes are combined, each
+  level keeps its best time, and the most recent run is the one you continue.
+  Offline, the game keeps saving locally and catches up later.
+- **Save files.** Export your progress as a small `.json` file and import it
+  on another computer. This works without any account.
+
+<details>
+<summary><b>Setting up cloud sync for your copy (free, about 10 minutes, no credit card)</b></summary>
+
+Cloud sync runs on [Firebase](https://firebase.google.com/)'s free Spark
+plan: its Google sign-in and one small document per player in its Firestore
+database. A save is a few kilobytes, so the free limits (1 GB stored, 20,000
+writes and 50,000 reads a day) are far beyond what the game needs. It is a
+separate service from any Supabase project you may have.
+
+1. Open the [Firebase console](https://console.firebase.google.com/),
+   choose **Create a project**, give it a name (for example `remnant`), and
+   turn Google Analytics off. The project starts on the free Spark plan.
+2. **Build → Authentication → Get started → Sign-in method → Google →
+   Enable**, pick a support email, and **Save**.
+3. **Authentication → Settings → Authorized domains → Add domain**:
+   `nurmuhammedkanybekov.github.io` (your GitHub Pages domain).
+4. **Build → Firestore Database → Create database**. Pick a location near
+   you and start in **production mode**.
+5. In Firestore, open **Rules**, replace everything with the contents of
+   [`firebase/firestore.rules`](firebase/firestore.rules), and **Publish**.
+   These rules let each player read and write only their own save.
+6. **Project settings** (the gear icon) **→ General → Your apps → Web
+   (`</>`)**. Register an app called `remnant` (no Firebase Hosting needed)
+   and copy two values from the config it shows: `apiKey` and `projectId`.
+7. In this repository on GitHub: **Settings → Secrets and variables →
+   Actions → Variables → New repository variable**. Add
+   `FIREBASE_API_KEY` and `FIREBASE_PROJECT_ID` with those values.
+8. **Actions → Deploy to GitHub Pages → Run workflow**. When it finishes,
+   the Saves screen shows **Sign In with Google**.
+
+The web `apiKey` is not a secret: Firebase designs it to ship in the page,
+and the database rules are what protect the data.
 
 </details>
 
@@ -417,11 +469,13 @@ npm run dev        # http://localhost:5173
 The deployed build reads these optional GitHub repository variables (or
 secrets). None are required.
 
-| Variable                                        | Purpose                                                          |
-| ----------------------------------------------- | ---------------------------------------------------------------- |
-| `METERED_APP`, `METERED_API_KEY`                | Your own Metered relay (see [Online co-op](#online-co-op)).      |
-| `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` | Any other TURN relay.                                            |
-| `METERED_REALTIME_KEY`                          | A different matchmaking key; `off` uses a PeerJS server instead. |
+| Variable                                        | Purpose                                                                     |
+| ----------------------------------------------- | --------------------------------------------------------------------------- |
+| `METERED_APP`, `METERED_API_KEY`                | Your own Metered relay (see [Online co-op](#online-co-op)).                 |
+| `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` | Any other TURN relay.                                                       |
+| `METERED_REALTIME_KEY`                          | A different matchmaking key; `off` uses a PeerJS server instead.            |
+| `FIREBASE_API_KEY`, `FIREBASE_PROJECT_ID`       | Cloud saves (see [Saves and cloud sync](#saves-and-cloud-sync)).            |
+| `FIREBASE_AUTH_DOMAIN`                          | Only if sign-in should use a domain other than `<project>.firebaseapp.com`. |
 
 For testing, `?debug` exposes test hooks on `window.game`, and
 `?signal=wss://…/peerjs` uses your own
@@ -429,11 +483,11 @@ For testing, `?debug` exposes test hooks on `window.game`, and
 
 ### Testing
 
-- **Unit tests** (Vitest, 170): level parsing and validation, collision,
+- **Unit tests** (Vitest, 179): level parsing and validation, collision,
   raycasts, pathfinding, movement, weapons, creature AI run headlessly
   (blindness, light-freezing, ceiling drops, spitting, lures, takedowns, the
   boss's phases), co-op targeting and snapshots, extra creature placement,
-  matchmaking against a fake service, room codes, relay settings, loadouts,
+  matchmaking against a fake service, cloud sync against a fake cloud, save merging, room codes, relay settings, loadouts,
   the inventory, bindings, settings and save migration. **Every level is
   checked to be completable.**
 - **Playtest bot** (`npm run playtest`): plays the campaign in a real browser
@@ -461,15 +515,15 @@ both public domain (CC0) and each with a generated fallback:
 
 ## Roadmap
 
-| Phase                                                           | Status  |
-| --------------------------------------------------------------- | ------- |
-| 1. Foundations                                                  | Done    |
-| 2. Campaign: ten levels, radio dialogue, endings                | Done    |
-| 3. Creatures, melee, more weapons                               | Done    |
-| 4. Adaptive music, interface, gamepad                           | Done    |
-| 5. Accounts and cloud saves                                     | Planned |
-| 6. Two-player online co-op                                      | Done    |
-| 7. Aizi mode, inventory and journal, character looks, creatures | Done    |
+| Phase                                                           | Status |
+| --------------------------------------------------------------- | ------ |
+| 1. Foundations                                                  | Done   |
+| 2. Campaign: ten levels, radio dialogue, endings                | Done   |
+| 3. Creatures, melee, more weapons                               | Done   |
+| 4. Adaptive music, interface, gamepad                           | Done   |
+| 5. Cloud saves (Google sign-in) and save files                  | Done   |
+| 6. Two-player online co-op                                      | Done   |
+| 7. Aizi mode, inventory and journal, character looks, creatures | Done   |
 
 Details are in [`docs/ROADMAP.md`](docs/ROADMAP.md); the story bible is
 [`docs/STORY.md`](docs/STORY.md).

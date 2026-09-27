@@ -82,6 +82,8 @@ src/
 │   ├── projectiles.ts         Lobbed acid
 │   └── enemyManager.ts        Spawning (incl. mid-level), noise, hit tests, threat
 ├── net/                       Co-op networking
+│   ├── cloud.ts               Cloud saves: sign-in state, pull-merge-push, upload debounce
+│   ├── firebaseBackend.ts     Firebase sign-in + Firestore REST for cloud saves
 │   ├── meteredSignaling.ts    Matchmaking over Metered Realtime (the default)
 │   ├── signaling.ts           Matchmaking over a PeerJS-protocol server (tests, self-hosting)
 │   ├── ice.ts                 STUN/TURN servers and the relay's state
@@ -771,6 +773,30 @@ retry, leaving together, moving to the next level, and a partner leaving
 (`tools/coop/run.mjs`; usage in its header).
 
 ---
+
+## 12b. Saves and cloud sync (`game/save.ts`, `net/cloud.ts`)
+
+The local save (localStorage, versioned, validated field by field) is always
+the one the game plays from. `SaveData.savedAt` records when it last
+changed. **`mergeSaves(a, b)`** combines two copies without losing
+progress: the highest unlocked level, the union of finished difficulties,
+endings and journal notes, the fastest time per level, and the run in
+progress from whichever copy has the newer `savedAt` (so a run finished or
+lost on the newer copy doesn't come back).
+
+**Cloud sync** (optional; on when the build has `VITE_FIREBASE_API_KEY` and
+`VITE_FIREBASE_PROJECT_ID`) signs in with Google through the Firebase SDK,
+loaded only when used. On sign-in, and on every start while signed in, it
+downloads `saves/{uid}` from Firestore's REST API with the player's ID
+token, merges it in, and uploads the result; after that, every change is
+uploaded 2.5 s later (bursts become one write). Nothing is uploaded before
+the cloud copy has been read, so a fresh browser can't overwrite a real
+save. Offline, the status says so and the save stays local until the next
+sync. Rules in `firebase/firestore.rules` limit each player to their own
+document and to a save-sized string.
+
+**Save files** (Saves → Export / Import): the save as JSON tagged
+`"game": "REMNANT"`; importing merges it in with the file's run taking over.
 
 ## 13. Debug hooks (`?debug`)
 
