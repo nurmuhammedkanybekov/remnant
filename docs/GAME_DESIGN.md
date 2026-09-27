@@ -181,10 +181,10 @@ Per playing frame, `Game` builds a `PlayerCommand` and calls
 | Enemy damage                          | ×0.5    | ×1.25   | ×1.75     | ×1.25   | ×2.2    |
 | Enemy sight & hearing                 | ×0.75   | ×1.1    | ×1.3      | ×1.1    | ×1.5    |
 | Enemy chase speed                     | ×0.9    | ×1.1    | ×1.2      | ×1.1    | ×1.3    |
-| Pickup amounts                        | ×1.5    | ×1      | ×0.75     | ×1      | ×0.6    |
-| Supply pickups on each level          | ×1.4    | ×1      | ×0.75     | ×1      | ×0.55   |
+| Pickup amounts                        | ×1.5    | ×1      | ×0.85     | ×1      | ×0.7    |
+| Supply pickups on each level          | ×1.4    | ×1      | ×0.85     | ×1      | ×0.65   |
 | Flashlight drain                      | ×0.6    | ×1      | ×1.3      | ×1      | ×1.5    |
-| Starting reserve ammo                 | 32      | 16      | 8         | 16      | 6       |
+| Starting reserve ammo                 | 32      | 16      | 12        | 16      | 8       |
 | Starting medkits                      | 2       | 1       | 0         | 1       | 0       |
 | Health / battery floor between levels | 70 / 50 | 40 / 30 | 25 / 20   | 40 / 30 | 15 / 15 |
 | Lives                                 | ∞       | ∞       | ∞         | **1**   | **1**   |
@@ -810,8 +810,17 @@ battery pickups on a map are thinned out (Nightmare, Aizi) or added to
 kind a level has; additions use the level's own mix, on reachable floor away
 from the start, doors, water and other items. Seeded by level and amount,
 so both co-op players and every checkpoint see the same list. Keycards,
-weapons and notes are never touched. Over the campaign that is 71 / 50 / 46
-/ 37 supply pickups on Story / Normal / Nightmare / Aizi.
+weapons and notes are never touched. Over the campaign that is 71 / 50 / 48
+/ 39 supply pickups on Story / Normal / Nightmare / Aizi.
+
+**Co-op supplies:** pickups are shared (whoever takes one, it's gone for
+both) while co-op has more and tougher creatures, so a co-op level multiplies
+the difficulty's supply by `COOP_LOOT` = 1.8 (`game/levelSession.ts`).
+Balanced with a simple model: the damage all the ammunition on a level can
+deal at a 60% hit rate, against the total health of its creatures. Across
+the campaign that share is about 3.0 on Story, 0.5–0.65 on Normal,
+0.25–0.3 on Nightmare and 0.12–0.15 on Aizi (solo–co-op); the rest is
+meant to be avoided or taken down silently.
 
 **Backups** (`tools/backup/firestore.mjs`, `.github/workflows/backup.yml`):
 once a day a GitHub Action signs in as a Firebase service account, reads

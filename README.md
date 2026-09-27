@@ -111,8 +111,9 @@ All keyboard and mouse controls can be rebound in the Controls menu.
   life. If you die, the run is over.
 
 Harder modes also leave less lying around: Story has about 40% more
-ammunition, medkits and batteries than Normal, Aizi almost half as many, and
-each pickup gives less too. The exact numbers for each mode are in the
+ammunition, medkits and batteries than Normal, Nightmare and Aizi fewer, and
+each pickup gives less too. Co-op levels have 80% more supplies, because
+every pickup is shared between the two of you. The exact numbers for each mode are in the
 [design document](docs/GAME_DESIGN.md#difficulty-contentdifficultyts).
 
 ### Characters and inventory
