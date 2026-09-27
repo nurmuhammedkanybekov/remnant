@@ -138,7 +138,7 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 ## Phase 8 — Characters, supplies, backups (done)
 
 - [x] Three named characters (Nur Kanybekov, Raiymbek Asanov, Nuraiza
-      Temirbekova), chosen at New Game or in the co-op menu; the story,
+      Akylbek), chosen at New Game or in the co-op menu; the story,
       notes and subtitles use your name, and your partner's name is on the HUD
 - [x] Supplies on each level depend on the difficulty, not just what each
       pickup gives

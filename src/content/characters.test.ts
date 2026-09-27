@@ -5,7 +5,7 @@ import { PROLOGUE, TRANSMISSIONS } from "./story";
 
 describe("characters", () => {
   it("has three named survivors", () => {
-    expect(LOOK_ORDER.map(fullName)).toEqual(["Nur Kanybekov", "Raiymbek Asanov", "Nuraiza Temirbekova"]);
+    expect(LOOK_ORDER.map(fullName)).toEqual(["Nur Kanybekov", "Raiymbek Asanov", "Nuraiza Akylbek"]);
   });
 
   it("tells the story to whoever is playing", () => {
