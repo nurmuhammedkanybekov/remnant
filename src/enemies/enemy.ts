@@ -52,6 +52,8 @@ const MELEE_WINDUP_MAX = 0.45;
 const TARGET_STICK = 3;
 /** A puppet further than this from where the host says it is jumps there instead of gliding. */
 const PUPPET_SNAP = 3;
+/** Seconds between a Howler's screams. */
+export const HOWL_COOLDOWN = 12;
 
 const STATES: EnemyState[] = ["lurk", "drop", "patrol", "investigate", "chase", "attack", "search", "dead"];
 
@@ -96,6 +98,9 @@ export class Enemy {
   onRanged: ((enemy: Enemy, from: THREE.Vector3, target: THREE.Vector3) => void) | null = null;
   /** A Mimic wants to make a sound to draw you in. */
   onLure: ((enemy: Enemy) => void) | null = null;
+  /** Howlers: it has found you and screams for the others. */
+  onHowl: ((enemy: Enemy) => void) | null = null;
+  private lastHowl = -Infinity;
 
   protected readonly home: THREE.Vector2;
   protected patrolTarget: THREE.Vector2;
@@ -103,6 +108,10 @@ export class Enemy {
   protected path: THREE.Vector2[] = [];
   protected repathTimer = 0;
   protected lastKnown = new THREE.Vector2();
+  /** Where it last knew a player was. */
+  get lastKnownPosition(): THREE.Vector2 {
+    return this.lastKnown.clone();
+  }
   protected sinceContact = 0;
   protected searchTimer = 0;
   protected attackTimer = 0;
@@ -266,7 +275,14 @@ export class Enemy {
   }
 
   protected enterChase(): void {
-    if (this.state !== "chase" && this.state !== "attack") this.onAlert?.(this);
+    if (this.state !== "chase" && this.state !== "attack") {
+      this.onAlert?.(this);
+      // A Howler screams when it finds you (not again for a while, or it would never stop).
+      if (this.stats.behaviour === "howler" && !this.puppet && this.time - this.lastHowl > HOWL_COOLDOWN) {
+        this.lastHowl = this.time;
+        this.onHowl?.(this);
+      }
+    }
     this.state = "chase";
     this.path = [];
     this.repathTimer = 0;

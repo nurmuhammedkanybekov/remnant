@@ -3,7 +3,7 @@ import { MusicDirector } from "../audio/music";
 import { SoundManager } from "../audio/soundManager";
 import { DIFFICULTIES, type DifficultyDef, type DifficultyId } from "../content/difficulty";
 import { cloneBindings, DEFAULT_BINDINGS, keyLabel, type Action } from "../core/actions";
-import { ENDINGS, PROLOGUE, TRANSMISSIONS, type EndingId } from "../content/story";
+import { ENDINGS, PROLOGUE, PROLOGUE_TWO, TRANSMISSIONS, type EndingId } from "../content/story";
 import { PAD, padLabel } from "../core/gamepad";
 import { QUALITY } from "../core/quality";
 import { Clock } from "../core/clock";
@@ -26,7 +26,7 @@ import { Hud, speakerName } from "../ui/hud";
 import type { InventoryView } from "../ui/inventory";
 import { Screens, type MenuItem } from "../ui/menu";
 import { Viewmodel } from "../weapons/viewmodel";
-import { LEVELS } from "../world/levels";
+import { LEVELS, PARTS, partOf } from "../world/levels";
 import type { CheckpointState } from "./checkpoint";
 import { LevelSession, type CoopLink, type SessionServices } from "./levelSession";
 import { carryOver, cloneLoadout, startingLoadout, type Loadout } from "./loadout";
@@ -229,7 +229,7 @@ export class Game {
       });
     }
     items.push(
-      { label: "New Game", primary: !saved, action: () => this.confirmReplaceRun(() => this.showDifficulty(0)) },
+      { label: "New Game", primary: !saved, action: () => this.confirmReplaceRun(() => this.showNewGame()) },
       { label: "Chapters", disabled: this.save.progress.unlockedLevel === 0, action: () => this.showChapters() },
       { label: "Co-op", detail: "Two players, online", action: () => this.showCoopMenu() },
       {
@@ -245,10 +245,16 @@ export class Game {
       { label: "Exit", detail: "Back to the title screen", action: () => this.exitToTitle() }
     );
     const reached = this.save.progress.unlockedLevel;
+    // The gauge shows the part your run is in (Part One if there's no run).
+    const part = partOf(saved?.levelIndex ?? 0);
     this.screens.main(
       items,
       __APP_VERSION__,
-      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, reached: i <= reached })),
+      LEVELS.slice(part.first, part.last + 1).map((def, i) => ({
+        name: def.name,
+        subtitle: def.subtitle,
+        reached: part.first + i <= reached,
+      })),
       personalise(TRANSMISSIONS[Math.floor(Math.random() * TRANSMISSIONS.length)])
     );
   }
@@ -339,12 +345,42 @@ export class Game {
     );
   }
 
+  /** Part Two opens once Part One has been finished (or reached) — or always, in ?debug. */
+  private get partTwoOpen(): boolean {
+    const p = this.save.progress;
+    return this.debug || p.completed.length > 0 || p.unlockedLevel >= PARTS[1].first;
+  }
+
+  /** New Game: which part (once Part Two is open), then difficulty, character, prologue. */
+  private showNewGame(): void {
+    if (!this.partTwoOpen) return this.showDifficulty(0);
+    this.screens.lobby("NEW GAME", "WHICH STORY", "", [
+      {
+        label: `${PARTS[0].title}: ${PARTS[0].name}`,
+        detail: "The mountain. Sublevel 10 to the surface",
+        action: () => this.showDifficulty(0),
+      },
+      {
+        label: `${PARTS[1].title}: ${PARTS[1].name}`,
+        primary: true,
+        detail: "Three weeks later. Seven levels, each worse than the last",
+        action: () => this.showDifficulty(PARTS[1].first),
+      },
+      { label: "Back", action: () => this.showMainMenu() },
+    ]);
+  }
+
   private showDifficulty(levelIndex: number): void {
     this.screens.difficulty(
       (id) => this.showCharacter(id, levelIndex),
       () => this.showMainMenu(),
-      this.save.progress.completed
+      partOf(levelIndex).id === 2 ? this.save.progress.completedTwo : this.save.progress.completed
     );
+  }
+
+  /** Can this level be picked in chapter select? Reached before, or the start of an open Part Two. */
+  private chapterOpen(i: number): boolean {
+    return i <= this.save.progress.unlockedLevel || (i === PARTS[1].first && this.partTwoOpen);
   }
 
   /** New game: who you play, then the prologue (or the chosen chapter). */
@@ -355,25 +391,26 @@ export class Game {
         this.settings.look = look;
         saveSettings(this.settings);
         this.applyDisplaySettings();
-        if (levelIndex === 0) this.showPrologue(difficulty);
+        if (levelIndex === 0 || levelIndex === PARTS[1].first) this.showPrologue(difficulty, levelIndex);
         else this.startCampaign(difficulty, levelIndex);
       },
       () => this.showDifficulty(levelIndex)
     );
   }
 
-  private showPrologue(difficulty: DifficultyId): void {
+  private showPrologue(difficulty: DifficultyId, levelIndex = 0): void {
+    const prologue = levelIndex === 0 ? PROLOGUE : PROLOGUE_TWO;
     this.screens.story(
-      PROLOGUE.title,
-      PROLOGUE.lines.map((l) => personalise(l)),
-      [{ label: "Begin", primary: true, action: () => this.startCampaign(difficulty, 0) }]
+      prologue.title,
+      prologue.lines.map((l) => personalise(l)),
+      [{ label: "Begin", primary: true, action: () => this.startCampaign(difficulty, levelIndex) }]
     );
   }
 
   private showChapters(): void {
-    const { unlockedLevel, bestTimes } = this.save.progress;
+    const { bestTimes } = this.save.progress;
     this.screens.chapters(
-      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, unlocked: i <= unlockedLevel, bestTime: bestTimes[def.id] })),
+      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, unlocked: this.chapterOpen(i), bestTime: bestTimes[def.id] })),
       (i) => this.confirmReplaceRun(() => this.showDifficulty(i)),
       () => this.showMainMenu()
     );
@@ -598,14 +635,20 @@ export class Game {
     if (card && !this.debug && !run.coop) {
       this.state = "card";
       const def = LEVELS[run.levelIndex];
+      const part = partOf(run.levelIndex);
       this.screens.levelCard(
         {
-          index: run.levelIndex,
+          index: run.levelIndex - part.first,
           name: def.name,
           subtitle: def.subtitle,
+          number: def.number,
           tagline: def.tagline,
           objective: run.checkpoint?.objective ?? def.objective,
-          depth: LEVELS.map((d, i) => ({ name: d.name, subtitle: d.subtitle, reached: i <= run.levelIndex })),
+          depth: LEVELS.slice(part.first, part.last + 1).map((d, i) => ({
+            name: d.name,
+            subtitle: d.subtitle,
+            reached: part.first + i <= run.levelIndex,
+          })),
           prompt: this.input.usingPad ? "PRESS A" : "CLICK OR PRESS ANY KEY",
         },
         () => this.beginLevel(false)
@@ -677,12 +720,22 @@ export class Game {
     const newBest = !run.coop && this.save.recordLevelTime(session.def.id, session.stats.time);
     this.music.setMode("silent");
 
-    if (run.levelIndex >= LEVELS.length - 1) {
+    // The last level of a part: its ending. After Part One, Part Two can follow straight on.
+    const part = partOf(run.levelIndex);
+    if (run.levelIndex >= part.last) {
       this.state = "victory";
-      const id = ending ?? "leave";
-      if (!run.coop) this.save.completeCampaign(run.difficulty.id, id);
+      const id = ending ?? (part.id === 1 ? "leave" : "dawn");
+      if (!run.coop) this.save.completeCampaign(run.difficulty.id, id, part.id);
+      const next = PARTS.find((p) => p.id === part.id + 1);
+      const onward: MenuItem[] = !next
+        ? []
+        : this.isGuest
+          ? []
+          : [{ label: `Continue to ${next.title}`, primary: true, detail: next.name, action: () => this.continueToPart(next.first) }];
       this.screens.ending(ENDINGS[id], run.stats, run.difficulty.name, [
-        { label: "Main Menu", primary: true, action: () => this.showMainMenu() },
+        ...onward,
+        ...(this.isGuest && next ? this.waitForHost() : []),
+        { label: "Main Menu", primary: onward.length === 0 && !(this.isGuest && next), action: () => this.showMainMenu() },
       ]);
       return;
     }
@@ -712,6 +765,26 @@ export class Game {
             { label: "Leave Game", action: () => this.showMainMenu() },
           ];
     this.screens.levelComplete(session.def.name, session.def.subtitle, session.stats, newBest, next);
+  }
+
+  /** Straight on from one part's ending into the next part: same difficulty, what you carried, fresh stats. */
+  private continueToPart(first: number): void {
+    const run = this.run!;
+    run.levelIndex = first;
+    run.loadout = carryOver(this.session?.loadout ?? run.loadout, run.difficulty);
+    run.stats = freshStats();
+    run.checkpoint = null;
+    this.persistRun();
+    if (run.coop) {
+      this.hostBegins({ t: "start", level: first, difficulty: run.difficulty.id, fresh: false });
+      this.startLevel(true);
+      return;
+    }
+    this.screens.story(
+      PROLOGUE_TWO.title,
+      PROLOGUE_TWO.lines.map((l) => personalise(l)),
+      [{ label: "Begin", primary: true, action: () => this.startLevel(true) }]
+    );
   }
 
   // ------------------------------------------------------------------ co-op
@@ -791,9 +864,9 @@ export class Game {
 
   private showCoopChapters(): void {
     this.coopMenuToken++;
-    const { unlockedLevel, bestTimes } = this.save.progress;
+    const { bestTimes } = this.save.progress;
     this.screens.chapters(
-      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, unlocked: i <= unlockedLevel, bestTime: bestTimes[def.id] })),
+      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, unlocked: this.chapterOpen(i), bestTime: bestTimes[def.id] })),
       (level) =>
         this.screens.difficulty(
           (difficulty) => this.hostGame(level, difficulty),

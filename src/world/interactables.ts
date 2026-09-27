@@ -321,6 +321,8 @@ export class DetonatorConsole implements Interactable {
   readonly reach = 2;
   used = false;
   onUse: (() => void) | null = null;
+  /** Why it can't be used yet (the boss is still guarding it), or null. */
+  lockedReason: () => string | null = () => null;
 
   private readonly glowSprite: THREE.Sprite;
 
@@ -346,11 +348,11 @@ export class DetonatorConsole implements Interactable {
   }
 
   get prompt(): string | null {
-    return this.used ? null : "TRIGGER THE CHARGES";
+    return this.used ? null : (this.lockedReason() ?? "TRIGGER THE CHARGES");
   }
 
   interact(): void {
-    if (this.used) return;
+    if (this.used || this.lockedReason()) return;
     this.used = true;
     this.onUse?.();
   }
