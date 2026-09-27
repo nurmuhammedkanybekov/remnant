@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { emptySave, parseSave, SaveStore, SAVE_VERSION } from "./save";
+import { emptySave, mergeSaves, parseSave, SaveStore, SAVE_VERSION } from "./save";
 import { freshStats } from "./stats";
 
 const LEVELS = 3;
@@ -23,6 +23,7 @@ describe("parseSave", () => {
       version: SAVE_VERSION,
       campaign: { ...campaign, updatedAt: 5 },
       progress: { unlockedLevel: 1, completed: ["story"], bestTimes: { a: 12 }, endings: ["seal"], notes: ["infirmary:1"] },
+      savedAt: 77,
     };
     expect(parseSave(JSON.parse(JSON.stringify(data)), LEVELS)).toEqual(data);
   });
@@ -169,5 +170,74 @@ describe("SaveStore", () => {
     const s = new SaveStore(LEVELS);
     expect(() => s.checkpoint(campaign)).not.toThrow();
     expect(s.campaign).toMatchObject(campaign);
+  });
+});
+
+describe("merging two copies of a save (cloud sync, imported files)", () => {
+  const storage = new Map<string, string>();
+  beforeEach(() => {
+    storage.clear();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => void storage.set(k, v),
+      removeItem: (k: string) => void storage.delete(k),
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const withRun = (levelIndex: number, savedAt: number) => ({
+    ...emptySave(),
+    campaign: { ...campaign, levelIndex, updatedAt: savedAt },
+    savedAt,
+  });
+
+  it("never loses progress: unlocks, finished modes, endings, notes, best times", () => {
+    const a = {
+      ...emptySave(),
+      progress: { unlockedLevel: 3, completed: ["story" as const], bestTimes: { x: 50, y: 20 }, endings: [], notes: ["a:1"] },
+    };
+    const b = {
+      ...emptySave(),
+      progress: {
+        unlockedLevel: 5,
+        completed: ["aizi" as const],
+        bestTimes: { x: 40, y: 30 },
+        endings: ["seal" as const],
+        notes: ["a:1", "b:2"],
+      },
+    };
+    const m = mergeSaves(a, b);
+    expect(m.progress).toEqual({
+      unlockedLevel: 5,
+      completed: ["story", "aizi"],
+      bestTimes: { x: 40, y: 20 },
+      endings: ["seal"],
+      notes: ["a:1", "b:2"],
+    });
+    expect(mergeSaves(b, a).progress.unlockedLevel).toBe(5);
+  });
+
+  it("keeps the run from the copy that changed last, even when that copy has no run", () => {
+    expect(mergeSaves(withRun(2, 100), withRun(6, 200)).campaign!.levelIndex).toBe(6);
+    expect(mergeSaves(withRun(6, 200), withRun(2, 100)).campaign!.levelIndex).toBe(6);
+    // Finished (or lost) the run on the newer copy: the old run doesn't come back.
+    expect(mergeSaves(withRun(2, 100), { ...emptySave(), savedAt: 300 }).campaign).toBeNull();
+    // A device that has never saved anything takes the run.
+    expect(mergeSaves(emptySave(), withRun(4, 100)).campaign!.levelIndex).toBe(4);
+  });
+
+  it("exports a file that imports back, and refuses anything else", () => {
+    const store = new SaveStore(LEVELS);
+    store.noteRead("infirmary:1");
+    store.checkpoint({ ...campaign, levelIndex: 2 });
+    const file = store.exportJson();
+    storage.clear();
+    const other = new SaveStore(LEVELS);
+    expect(other.importJson("not json")).toBe(false);
+    expect(other.importJson('{"version":3}')).toBe(false);
+    expect(other.importJson(file)).toBe(true);
+    expect(other.campaign!.levelIndex).toBe(2);
+    expect(other.progress.notes).toEqual(["infirmary:1"]);
+    // ...and it was written through, so a reload keeps it.
+    expect(new SaveStore(LEVELS).campaign!.levelIndex).toBe(2);
   });
 });

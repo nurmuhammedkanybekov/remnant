@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@metered-ca/realtime": "^1.2.0",
+    "firebase": "^12.19.0",
     "three": "^0.166.1"
   },
   "engines": {

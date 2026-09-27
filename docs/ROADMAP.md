@@ -83,12 +83,18 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] Photo-scanned CC0 surface materials (normal and roughness mapped) with
       the facility details painted over them, and per-face wall variation
 
-## Phase 5 — Accounts and cloud saves (optional)
+## Phase 5 — Cloud saves (done)
 
-- [ ] Sign in with Google/GitHub through a free-tier backend (Supabase or
-      Firebase)
-- [ ] Cloud save sync; local saves keep working offline
-- [ ] Per-level best times
+- [x] Google sign-in on Firebase's free plan (no server to run, no card);
+      the save is one small Firestore document per player, written over the
+      REST API so the database SDK never ships
+- [x] Merge rules that never lose progress: unlocks, finished modes,
+      endings and notes are joined, best times keep the fastest, and the
+      most recently changed copy decides the run in progress
+- [x] Uploads a few seconds after each change; offline keeps saving locally
+- [x] Save files: export and import progress with no account at all
+- [x] Database rules in `firebase/firestore.rules`: each player reads and
+      writes only their own save
 
 ## Phase 6 — Two-player co-op (done)
 
