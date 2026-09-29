@@ -66,12 +66,20 @@ most of the sound) is generated in code.
   endings.
 - Stealth that actually matters. Every step makes noise, sprinting and wading
   make more, and your flashlight lets creatures spot you from twice as far.
+  Creatures right beside you can hear you breathe, so hold your breath while
+  one walks past, or throw a bottle to send it somewhere else.
+- A heartbeat and breathing that speed up when something is close and you
+  can't see it.
 - Nine kinds of creature, each designed to break a habit the previous one
   taught you: one that only hears, one that freezes in your light, one that
   waits on the ceiling, one that imitates the voice on the radio.
 - Three weapons, silent takedowns from behind, and medkits you carry and use
   when you choose.
-- Online co-op for two players with a room code. No accounts or installs.
+- Online co-op for two or three players with a room code, with voice chat
+  that comes from where your partner stands. No accounts or installs.
+- Ammunition in small caches spread through each level, and a hidden room
+  behind a loose wall panel on every level.
+- An online leaderboard of everyone's best time on each level.
 - An inventory with your gear, a journal of every note you've found, and a
   log of the radio.
 - Three characters to play as. The radio and the notes call you by your own
@@ -95,6 +103,9 @@ Headphones help a lot, because most threats are heard before they are seen.
 | Use, hold to revive   | E                  | A        |
 | Melee or takedown     | V or right click   | RB       |
 | Medkit                | H                  | D-pad up |
+| Hold breath           | B (hold)           | L3       |
+| Throw a bottle        | G                  | R3       |
+| Push to talk (co-op)  | T (hold)           | —        |
 | Switch weapon         | 1 2 3, Q or wheel  | Y        |
 | Inventory and journal | Tab or I           | View     |
 | Pause                 | Esc                | Menu     |
@@ -111,9 +122,12 @@ All keyboard and mouse controls can be rebound in the Controls menu.
   life. If you die, the run is over.
 
 Harder modes also leave less lying around: Story has about 40% more
-ammunition, medkits and batteries than Normal, Nightmare and Aizi fewer, and
-each pickup gives less too. Co-op levels have 80% more supplies, because
-every pickup is shared between the two of you. The exact numbers for each mode are in the
+medkits and batteries than Normal and Aizi fewer, and each pickup gives less
+too. Ammunition comes in small caches spread from near the start to the far
+corners, so you find it by exploring. If you die, the retry tops your pistol
+up to a minimum, so an empty gun can't trap you. Co-op levels have 80% more
+supplies for two players and 140% more for three, because every pickup is
+shared. The exact numbers for each mode are in the
 [design document](docs/GAME_DESIGN.md#difficulty-contentdifficultyts).
 
 ### Characters and inventory
@@ -121,7 +135,7 @@ every pickup is shared between the two of you. The exact numbers for each mode a
 <img src="docs/screenshots/inventory.jpg" alt="The journal in the inventory" width="100%">
 
 Tab opens the inventory. The Equipment tab shows your health, battery,
-medkits, keycard and ammo for each weapon. The Journal keeps every note you
+medkits, bottles, keycard and ammo for each weapon. The Journal keeps every note you
 have picked up, across all your runs, and the Radio log has everything said
 on the current level.
 
@@ -142,13 +156,18 @@ character and their name is on your HUD.
 <img src="docs/screenshots/coop-lobby.jpg" alt="The co-op lobby showing a room code" width="100%">
 
 One player opens Co-op, chooses Host a Game and gets a five-letter room code.
-The other chooses Join a Game and types it in. That's all.
+Up to two others choose Join a Game and type it in. The host starts when
+everyone is in.
 
-When you play together, both of you are hunted, and there are more creatures
-than in solo play. If your health runs out you go down instead of dying, and
-your partner has 45 seconds to reach you and hold E to revive you. Keycards,
-doors, generators and checkpoints are shared, and you leave each level
-together. If one of you leaves, the host keeps playing.
+When you play together, all of you are hunted, and there are more creatures
+than in solo play (more again with three). If your health runs out you go
+down instead of dying, and the others have 45 seconds to reach you and hold E
+to revive you. Keycards, doors, generators and checkpoints are shared, and you
+leave each level together. If someone leaves, the others keep playing.
+
+Voice chat is built in: hold T to talk (or switch to open mic in Settings).
+Voices come from where each player stands and are muffled through walls. The
+creatures can hear you talking too, so whisper, or wait until it's clear.
 
 The browsers find each other through a free matchmaking service and then
 connect directly. On networks that block direct connections (some schools,
@@ -161,7 +180,8 @@ offices and mobile carriers) the game switches to a relay automatically.
 | -------------------------------------- | ---------------------------------------------------------------------- |
 | "No game with that code"               | Check the code. Codes never use 0, O, 1, I or L.                       |
 | "A different version of REMNANT"       | Both players refresh the page. The build number is on every screen.    |
-| "That game already has two players"    | The host opens a new room.                                             |
+| "That game already has three players"  | The host opens a new room.                                             |
+| No voice                               | Allow the microphone when the browser asks, or check Settings.         |
 | "Couldn't connect to the other player" | The screen shows the last connection steps. Try again, or add a relay. |
 
 The game already gets a relay from the matchmaking service. If you want your
@@ -193,6 +213,10 @@ checkpoints. From the Saves screen on the main menu you can also:
   you continue whichever run you played most recently.
 - **Export and import a save file**, which works without any account.
 
+Signed in, your best time on every level also goes up to the **Leaderboard**
+(main menu), per difficulty, solo and co-op. It shows the top three on each
+level and where you stand. Only your first name is shown.
+
 <details>
 <summary>Setting up cloud saves on your own copy (free, about 10 minutes)</summary>
 
@@ -206,7 +230,8 @@ save is a few kilobytes, so the free limits are far more than enough.
    domain, for example `nurmuhammedkanybekov.github.io`.
 4. Firestore Database: create a database in production mode.
 5. Firestore, Rules: paste in [`firebase/firestore.rules`](firebase/firestore.rules)
-   and publish. Each player can then read and write only their own save.
+   and publish. Each player can then read and write only their own save, and
+   only their own leaderboard entry, which any signed-in player can read.
 6. Project settings, General, Your apps: add a Web app and copy `apiKey` and
    `projectId` from its config. Copy the key exactly; it starts with `AIza`.
 7. In the GitHub repository, add the variables `FIREBASE_API_KEY` and
@@ -313,6 +338,13 @@ of each level. Each player moves their own character locally, so movement
 never waits for the network. The guest's creatures follow the host's
 snapshots. Events go over a reliable channel and positions over a fast one,
 where a late packet is simply dropped.
+
+With three players, each guest connects to the host only. Once the first
+guest is in, the host opens the room again under the same code for a second,
+and from then on passes on what one guest says that the other needs
+(positions, shots, throws, pickups, revives). Voice travels the same way: every
+connection carries two audio channels, one for the other end's microphone and
+one for the third player's voice relayed by the host.
 
 Getting this to work on real home networks took more effort than the rest of
 co-op put together. The handshake is re-sent until it is answered,
