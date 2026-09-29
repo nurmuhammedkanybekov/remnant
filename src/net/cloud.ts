@@ -1,5 +1,6 @@
 import { parseSave, type SaveData, type SaveStore } from "../game/save";
 import { readJson, writeJson } from "../core/storage";
+import type { BoardBackend } from "./leaderboard";
 
 /**
  * Cloud saves: sign in (Google) and your progress follows you to any
@@ -27,6 +28,8 @@ export interface CloudBackend {
   /** The stored save's JSON, or null if this player has none yet. */
   load(uid: string): Promise<string | null>;
   store(uid: string, json: string, savedAt: number): Promise<void>;
+  /** The online leaderboard, where the backend has one. */
+  board?: BoardBackend;
 }
 
 export type CloudStatus = "off" | "signed-out" | "connecting" | "syncing" | "synced" | "offline" | "error";
@@ -62,6 +65,14 @@ export class CloudSync {
   ) {
     this.status = factory ? "signed-out" : "off";
     save.onChange = () => this.schedulePush();
+  }
+
+  /** Called whenever a player has just signed in (or reconnected): the leaderboard uploads then. */
+  onSignedIn: (() => void) | null = null;
+
+  /** The leaderboard's database side, once connected. */
+  get board(): BoardBackend | null {
+    return this.backend?.board ?? null;
   }
 
   get available(): boolean {
@@ -132,7 +143,10 @@ export class CloudSync {
             return;
           }
           writeJson(FLAG_KEY, true);
-          if (user.uid !== was) void this.syncNow();
+          if (user.uid !== was) {
+            void this.syncNow();
+            this.onSignedIn?.();
+          }
         });
         return backend;
       })
