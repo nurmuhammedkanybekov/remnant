@@ -16,7 +16,12 @@ interface Lamp {
   timer: number;
   phase: number;
   baseColor: THREE.Color;
+  /** A creature is close: it's stuttering. */
+  disturbed: boolean;
 }
+
+/** Lamps within this distance (world units) of a creature stutter. */
+const DISTURB_RADIUS = 7;
 
 /**
  * Levels can have many lamps, but every extra real-time light makes every
@@ -38,6 +43,7 @@ export class LampSystem {
       timer: Math.random(),
       phase: Math.random() * Math.PI * 2,
       baseColor: new THREE.Color(spawn.color),
+      disturbed: false,
     }));
     for (let i = 0; i < poolSize; i++) {
       const l = new THREE.PointLight(0xffffff, 0, 11, 1.6);
@@ -47,9 +53,30 @@ export class LampSystem {
     }
   }
 
-  update(dt: number, player: THREE.Vector3, time: number): void {
+  /**
+   * `creatures`: where the living creatures are. Lamps near one stutter and
+   * drop out, whatever their mode: the Remnant in them does something to the
+   * current. A light going wrong is how you know something is close.
+   */
+  update(dt: number, player: THREE.Vector3, time: number, creatures: readonly THREE.Vector2[] = []): void {
     for (const lamp of this.lamps) {
       lamp.timer -= dt;
+      const near = creatures.some((c) => Math.hypot(c.x - lamp.spawn.pos.x, c.y - lamp.spawn.pos.y) < DISTURB_RADIUS);
+      if (near) {
+        lamp.disturbed = true;
+        if (lamp.timer <= 0) {
+          const on = Math.random() < 0.35;
+          lamp.brightness = on ? 0.5 + Math.random() * 0.5 : 0.03;
+          lamp.timer = on ? 0.03 + Math.random() * 0.08 : 0.08 + Math.random() * 0.5;
+        }
+        this.paint(lamp);
+        continue;
+      }
+      if (lamp.disturbed) {
+        // It's gone: the lamp settles back.
+        lamp.disturbed = false;
+        lamp.brightness = 1;
+      }
       switch (lamp.mode) {
         case "steady":
           lamp.brightness = 0.95 + Math.sin(time * 50 + lamp.phase) * 0.03;
@@ -72,10 +99,7 @@ export class LampSystem {
           }
           break;
       }
-      if (lamp.fixture) {
-        (lamp.fixture.mesh.material as THREE.MeshBasicMaterial).color.copy(lamp.baseColor).multiplyScalar(0.15 + lamp.brightness);
-        lamp.fixture.halo.material.opacity = (lamp.spawn.emergency ? 0.5 : 0.35) * lamp.brightness;
-      }
+      this.paint(lamp);
     }
 
     // Assign pooled lights to the nearest lamps.
@@ -97,5 +121,11 @@ export class LampSystem {
       const fade = THREE.MathUtils.clamp((MAX_LIGHT_DIST - d) / 6, 0, 1);
       light.intensity = (l.spawn.emergency ? 14 : 18) * l.brightness * fade;
     }
+  }
+
+  private paint(lamp: Lamp): void {
+    if (!lamp.fixture) return;
+    (lamp.fixture.mesh.material as THREE.MeshBasicMaterial).color.copy(lamp.baseColor).multiplyScalar(0.15 + lamp.brightness);
+    lamp.fixture.halo.material.opacity = (lamp.spawn.emergency ? 0.5 : 0.35) * lamp.brightness;
   }
 }

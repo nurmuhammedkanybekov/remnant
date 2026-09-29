@@ -51,10 +51,10 @@ const CSS = /* css */ `
 .vrow.health .vbar > b.fill { background: linear-gradient(90deg, #8e1f16, var(--ui-red)); }
 .vrow.stamina .vbar { height: 3px; }
 .vrow.stamina .vbar > b.fill { background: rgba(232,226,214,.7); }
-.vrow.breath { display: none; }
-.vrow.breath.on { display: flex; }
 .vrow.breath .vbar { height: 3px; }
 .vrow.breath .vbar > b.fill { background: #7fb8d8; }
+.vrow.breath:not(.on) { opacity: .55; }
+.vrow.breath.held .vbar > b.fill { background: #a8dcff; box-shadow: 0 0 6px rgba(127,184,216,.6); }
 .vrow.breath.low .vbar > b.fill { background: var(--ui-red); animation: blink .5s steps(2) infinite; }
 .vrow.breath .vnum { font-size: 10px; letter-spacing: .15em; width: auto; }
 .vrow.battery .vbar > b.fill { background: linear-gradient(90deg, #8a6a20, var(--ui-amber)); }

@@ -61,6 +61,16 @@ function run(e: Enemy, p: Perception, seconds: number, others: Enemy[] = [e]): v
 }
 
 describe("creature senses", () => {
+  it("a light in the dark gives you away at once: it comes for you", () => {
+    const lit = spawn("husk", 3);
+    run(lit, perceive(6, { torchOn: true }), 0.5);
+    expect(lit.isHunting).toBe(true);
+    // The same spot in the dark, light off: too far for it to see you.
+    const dark = spawn("husk", 3);
+    run(dark, perceive(6), 0.5);
+    expect(dark.isHunting).toBe(false);
+  });
+
   it("a Listener is blind: it never spots you by sight, even with the light on", () => {
     const e = spawn("listener", 3);
     run(e, perceive(5, { torchOn: true }), 3);
