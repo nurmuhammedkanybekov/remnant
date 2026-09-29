@@ -411,13 +411,15 @@ export class Screens {
   // ------------------------------------------------------------------ co-op
 
   /** A co-op screen: title, a line of status, optionally the room code in big letters. */
-  lobby(title: string, tag: string, text: string, items: MenuItem[], code?: string): void {
+  lobby(title: string, tag: string, text: string, items: MenuItem[], code?: string, variant = ""): void {
     this.render(
       `<h2>${esc(title)}</h2><div class="tag">${esc(tag)}</div>${
         code ? `<div class="room-code" aria-label="Room code">${[...code].map((c) => `<b>${esc(c)}</b>`).join("")}</div>` : ""
       }<div class="sub">${esc(text)}</div>`,
       items,
-      true
+      true,
+      false,
+      variant
     );
   }
 
