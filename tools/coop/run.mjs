@@ -78,7 +78,7 @@ const st = (p) =>
   p.evaluate(() => {
     const g = window.game;
     const s = g.session;
-    const r = s.remote;
+    const r = [...s.remotes.values()][0];
     return {
       state: g.debugState(),
       me: [s.player.position.x, s.player.position.z].map((v) => +v.toFixed(2)),
@@ -129,8 +129,16 @@ check("objective updates for both", objs[0] === objs[1] && objs[0] === "Reach th
 // 1b. Each sees the other in their chosen look.
 await guest.evaluate(() => (window.game.settings.look = "woman"));
 await host.evaluate(() => (window.game.settings.look = "dark"));
-await sleep(1500);
-const looks = await Promise.all([host, guest].map((p) => p.evaluate(() => window.game.session.remote?.look)));
+// State goes out on game time, which runs slowly under software rendering: wait for it to arrive.
+await Promise.all(
+  [
+    [host, "woman"],
+    [guest, "dark"],
+  ].map(([p, want]) =>
+    p.waitForFunction((w) => [...window.game.session.remotes.values()][0]?.look === w, want, { timeout: 10000 }).catch(() => {})
+  )
+);
+const looks = await Promise.all([host, guest].map((p) => p.evaluate(() => [...window.game.session.remotes.values()][0]?.look)));
 check("partner looks travel both ways", looks[0] === "woman" && looks[1] === "dark", JSON.stringify(looks));
 
 // 2. The guest opens a door.
@@ -213,7 +221,7 @@ await host.evaluate(() => {
 });
 await sleep(1000);
 const down = await host.evaluate(() => ({ downed: window.game.session.downed, state: window.game.debugState() }));
-const guestSeesDown = await guest.evaluate(() => window.game.session.remote.down);
+const guestSeesDown = await guest.evaluate(() => [...window.game.session.remotes.values()][0].down);
 check("host goes down (not dead) with a partner", down.downed && down.state === "playing" && guestSeesDown, JSON.stringify(down));
 await guest.evaluate(() => window.game.hud.setVisible(true));
 await sim(guest, 3.5, ["KeyE"]);
@@ -276,8 +284,11 @@ await sleep(3000);
 
 // 8. The guest leaves: the host carries on alone.
 await guest.evaluate(() => window.game.debugLeave());
-await host.waitForFunction(() => !window.game.session.remote.visible, null, { timeout: 20000 }).catch(() => {});
-const hostAfter = await host.evaluate(() => ({ state: window.game.debugState(), remote: window.game.session.remote.visible }));
+await host.waitForFunction(() => ![...window.game.session.remotes.values()][0].visible, null, { timeout: 20000 }).catch(() => {});
+const hostAfter = await host.evaluate(() => ({
+  state: window.game.debugState(),
+  remote: [...window.game.session.remotes.values()][0].visible,
+}));
 check("guest leaves → host keeps playing alone", hostAfter.state === "playing" && hostAfter.remote === false, JSON.stringify(hostAfter));
 
 console.log("FAILURES:", failures.length ? failures.join(", ") : "none");

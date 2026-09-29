@@ -267,7 +267,7 @@ One character = one 4×4 world-unit cell. Wall height 3.2.
 | `G`     | generator (solid)                          | `Y`     | intercom                            |
 | `~`     | shallow water                              | `*`     | checkpoint                          |
 | `Z`     | detonator console (finale only)            | `0`–`9` | note, text from the level's `notes` |
-| `a`–`z` | invisible trigger, runs `triggers[letter]` |         |                                     |
+| `a`–`z` | invisible trigger, runs `triggers[letter]` | `+`     | loose panel (hidden room)           |
 
 A level is a `LevelDef`: map, notes, spawn facing, and optionally
 `triggers`, `intercoms`, `events` (`start`, `keycard`, `power`,
@@ -281,6 +281,14 @@ scripts, with an error naming the level and cell.
 it unlocks the exit. If a level has generators, the exit has no power until
 every one is running. If a level has a boss, the exit stays sealed until
 it's dead.
+
+**Hidden rooms.** A `+` is a loose panel: a door (`DoorSpawn.panel`) that
+wears the walls' own material over the whole cell, with only a faint seam
+and pry marks to give it away. Use pries it loose (quietly, noise 4, where a
+door's motor is 9) and it drops away; the results screen counts **secrets
+found**. Every level has one, off its right or bottom edge (three columns or
+rows added there, so nothing already on the map moves), holding a note and a
+medkit, battery or ammunition. Creatures never open panels.
 
 **Themes** (`world/theme.ts`) set fog colour and density, fill light, wall
 and floor tint and lamp colour per level.
@@ -348,6 +356,29 @@ line at a time on the simulation clock, so pausing pauses the conversation.
 **Noise.** Each gait has a hearing radius: still 0, crouch 1.6, walk 5.5,
 sprint 12. Walls cut it to 40%. **Water** multiplies it by 1.8 and slows you
 to 72%. The HUD noise meter shows your current level.
+
+**Breathing** (`player/breath.ts`). Your breathing carries 1.8 units (it's
+your noise whenever you're quieter than that), so a creature right beside
+you can hear you standing still. **Hold your breath** (hold B, pad L3) to
+silence it for up to 7 s; not while sprinting. Let go early and you breathe
+out quietly (noise 1.2); run out and you **gasp** (noise 6), and your lungs
+take 4 s to refill after a short pause. A bar under stamina shows your air
+while you hold it or get it back. Co-op partners send `held` with their
+state, so the host's creatures hear them the same way.
+
+**Dread.** A creature within 13 units that you can't see (behind you, round
+a corner, or in the dark beyond your light) sets your heart beating and your
+breathing quick and shaky, more strongly when it's hunting you; one you're
+looking at in your light counts for about a third. It swells quickly and
+fades slowly. The first time it's strong, a hint says how to hold your
+breath.
+
+**Throwing** (G, pad R3; `items/throwables.ts`). A bottle flies from the
+camera at 13 units/s with a slight lift, under gravity, stepped in short
+slices so it can't pass through a wall, and breaks on the first wall, floor
+or ceiling. The smash carries 16 units: creatures that hear it go to look.
+You start a run with one and carry up to three; in co-op each throw is
+flown on every copy (`toss`) but only the thrower's makes the noise.
 
 **Flashlight** (F): spotlight held low-right with beam sway that lags your
 aim. Battery 100, drains 1.7/s (~60 s). While off it trickles back to at
@@ -538,6 +569,7 @@ spasms, snapping the head sideways — each creature on its own rhythm.
 | Item      | Effect                                                         |
 | --------- | -------------------------------------------------------------- |
 | Ammo      | +4 rounds (not picked up if full)                              |
+| Bottle    | Carried (max 3). Throw it (G) to make a noise somewhere else   |
 | Shells    | +2 shotgun shells                                              |
 | Rivets    | +6 rivets                                                      |
 | Medkit    | Carried (max 3). Use it to heal 45                             |
@@ -687,9 +719,41 @@ With a pad in use the game doesn't need pointer lock.
 
 ## 12. Co-op (`net/`, `game/remotePlayer.ts`)
 
-Two players, online, through the whole campaign. Main menu → **Co-op** →
-**Host a Game** (pick a sublevel you've reached and a difficulty) shows a
-five-character room code; the partner picks **Join a Game** and types it.
+Two or three players, online, through the whole campaign. Main menu →
+**Co-op** → **Host a Game** (pick a sublevel you've reached and a
+difficulty) shows a five-character room code; up to two partners pick
+**Join a Game** and type it. The host starts once at least one is in.
+
+**Three players.** Each guest has its own connection to the host (a star:
+the guests never connect to each other). The host's first room closes its
+signaling once a guest is in (as before); the host then opens the room again
+under the same code for a second guest, until two are in or the game starts
+(no joining mid-game). Players have slots: 0 the host, 1 and 2 the guests; a
+guest learns its slot from `start`. The host passes on what one guest says
+that the other needs (`RELAYED` in `net/protocol.ts`: `ps`, `shot`, `toss`,
+`pickup`, `trigger`, `revive`, `wipe`), stamped `from` with the sender's
+slot, and messages meant for one guest (`hurt`, `killed`) go to that guest
+only (`CoopLink.sendTo`). The host also sends the player count with every
+`start` and `restart`, so all copies build the same world for that many
+(`COOP_EXTRA_ENEMIES`, `COOP_ENEMY_HEALTH`, `COOP_LOOT` in
+`game/levelSession.ts`, by player count: +40% / ×1.3 / ×1.8 for two, +70% /
+×1.45 / ×2.4 for three). A guest who leaves mid-game is announced (`gone`)
+and the others carry on.
+
+**Voice** (`net/voice.ts`, `PeerLink.setVoice`, `VoicePlayer` in
+`audio/soundManager.ts`). Every connection is made with two audio
+transceivers next to the data channels, so voice never needs renegotiating:
+"direct" carries the other end's microphone, "relay" the third player's
+voice, which the host forwards from the other guest's connection
+(`replaceTrack` with the received track). A muted track sends silence, which
+is how push to talk (hold T) works; open mic and off are the other settings.
+The microphone is asked for once, in the lobby. Each voice plays through Web
+Audio from the speaker's position (pan, distance, a low-pass behind walls,
+never quieter than a murmur), through a muted `<audio>` element as well,
+which Chrome needs before remote audio reaches Web Audio. While you're
+actually speaking (mic level above a threshold), your noise radius is at
+least 4, and guests send `talk` in their `ps` so the host's creatures hear
+them too.
 
 **Connecting.** Browsers talk directly over WebRTC data channels. To find
 each other they use a signaling service, only as a mailbox for the
@@ -735,8 +799,8 @@ While a co-op tab is in the background (where browsers stop animation
 frames), a worker timer keeps the game ticking at 20 Hz without drawing, so
 the host's world doesn't freeze for the guest. A guest whose connection
 never completes doesn't hold the host's room (it frees after 30 s); a guest
-leaving the lobby reopens the room under a new code; a second guest is
-turned away; Start can't be triggered twice. Browsers without WebRTC get a
+leaving the lobby keeps the room open for the next; a third guest is turned
+away; Start can't be triggered twice. Browsers without WebRTC get a
 clear message.
 
 **Who decides what.** The host's game is the authority on the world:
@@ -751,7 +815,7 @@ clear message.
 | Doors, generators, intercoms   | The guest sends `use`; the host does it and broadcasts `used`. A locked door is answered locally.                                                                                                                                                                   |
 | Pickups                        | Whoever walks over one gets it; it vanishes for both. The **keycard is shared**. Boss-arena restocks are timed by the host.                                                                                                                                         |
 | Triggers, checkpoints          | Whoever reaches one fires it for both; each player keeps their own checkpoint snapshot.                                                                                                                                                                             |
-| The exit                       | Both players must be within 4.5 m of it; the host ends the level for both.                                                                                                                                                                                          |
+| The exit                       | Every player must be within 4.5 m of it; the host ends the level for all.                                                                                                                                                                                           |
 
 **Down, not dead.** In co-op, reaching 0 health puts you **down**: camera on
 the floor, look only, 45 s bleed-out. The partner holds Use within 2 m for
@@ -839,6 +903,19 @@ the campaign that share is about 1.1–1.3 on Normal, 0.5–0.7 on Nightmare
 and 0.2–0.25 on Aizi (solo–co-op), with Cold Storage and Containment the
 tightest; the rest is meant to be avoided or taken down silently.
 
+**Leaderboard** (`net/leaderboard.ts`). Every level cleared records its time
+in this browser under a key for the level, difficulty and mode
+(`cold_storage__nightmare`, `…__coop`), keeping only your best. Signed in,
+bests go up to `leaderboard/{uid}` in the same Firestore database: `name`
+(the first word of the account name, never an email address), `times` (a
+map of those keys) and `updatedAt`, written with a field mask so only the
+changed times are touched, and never replacing a faster time already there
+(from another device). Times set while signed out are uploaded at the next
+sign-in. Main menu → **Leaderboard** reads every entry (cached for a
+minute) and shows each level's top three and your own rank, for any
+difficulty and solo or co-op. The rules let any signed-in player read the
+board and each write only their own entry; times under 5 s are ignored.
+
 **Backups** (`tools/backup/firestore.mjs`, `.github/workflows/backup.yml`):
 once a day a GitHub Action signs in as a Firebase service account, reads
 every document in `saves`, encrypts the file (AES-256-GCM, key from the
@@ -899,7 +976,12 @@ See [`ROADMAP.md`](ROADMAP.md) for the full plan.
    TURN relay; if they're down, players can't find each other (a
    self-hosted PeerJS server via `?signal=` is the fallback). Joining needs a keyboard
    to type the code. There's no host migration: if the host leaves, the
-   guest's game ends.
-7. **Performance** hasn't been profiled on real low-end GPUs; the Low
+   guests' games end. Three players at most, and nobody joins mid-game.
+   Everything a guest does reaches the other guest through the host, so
+   the host's connection carries twice the traffic (voice included).
+7. **The leaderboard trusts the players.** The rules stop anyone writing
+   someone else's entry, but not a made-up time in their own. Fine among
+   friends; a public board would need times checked on a server.
+8. **Performance** hasn't been profiled on real low-end GPUs; the Low
    preset is the lever if it's needed.
-8. **The gamepad layout isn't rebindable** (the keyboard is).
+9. **The gamepad layout isn't rebindable** (the keyboard is).
