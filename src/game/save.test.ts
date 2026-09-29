@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CHECKPOINT_LAYOUT } from "./checkpoint";
 import { emptySave, mergeSaves, parseSave, SaveStore, SAVE_VERSION } from "./save";
 import { freshStats } from "./stats";
 
@@ -94,6 +95,7 @@ describe("parseSave", () => {
 
   it("keeps a valid mid-level checkpoint and drops a broken one", () => {
     const cp = {
+      layout: CHECKPOINT_LAYOUT,
       x: 5,
       z: 6,
       yaw: 1,
@@ -113,6 +115,9 @@ describe("parseSave", () => {
     expect(ok.campaign!.checkpoint).toMatchObject({ x: 5, collected: [0, 2], firedTriggers: ["a"], hasKeycard: true });
     const broken = parseSave({ version: SAVE_VERSION, campaign: { ...campaign, checkpoint: { x: "nope" } } }, LEVELS);
     expect(broken.campaign!.checkpoint).toBeNull();
+    // One taken before the level layouts last changed: its indices no longer line up.
+    const stale = parseSave({ version: SAVE_VERSION, campaign: { ...campaign, checkpoint: { ...cp, layout: undefined } } }, LEVELS);
+    expect(stale.campaign!.checkpoint).toBeNull();
   });
 
   it("drops a campaign that points past the last level", () => {

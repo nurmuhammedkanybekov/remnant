@@ -24,7 +24,7 @@ export interface WeaponDef {
   noiseRadius: number;
   /** Camera pitch kick per shot, in radians. */
   recoil: number;
-  /** Rounds in one ammo pickup for this weapon. */
+  /** Rounds in one ammo cache for this weapon (small: a level has many, spread out; see `world/loot.ts`). */
   ammoPickup: number;
   /** Level where it is found; chapter select starts later levels with it. Null = carried from the start. */
   foundIn: string | null;
@@ -47,7 +47,7 @@ export const WEAPONS = {
     spread: 0.006,
     noiseRadius: 22,
     recoil: 0.03,
-    ammoPickup: 8,
+    ammoPickup: 4,
     foundIn: null,
   },
   /**
@@ -71,7 +71,7 @@ export const WEAPONS = {
     spread: 0.012,
     noiseRadius: 4.5,
     recoil: 0.012,
-    ammoPickup: 12,
+    ammoPickup: 6,
     foundIn: "ventilation",
   },
   shotgun: {
@@ -90,7 +90,7 @@ export const WEAPONS = {
     spread: 0.075,
     noiseRadius: 32,
     recoil: 0.085,
-    ammoPickup: 4,
+    ammoPickup: 2,
     foundIn: "armory",
   },
 } as const satisfies Record<string, WeaponDef>;

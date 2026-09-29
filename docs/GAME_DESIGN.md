@@ -162,10 +162,11 @@ playing ──health 0──► dead ──Retry──► playing (same level, s
   the single pistol into a multi-weapon loadout and dropped mid-level
   checkpoints, whose indices no longer matched the redesigned levels).
 - **Carry-over**: health, battery, weapons, ammo and medkits carry into the
-  next level, with health, battery and pistol ammo topped up to the
-  difficulty's floors so a bad run isn't unwinnable. Retrying from a
-  checkpoint after a death tops the pistol up to the same floor, so an empty
-  gun can't trap you in a loop of deaths. Starting from a later chapter hands you the
+  next level, with health and battery topped up to the difficulty's floors
+  so a bad run isn't unwinnable. Ammunition is not topped up: it's found by
+  searching. Retrying after a death (from a checkpoint or the level's start)
+  tops the pistol up to the difficulty's ammo floor, so an empty gun can't
+  trap you in a loop of deaths. Starting from a later chapter hands you the
   weapons you would have found on the way.
 - If pointer lock is refused (browsers block re-locking right after Esc), the
   HUD shows "CLICK TO RESUME" and clicking the view re-locks.
@@ -176,21 +177,21 @@ Per playing frame, `Game` builds a `PlayerCommand` and calls
 
 ### Difficulty (`content/difficulty.ts`)
 
-|                                        | Story   | Normal  | Nightmare | Ironman | Aizi    |
-| -------------------------------------- | ------- | ------- | --------- | ------- | ------- |
-| Extra creatures per level              | —       | +80%    | +130%     | +80%    | +180%   |
-| Enemy health                           | ×0.7    | ×1      | ×1.35     | ×1      | ×1.6    |
-| Enemy damage                           | ×0.5    | ×1.25   | ×1.75     | ×1.25   | ×2.2    |
-| Enemy sight & hearing                  | ×0.75   | ×1.1    | ×1.3      | ×1.1    | ×1.5    |
-| Enemy chase speed                      | ×0.9    | ×1.1    | ×1.2      | ×1.1    | ×1.3    |
-| Pickup amounts                         | ×1.5    | ×1      | ×1        | ×1      | ×0.7    |
-| Supply pickups on each level           | ×1.4    | ×1      | ×1        | ×1      | ×0.65   |
-| Flashlight drain                       | ×0.6    | ×1      | ×1.3      | ×1      | ×1.5    |
-| Starting reserve ammo                  | 32      | 16      | 12        | 16      | 8       |
-| Starting medkits                       | 2       | 1       | 0         | 1       | 0       |
-| Health / battery floor between levels  | 70 / 50 | 40 / 30 | 25 / 20   | 40 / 30 | 15 / 15 |
-| Pistol ammo floor (levels and retries) | 32      | 24      | 16        | 24      | 8       |
-| Lives                                  | ∞       | ∞       | ∞         | **1**   | **1**   |
+|                                       | Story   | Normal  | Nightmare | Ironman | Aizi    |
+| ------------------------------------- | ------- | ------- | --------- | ------- | ------- |
+| Extra creatures per level             | —       | +80%    | +130%     | +80%    | +180%   |
+| Enemy health                          | ×0.7    | ×1      | ×1.35     | ×1      | ×1.6    |
+| Enemy damage                          | ×0.5    | ×1.25   | ×1.75     | ×1.25   | ×2.2    |
+| Enemy sight & hearing                 | ×0.75   | ×1.1    | ×1.3      | ×1.1    | ×1.5    |
+| Enemy chase speed                     | ×0.9    | ×1.1    | ×1.2      | ×1.1    | ×1.3    |
+| Pickup amounts                        | ×1.5    | ×1      | ×1        | ×1      | ×0.7    |
+| Supply pickups on each level          | ×1.4    | ×1      | ×1        | ×1      | ×0.65   |
+| Flashlight drain                      | ×0.6    | ×1      | ×1.3      | ×1      | ×1.5    |
+| Starting reserve ammo                 | 32      | 16      | 12        | 16      | 8       |
+| Starting medkits                      | 2       | 1       | 0         | 1       | 0       |
+| Health / battery floor between levels | 70 / 50 | 40 / 30 | 25 / 20   | 40 / 30 | 15 / 15 |
+| Pistol ammo floor on a retry          | 32      | 24      | 16        | 24      | 8       |
+| Lives                                 | ∞       | ∞       | ∞         | **1**   | **1**   |
 
 **Extra creatures** (`world/reinforcements.ts`) come on top of each level's
 hand-placed ones: that fraction of its own count, a small level counting as four (at most 14 more), plus
@@ -536,9 +537,9 @@ spasms, snapping the head sideways — each creature on its own rhythm.
 
 | Item      | Effect                                                         |
 | --------- | -------------------------------------------------------------- |
-| Ammo      | +8 rounds (not picked up if full)                              |
-| Shells    | +4 shotgun shells                                              |
-| Rivets    | +12 rivets                                                     |
+| Ammo      | +4 rounds (not picked up if full)                              |
+| Shells    | +2 shotgun shells                                              |
+| Rivets    | +6 rivets                                                      |
 | Medkit    | Carried (max 3). Use it to heal 45                             |
 | Battery   | +45 flashlight charge                                          |
 | Keycard   | Opens security doors, or the exit                              |
@@ -810,23 +811,33 @@ document and to a save-sized string.
 **Save files** (Saves → Export / Import): the save as JSON tagged
 `"game": "REMNANT"`; importing merges it in with the file's run taking over.
 
-**Supplies by difficulty** (`world/loot.ts`): the ammunition, medkit and
-battery pickups on a map are thinned out (Nightmare, Aizi) or added to
+**Ammunition caches** (`world/loot.ts`): ammunition comes in small caches
+(half of what a pickup used to hold) spread over the whole level, so it is
+found by exploring rather than in one box by the door. Each ammunition
+pickup on a map becomes two caches (times the difficulty's `lootSupply`, at
+least three of each kind a level has), spread evenly by walking distance
+from a fifth of the way in to the far end: each new cache goes in the
+emptiest stretch. Map-placed pickups past that point keep their spot; ones
+by the start move out into the level. The total is about what it was.
+Checkpoints carry a layout number (`CHECKPOINT_LAYOUT`), so one taken before
+this change restarts its level instead of restoring the wrong pickups.
+
+**Supplies by difficulty** (`world/loot.ts`): the medkit and battery
+pickups on a map are thinned out (Nightmare, Aizi) or added to
 (Story) by the difficulty's `lootSupply`. Removal keeps at least one of each
 kind a level has; additions use the level's own mix, on reachable floor away
 from the start, doors, water and other items. Seeded by level and amount,
 so both co-op players and every checkpoint see the same list. Keycards,
-weapons and notes are never touched. Over the campaign that is 71 / 50 / 48
-/ 39 supply pickups on Story / Normal / Nightmare / Aizi.
+weapons and notes are never touched.
 
 **Co-op supplies:** pickups are shared (whoever takes one, it's gone for
 both) while co-op has more and tougher creatures, so a co-op level multiplies
 the difficulty's supply by `COOP_LOOT` = 1.8 (`game/levelSession.ts`).
 Balanced with a simple model: the damage all the ammunition on a level can
 deal at a 60% hit rate, against the total health of its creatures. Across
-the campaign that share is about 3.0 on Story, 0.5–0.65 on Normal,
-0.25–0.3 on Nightmare and 0.12–0.15 on Aizi (solo–co-op); the rest is
-meant to be avoided or taken down silently.
+the campaign that share is about 1.1–1.3 on Normal, 0.5–0.7 on Nightmare
+and 0.2–0.25 on Aizi (solo–co-op), with Cold Storage and Containment the
+tightest; the rest is meant to be avoided or taken down silently.
 
 **Backups** (`tools/backup/firestore.mjs`, `.github/workflows/backup.yml`):
 once a day a GitHub Action signs in as a Firebase service account, reads
