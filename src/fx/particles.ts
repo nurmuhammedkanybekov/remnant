@@ -216,6 +216,22 @@ export class Effects {
     }
   }
 
+  /** A bottle smashing: glints of glass. */
+  glassBurst(point: THREE.Vector3): void {
+    for (let i = 0; i < 16; i++) {
+      const v = new THREE.Vector3((Math.random() - 0.5) * 4, 0.5 + Math.random() * 2.5, (Math.random() - 0.5) * 4);
+      const g = 0.5 + Math.random() * 0.5;
+      this.sparks.emit(
+        point,
+        v,
+        0.25 + Math.random() * 0.35,
+        0.03 + Math.random() * 0.03,
+        new THREE.Color(0.55 * g, 0.85 * g, 0.6 * g),
+        10
+      );
+    }
+  }
+
   /** A glob of acid bursting. */
   acidSplash(point: THREE.Vector3): void {
     for (let i = 0; i < 14; i++) {

@@ -34,6 +34,8 @@ export interface HudState {
   /** Air left while holding your breath, 0..1 (1 = breathing normally). */
   breath: number;
   breathHeld: boolean;
+  /** Bottles carried. */
+  throwables: number;
   battery: number; // 0..1
   torchOn: boolean;
   mag: number;
@@ -94,6 +96,7 @@ export class Hud {
         <div class="vrow breath" data-k="brRow">${ICON.lungs}<div class="vbar"><b class="fill" data-k="br"></b></div><div class="vnum" data-k="brTxt"></div></div>
         <div class="vrow battery" data-k="batRow">${ICON.torch}<div class="vbar"><b class="fill" data-k="bat"></b></div><div class="vnum" data-k="batNum"></div></div>
         <div class="medkits" data-k="med"><b>✚</b><span data-k="medNum"></span><kbd data-k="medKey"></kbd></div>
+        <div class="medkits throwables" data-k="thr"><b>◆</b><span data-k="thrNum"></span><kbd data-k="thrKey"></kbd></div>
         <div class="keycard" data-k="key">▣ KEYCARD</div>
         <div class="partner" data-k="partner"><span data-k="partnerName">PARTNER</span><div class="pbar"><b data-k="partnerHp"></b></div><span data-k="partnerTxt"></span></div>
       </div>
@@ -160,8 +163,9 @@ export class Hud {
   }
 
   /** The heal key's label, shown next to the medkit count. Cheap to call every frame. */
-  setHealKey(key: string): void {
+  setHealKey(key: string, throwKey?: string): void {
     if (this.el.medKey.textContent !== key) this.el.medKey.textContent = key;
+    if (throwKey !== undefined && this.el.thrKey.textContent !== throwKey) this.el.thrKey.textContent = throwKey;
   }
 
   /** HUD size and subtitle size (accessibility settings). */
@@ -261,6 +265,10 @@ export class Hud {
     if (L.weapon !== s.weapon) this.el.wname.textContent = s.weapon.toUpperCase();
     if (L.slot !== s.slot)
       this.el.slots.querySelectorAll<HTMLElement>("i").forEach((i) => i.classList.toggle("on", Number(i.dataset.slot) === s.slot));
+    if (L.throwables !== s.throwables) {
+      this.el.thrNum.textContent = `×${s.throwables}`;
+      this.el.thr.classList.toggle("none", s.throwables === 0);
+    }
     if (L.medkits !== s.medkits) {
       this.el.medNum.textContent = `×${s.medkits}`;
       this.el.med.classList.toggle("none", s.medkits === 0);

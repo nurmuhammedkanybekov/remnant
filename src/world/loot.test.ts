@@ -54,7 +54,9 @@ describe("loot by difficulty", () => {
       for (const supply of [0.55, 0.75, 1, 1.4]) {
         const items = lootFor(level, supply);
         expect(items).toEqual(lootFor(level, supply)); // same every time
-        expect(count(items, (t) => !SUPPLY.has(t))).toBe(count(own, (t) => !SUPPLY.has(t)));
+        const fixed = (t: string) => !SUPPLY.has(t) && t !== "bottle";
+        expect(count(items, fixed)).toBe(count(own, fixed));
+        expect(count(items, (t) => t === "bottle")).toBeGreaterThanOrEqual(1);
         for (const type of new Set(own.map((i) => i.type))) expect(count(items, (t) => t === type)).toBeGreaterThan(0);
         for (const i of items) {
           const c = worldToCell(i.pos.x, i.pos.y);

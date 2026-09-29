@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { SoundManager, Spatial } from "../audio/soundManager";
 import type { DifficultyDef } from "../content/difficulty";
 import { MIMIC_LINES, type EndingId } from "../content/story";
-import { HEAL_TIME, ITEMS, MAX_MEDKITS } from "../content/items";
+import { HEAL_TIME, ITEMS, MAX_MEDKITS, MAX_THROWABLES } from "../content/items";
 import { WEAPON_ORDER, WEAPONS, type WeaponId } from "../content/weapons";
 import { ACTIONS, type Action } from "../core/actions";
 import type { Engine } from "../core/engine";
@@ -13,6 +13,7 @@ import { EnemyManager } from "../enemies/enemyManager";
 import { Projectiles } from "../enemies/projectiles";
 import { Effects } from "../fx/particles";
 import { Pickup } from "../items/pickup";
+import { SMASH_NOISE, throwFrom, Throwables } from "../items/throwables";
 import { r2, type PlayerState, type SessionMsg } from "../net/protocol";
 import type { Role } from "../net/link";
 import { emptyCommand, type PlayerCommand } from "../player/command";
@@ -122,6 +123,9 @@ export class LevelSession {
   readonly stats: RunStats = freshStats();
   hasKeycard = false;
   medkits: number;
+  /** Bottles and cans carried, to throw. */
+  throwablesHeld: number;
+  private readonly throwables: Throwables;
   /** Carried weapons, by id. */
   private readonly weapons = new Map<WeaponId, Weapon>();
   private currentWeapon: WeaponId;
@@ -155,6 +159,8 @@ export class LevelSession {
   private healTimer = 0;
   private meleeCooldown = 0;
   private healHintShown = false;
+  private throwHintShown = false;
+  private bottleHintShown = false;
   private armouredHits = 0;
   /** Supplies in the boss arena come back while the fight goes on: [pickup, seconds left]. */
   private readonly restock: [Pickup, number][] = [];
@@ -219,6 +225,8 @@ export class LevelSession {
     this.player.health.current = start.health;
     this.player.flashlight.battery = start.battery;
     this.medkits = start.medkits;
+    this.throwablesHeld = start.throwables;
+    this.throwables = new Throwables(scene, this.level);
     this.player.flashlight.drainMultiplier = difficulty.batteryDrain;
     this.player.health.onDeath = () => this.handleDeath();
     this.player.health.onDamage = (amount, source) => this.handleDamage(amount, source);
@@ -366,6 +374,7 @@ export class LevelSession {
       health: this.player.health.current,
       battery: this.player.flashlight.battery,
       medkits: this.medkits,
+      throwables: this.throwablesHeld,
       weapons,
       current: this.currentWeapon,
     };
@@ -400,6 +409,7 @@ export class LevelSession {
 
     this.enemies.update(dt, this.perceptions(false));
     this.projectiles.update(dt, this.player.position, this.player.position.y, this.player.health.isDead);
+    this.updateThrowables(dt);
     if (!this.downed) {
       this.updateCombat(dt, cmd);
       this.updatePickups(dt);
@@ -480,6 +490,7 @@ export class LevelSession {
     this.enemies.update(dt, this.perceptions(true));
     this.updateCoop(dt, emptyCommand());
     this.projectiles.update(dt, this.player.position, this.player.position.y, true);
+    this.updateThrowables(dt);
     this.lamps.update(dt, this.player.position, this.time);
     this.effects.update(dt, cam, this.player.flashlight.level, this.time);
     this.damageFx = Math.max(0.4, this.damageFx - dt);
@@ -843,9 +854,40 @@ export class LevelSession {
       this.switchTo(owned[(i + cmd.cycleWeapon + owned.length) % owned.length]);
     }
     if (cmd.heal) this.startHeal();
+    if (cmd.throw) this.throwBottle();
     if (cmd.melee) this.melee();
     if (cmd.reload && !this.busy) this.weapon.tryReload();
     if (cmd.fire) this.fire();
+  }
+
+  /** Throws a bottle where you're looking: where it breaks, creatures come to look. */
+  private throwBottle(): void {
+    const { hud, sound } = this.services;
+    if (this.throwablesHeld <= 0) {
+      this.throttledPrompt("NOTHING TO THROW — LOOK FOR BOTTLES");
+      return;
+    }
+    if (this.busy) return;
+    const cam = this.services.engine.camera;
+    const { pos, vel } = throwFrom(cam.getWorldPosition(new THREE.Vector3()), cam.getWorldDirection(new THREE.Vector3()));
+    this.throwablesHeld--;
+    this.throwables.launch(pos, vel, true);
+    this.coop?.send({ t: "toss", p: [r2(pos.x), r2(pos.y), r2(pos.z)], v: [r2(vel.x), r2(vel.y), r2(vel.z)] });
+    sound.playThrow();
+    this.player.addTrauma(0.05);
+    if (!this.throwHintShown) {
+      this.throwHintShown = true;
+      hud.prompt("WHERE IT BREAKS, THEY GO TO LOOK", 3);
+    }
+  }
+
+  private updateThrowables(dt: number): void {
+    for (const l of this.throwables.update(dt)) {
+      this.services.sound.playShatter(this.spatial(new THREE.Vector2(l.pos.x, l.pos.z)));
+      this.effects.glassBurst(l.pos);
+      // Only the thrower's copy is heard by the creatures (the host's, or sent over by the guest).
+      if (l.own) this.playerNoise(new THREE.Vector2(l.pos.x, l.pos.z), SMASH_NOISE);
+    }
   }
 
   private switchTo(id: WeaponId): void {
@@ -1090,6 +1132,18 @@ export class LevelSession {
           }
           break;
         }
+        case "bottle":
+          if (this.throwablesHeld >= MAX_THROWABLES) {
+            this.throttledPrompt("CAN'T CARRY MORE BOTTLES");
+            continue;
+          }
+          this.throwablesHeld++;
+          hud.toast(`+ BOTTLE (${this.throwablesHeld}/${MAX_THROWABLES})`, "var(--ui-green)");
+          if (!this.bottleHintShown) {
+            this.bottleHintShown = true;
+            hud.prompt(`PRESS ${this.services.keyFor("throw")} TO THROW IT — A NOISE TO LEAD THEM AWAY`, 4);
+          }
+          break;
         case "battery":
           if (this.player.flashlight.battery >= MAX_BATTERY - 1) {
             this.throttledPrompt("BATTERY FULL");
@@ -1453,6 +1507,10 @@ export class LevelSession {
         }
         break;
       }
+      case "toss":
+        // The partner's throw: flown here too, so it's seen and heard, but their copy makes the noise.
+        this.throwables.launch(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), false);
+        break;
       case "pickup": {
         const p = this.pickups[m.i];
         if (!p || p.collected) break;
@@ -1486,7 +1544,7 @@ export class LevelSession {
 
   private updateHud(): void {
     const { engine, hud } = this.services;
-    hud.setHealKey(this.services.keyFor("heal"));
+    hud.setHealKey(this.services.keyFor("heal"), this.services.keyFor("throw"));
     const noiseBars = Math.min(5, Math.round((this.player.noiseRadius / NOISE_RADIUS.sprint) * 5));
     const spread = this.weapon.currentSpread(this.player.moveFactor);
     const halfFov = Math.tan(THREE.MathUtils.degToRad(engine.camera.fov / 2));
@@ -1512,6 +1570,7 @@ export class LevelSession {
       hasKeycard: this.hasKeycard,
       breath: this.player.breath.air,
       breathHeld: this.player.breath.held,
+      throwables: this.throwablesHeld,
     });
     const r = this.partnerHere ? this.remote?.state : null;
     hud.partner(r ? { hp: r.hp, down: r.down, bleed: r.bleed, name: isCharacterLook(r.look) ? LOOKS[r.look].firstName : undefined } : null);

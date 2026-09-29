@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { textures } from "../fx/textures";
 import { ITEMS, type PickupType } from "../content/items";
+import { bottleMesh } from "./throwables";
 
 export type { PickupType };
 
@@ -176,6 +177,9 @@ function buildItem(type: PickupType): THREE.Object3D {
       g.add(chip);
       break;
     }
+    case "bottle":
+      g.add(bottleMesh());
+      break;
     case "note": {
       const paper = new THREE.Mesh(
         new THREE.PlaneGeometry(0.24, 0.32),

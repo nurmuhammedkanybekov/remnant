@@ -11,6 +11,8 @@ const view = (over: Partial<InventoryView> = {}): InventoryView => ({
   maxBattery: 100,
   medkits: 2,
   maxMedkits: 3,
+  throwables: 1,
+  maxThrowables: 3,
   keycard: true,
   weapons: [
     { name: "Sidearm", slot: 1, owned: true, inHand: true, mag: 0, magSize: 12, reserve: 0, reserveMax: 60 },
@@ -19,6 +21,7 @@ const view = (over: Partial<InventoryView> = {}): InventoryView => ({
   notes: [],
   radio: [],
   healKey: "H",
+  throwKey: "G",
   closeKey: "Tab",
   live: false,
   ...over,
