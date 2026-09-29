@@ -4,7 +4,7 @@
 
 # REMNANT
 
-A first-person survival horror game that runs in the browser. Play it alone, or online with a friend.
+A first-person survival horror game that runs in the browser. Play it alone, or online with up to two friends.
 
 **[Play it here](https://nurmuhammedkanybekov.github.io/remnant/)**
 
@@ -61,33 +61,38 @@ most of the sound) is generated in code.
 
 ## What's in the game
 
-- A campaign of ten hand-built levels with a story told over the radio,
-  notes from the people who were there before you, a three-phase boss and two
-  endings.
-- Stealth that actually matters. Every step makes noise, sprinting and wading
-  make more, and your flashlight lets creatures spot you from twice as far.
-  Creatures right beside you can hear you breathe, so hold your breath while
-  one walks past, or throw a bottle to send it somewhere else.
-- A heartbeat and breathing that speed up when something is close and you
-  can't see it.
-- Nine kinds of creature, each designed to break a habit the previous one
-  taught you: one that only hears, one that freezes in your light, one that
-  waits on the ceiling, one that imitates the voice on the radio.
-- Three weapons, silent takedowns from behind, and medkits you carry and use
-  when you choose.
-- Online co-op for two or three players with a room code, with voice chat
-  that comes from where your partner stands. No accounts or installs.
-- Ammunition in small caches spread through each level, and a hidden room
-  behind a loose wall panel on every level.
-- An online leaderboard of everyone's best time on each level.
-- An inventory with your gear, a journal of every note you've found, and a
-  log of the radio.
-- Three characters to play as. The radio and the notes call you by your own
-  name, and your partner sees you as you are.
-- Five difficulty modes that change how many creatures there are, how hard
-  they hit, and how much ammunition, medicine and battery you find.
-- Cloud saves with Google sign-in, full gamepad support, rebindable controls
-  and accessibility options.
+**The campaign.** Ten hand-built levels, from the deepest sublevel up to the
+surface, with a story told over the radio, notes left by the people who were
+there before you, a three-phase boss and two endings. Every level also hides
+a room behind a loose wall panel.
+
+**Stealth that matters.** The creatures are blind, but they hear everything.
+Every step makes noise, sprinting and wading make more, and a creature right
+beside you can hear you breathe, so you hold your breath while it walks past.
+Your flashlight is the other half of it: turn it on in the dark and anything
+that sees the light comes for you straight away. A thrown bottle sends them
+somewhere else.
+
+**Creatures that hunt.** Nine kinds, each designed to break a habit the
+previous one taught you: one that only hears, one that freezes in your light,
+one that waits on the ceiling, one that imitates the voice on the radio. Some
+of them wander the whole level, and every so often one is drawn towards
+wherever you are, so nowhere stays safe for long. Lamps stutter when one is
+near, and your heart beats faster when something is close that you can't see.
+
+**Scarce supplies.** Three weapons, silent takedowns from behind, and
+medkits you carry and use when you choose. Ammunition comes in small caches
+spread across each level, so you find it by exploring.
+
+**Together.** Online co-op for two or three players with a room code, and
+voice chat that comes from where each player stands. No accounts, no
+installs.
+
+**And the rest.** Three characters to play as (the radio and the notes call
+you by your own name), five difficulty modes, an inventory with a journal of
+every note you've found, cloud saves with Google sign-in, an online
+leaderboard of best times, full gamepad support, rebindable controls and
+accessibility options.
 
 ## How to play
 
@@ -121,13 +126,12 @@ All keyboard and mouse controls can be rebound in the Controls menu.
 - **Aizi**: harder than Nightmare in every way, the fewest supplies, and one
   life. If you die, the run is over.
 
-Harder modes also leave less lying around: Story has about 40% more
-medkits and batteries than Normal and Aizi fewer, and each pickup gives less
-too. Ammunition comes in small caches spread from near the start to the far
-corners, so you find it by exploring. If you die, the retry tops your pistol
-up to a minimum, so an empty gun can't trap you. Co-op levels have 80% more
-supplies for two players and 140% more for three, because every pickup is
-shared. The exact numbers for each mode are in the
+Harder modes also leave less lying around. Story has about 40% more
+medkits and batteries than Normal, Aizi fewer, and each pickup gives less on
+the harder modes. When you die and retry, your pistol is topped up to a small
+minimum, so an empty gun can't trap you in a loop. Co-op levels have more
+supplies (80% more for two players, 140% more for three), because every
+pickup is shared. The exact numbers are in the
 [design document](docs/GAME_DESIGN.md#difficulty-contentdifficultyts).
 
 ### Characters and inventory
@@ -148,8 +152,8 @@ You choose who you play when you start a new game (or in the co-op menu):
 | **Nuraiza Akylbek** | Field geologist. She mapped these tunnels before anyone else went down.  |
 
 The story is the same for all three, but the voice on the radio, the notes
-and the subtitles use your character's name. Your partner in co-op sees your
-character and their name is on your HUD.
+and the subtitles use your character's name. In co-op the others see your
+character, and their names are on your HUD.
 
 ## Co-op
 
@@ -179,9 +183,10 @@ offices and mobile carriers) the game switches to a relay automatically.
 | You see                                | Try this                                                               |
 | -------------------------------------- | ---------------------------------------------------------------------- |
 | "No game with that code"               | Check the code. Codes never use 0, O, 1, I or L.                       |
-| "A different version of REMNANT"       | Both players refresh the page. The build number is on every screen.    |
+| "A different version of REMNANT"       | Everyone refreshes the page. The build number is on every screen.      |
 | "That game already has three players"  | The host opens a new room.                                             |
-| No voice                               | Allow the microphone when the browser asks, or check Settings.         |
+| No voice                               | Allow the microphone when the browser asks, and check Settings.        |
+| Creatures stutter for a guest          | Usually the host's computer or Wi-Fi. The host should be the fastest.  |
 | "Couldn't connect to the other player" | The screen shows the last connection steps. Try again, or add a relay. |
 
 The game already gets a relay from the matchmaking service. If you want your
@@ -356,13 +361,19 @@ two different builds refuse to connect instead of drifting apart.
 
 - Changing the number of lights in Three.js recompiles shaders and causes a
   stutter, so the level uses a fixed pool of lights that is reassigned to the
-  lamps nearest the player every frame.
+  lamps nearest the player every frame. Co-op partners' headlamps exist from
+  the start of a level for the same reason.
+- On a guest's screen, creatures keep moving between the host's snapshots
+  at their last known speed, and a snapshot that arrives late is thrown away,
+  so a slow network doesn't make them stall or jump back.
+- With three players the host forwards one guest's voice to the other over
+  the same peer-to-peer connection, so voice chat needs no server.
 - One text grid drives the level geometry, collision, line of sight, bullet
   raycasts and pathfinding.
 - Every level is checked by a validator that fails the build if an exit,
   keycard or generator can't be reached.
-- Extra creatures on harder difficulties are placed by a seeded algorithm, so
-  both co-op players get exactly the same ones.
+- Extra creatures, ammunition caches and bottles are placed by seeded
+  algorithms, so every co-op player gets exactly the same level.
 - Saves are versioned and validated field by field. Old saves are migrated,
   broken values are repaired, and the game still runs if storage is blocked.
 
@@ -371,11 +382,12 @@ two different builds refuse to connect instead of drifting apart.
 ```
 src/
   game/      app shell, level session, co-op partner, saves
-  net/       matchmaking, WebRTC link, relay, cloud saves, protocol
+  net/       matchmaking, WebRTC link, relay, voice, cloud saves, leaderboard
   content/   creatures, weapons, items, difficulty, characters
   world/     level format, parser, validator, builder, grid, pathfinding
   enemies/   AI, creature bodies, boss, projectiles
-  player/    input commands, movement, flashlight, health
+  items/     pickups, thrown bottles
+  player/    input commands, movement, breathing, flashlight, health
   weapons/   weapon logic, first-person models
   core/      renderer, input, gamepad, settings
   fx/        textures, particles
@@ -424,9 +436,9 @@ The game is then at http://localhost:5173. Other useful commands:
   session: joining with a code, shared doors and pickups, reviving, retrying,
   finishing a level together and leaving.
 
-There are 196 unit tests covering level validation, collision, pathfinding,
-movement, weapons, creature AI, co-op, save merging and cloud sync, settings
-and more. Adding `?debug` to the URL exposes test hooks on `window.game`.
+There are 224 unit tests covering level validation, collision, pathfinding,
+movement, breathing, weapons, thrown bottles, creature AI, loot placement,
+co-op, save merging, cloud sync, the leaderboard, settings and more. Adding `?debug` to the URL exposes test hooks on `window.game`.
 
 Every push to `main` is checked and deployed to GitHub Pages. The optional
 repository variables are the relay and cloud save settings described above.
