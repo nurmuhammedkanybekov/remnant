@@ -19,20 +19,26 @@ export const LIFT_SHAFT: LevelDef = {
     skyLight: 0x8090a8,
     fillIntensity: 1.5,
   },
+  notes: {
+    "1": "SURFACE CREW ROSTER, taped inside the hatch. Forty-one names. Forty have been scratched out.",
+    "2": "Tag on the lift cable: INSPECTED. Under it, in pencil: 'It rode up with me yesterday. It was holding my hand.'",
+  },
   map: [
     "########################",
     "#S....L.....D......L...#",
     "#.C....C....#..........#",
     "#...........#....a.....#",
     "#.C..E.C....#......Z...#",
-    "#.....L.....#..........#",
+    "#.....L....2#..........#",
     "######D######....L..X..#",
     "#.T....V.....#.........#",
     "#.M....A.....D.H.......#",
     "#......L.....#.........#",
+    "###########+############",
+    "###########.1###########",
+    "###########B.###########",
     "########################",
   ],
-  notes: {},
   events: {
     start: [
       radio(

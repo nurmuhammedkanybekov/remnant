@@ -23,16 +23,21 @@ export const POWER_PLANT: LevelDef = {
     "#......L....D......H.........#",
     "#..O.....O..#....O.......O...#",
     "#.....G.....#.......*........#",
-    "#...........#......L.....P...#",
+    "#4..........#......L.....P...#",
     "#####D#######.............2..#",
     "#...........#................#",
     "#.A...M..B..D......A.........#",
     "#...........#................#",
+    "###########+##################",
+    "###########.3#################",
+    "###########B.#################",
     "##############################",
   ],
   notes: {
     "1": "SHIFT LOG: Lift runs off the backup generators. All three. If one trips, the lift stops wherever it is. Do not be in it when that happens.",
     "2": "The generators are loud. The things come to the noise. Start one, then run. Start the next, then run. That's the whole plan. — M.",
+    "3": "ENGINEER'S STASH. Batteries, tape, a flask. And a list, crossed out one by one: Petrov. Ilyasova. Kim. Arkadin. Me.",
+    "4": "ARKADIN, LOG 173. Power draws it. Light, heat, current. We thought it wanted to get out. It wants to be carried.",
   },
   events: {
     start: [

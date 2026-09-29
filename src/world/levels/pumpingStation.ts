@@ -28,11 +28,15 @@ export const PUMPING_STATION: LevelDef = {
     "#.#.......*..~.........D...#",
     "#.######.####~#####.####...#",
     "#...B....L..~~~..A.....#.E.#",
+    "#######+####################",
+    "#######.3###################",
+    "#######M.###################",
     "############################",
   ],
   notes: {
     "1": "ARKADIN, LOG 112. It hears the water. Every drop that falls in this station, it hears. We have stopped the pumps. We have stopped talking.",
     "2": "Took the pump control card off what was left of Hendricks. Left it in the east intake for whoever comes next. Wade slowly. — M.",
+    "3": "ARKADIN, LOG 98. We built this room so we could talk without being heard. Tonight the walls answered.",
   },
   events: {
     start: [

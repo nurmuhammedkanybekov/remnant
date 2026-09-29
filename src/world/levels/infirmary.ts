@@ -25,11 +25,15 @@ export const INFIRMARY: LevelDef = {
     "#.....#.#...#.#.E..#...#",
     "#.###.#.#.A.#.#.####.#.#",
     "#..L..#.....#...d....#X#",
+    "#########+##############",
+    "#########.3#############",
+    "#########M.#############",
     "########################",
   ],
   notes: {
     "1": "PATIENT 14 — KESSLER, T. Drilling crew. Admitted with 'mineral dermatitis'. Refuses light. Asked for the lamps off. Asked us to be quiet. Asked, and asked, and asked.",
     "2": "Nur — if you wake up before I get back: I've gone up to find the others. Keep your light off when you can. They follow it. — Mara",
+    "3": "Hid this behind the panel so the others wouldn't take it all. If you found it, you're the kind who looks. Good. Keep looking. — M.",
   },
   events: {
     start: [radio(unknown("...is anyone on ten? Anyone at all? Pick up the intercom."), nur("My head. How long was I out?"))],

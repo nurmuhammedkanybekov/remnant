@@ -24,6 +24,9 @@ export const CONTAINMENT_LABS: LevelDef = {
     "#....M....#....K....#......X.#",
     "#.4.......#..C...C..#..R.....#",
     "#.........#.E.....B.#........#",
+    "##############+###############",
+    "##############.5##############",
+    "##############B.##############",
     "##############################",
   ],
   notes: {
@@ -31,6 +34,7 @@ export const CONTAINMENT_LABS: LevelDef = {
     "2": "ARKADIN, LOG 140. R-7 has begun repeating the words we say near it. Tonight it said my daughter's name. I have never said her name down here.",
     "3": "CONSORTIUM MEMO: all Zenit-era material is scrap. Anything 'soft' goes to the incinerator. Do NOT open containment. — Site Management",
     "4": "Kessler talked his way into the labs. He wanted to see it. He came out smiling. None of us had ever seen him smile.",
+    "5": "ARKADIN, LOG 151. The last clean sample of my blood is in this cabinet. If it is still red when you find it, burn it. If it isn't, run.",
   },
   events: {
     start: [
