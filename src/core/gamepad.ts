@@ -30,13 +30,13 @@ export const PAD_BINDINGS: Record<Action, number[]> = {
   moveBack: [],
   moveLeft: [],
   moveRight: [],
-  sprint: [PAD.LT, PAD.L3],
+  sprint: [PAD.LT],
   crouch: [PAD.B],
   fire: [PAD.RT],
   reload: [PAD.X],
   flashlight: [PAD.LB],
   interact: [PAD.A],
-  melee: [PAD.RB, PAD.R3],
+  melee: [PAD.RB],
   heal: [PAD.UP],
   inventory: [PAD.BACK],
   nextWeapon: [PAD.Y, PAD.RIGHT],
@@ -44,6 +44,10 @@ export const PAD_BINDINGS: Record<Action, number[]> = {
   weapon1: [PAD.DOWN],
   weapon2: [],
   weapon3: [],
+  holdBreath: [PAD.L3],
+  throw: [PAD.R3],
+  camera: [],
+  talk: [],
 };
 
 const BUTTON_NAMES: Record<number, string> = {

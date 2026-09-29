@@ -24,6 +24,10 @@ export const ACTIONS = [
   "weapon1",
   "weapon2",
   "weapon3",
+  "holdBreath",
+  "throw",
+  "camera",
+  "talk",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -51,6 +55,10 @@ export const ACTION_LABELS: Record<Action, string> = {
   weapon1: "Sidearm",
   weapon2: "Rivet gun",
   weapon3: "Shotgun",
+  holdBreath: "Hold breath",
+  throw: "Throw bottle / can",
+  camera: "First / third person",
+  talk: "Push to talk (co-op)",
 };
 
 export const DEFAULT_BINDINGS: Bindings = {
@@ -72,6 +80,10 @@ export const DEFAULT_BINDINGS: Bindings = {
   weapon1: ["Digit1", null],
   weapon2: ["Digit2", null],
   weapon3: ["Digit3", null],
+  holdBreath: ["KeyB", null],
+  throw: ["KeyG", null],
+  camera: ["KeyP", null],
+  talk: ["KeyT", null],
 };
 
 /** Codes that can never be bound: Escape is reserved by the browser for releasing the mouse. */

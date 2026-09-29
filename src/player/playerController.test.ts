@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { CELL_SIZE, type LevelGrid } from "../world/grid";
+import { BREATH_NOISE } from "./breath";
 import { emptyCommand, type PlayerCommand } from "./command";
 import { MAX_STAMINA, NOISE_RADIUS, PlayerController } from "./playerController";
 
@@ -49,7 +50,18 @@ describe("PlayerController", () => {
     const p = makePlayer();
     simulate(p, 1, { moveY: 1, crouch: true, sprint: true });
     expect(p.gait).toBe("crouch");
+    // Crouch-walking is quieter than your breathing; hold it and only the steps are left.
+    expect(p.noiseRadius).toBe(Math.max(NOISE_RADIUS.crouch, BREATH_NOISE));
+    simulate(p, 1, { moveY: 1, crouch: true, holdBreath: true });
     expect(p.noiseRadius).toBe(NOISE_RADIUS.crouch);
+  });
+
+  it("standing still you're only heard breathing, and not at all while you hold it", () => {
+    const p = makePlayer();
+    simulate(p, 0.5, {});
+    expect(p.noiseRadius).toBe(BREATH_NOISE);
+    simulate(p, 0.5, { holdBreath: true });
+    expect(p.noiseRadius).toBe(0);
   });
 
   it("applies look input and clamps pitch", () => {
