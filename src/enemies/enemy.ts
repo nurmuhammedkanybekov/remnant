@@ -50,6 +50,20 @@ const BEHIND_ANGLE = THREE.MathUtils.degToRad(105);
 const MELEE_WINDUP_MAX = 0.45;
 /** With two players, it only switches to the other one if they're this much closer. */
 const TARGET_STICK = 3;
+/**
+ * Roamers: this share of the creatures that walk don't keep to their corner;
+ * they wander the level, so nowhere you've cleared is safe for long.
+ */
+const ROAM_SHARE = 0.4;
+/** How far (cells) a roamer picks its next spot from where it is, and how long it tries to reach it. */
+const ROAM_RADIUS = 7;
+const ROAM_GIVE_UP = 14;
+/** How fast suspicion fills when it sees you with your light on: a blink, then it comes. */
+const LIT_SUSPICION_RATE = 6;
+/** A puppet carries on at the host copy's last speed for at most this long past its last snapshot. */
+const PUPPET_EXTRAPOLATE = 0.25;
+/** Faster than any creature runs: a jump that big between snapshots is a teleport, not movement. */
+const PUPPET_MAX_SPEED = 12;
 /** A puppet further than this from where the host says it is jumps there instead of gliding. */
 const PUPPET_SNAP = 3;
 
@@ -88,6 +102,9 @@ export class Enemy {
   puppet = false;
   /** Latest snapshot from the host, for a puppet. */
   protected net: number[] | null = null;
+  /** Puppet: how fast the host's copy was moving between its last two snapshots, and when the last one came. */
+  private readonly netVel = new THREE.Vector2();
+  private netAge = 0;
 
   onAttackHit: ((damage: number, from: THREE.Vector2) => void) | null = null;
   onAlert: ((enemy: Enemy) => void) | null = null;
@@ -100,6 +117,9 @@ export class Enemy {
   protected readonly home: THREE.Vector2;
   protected patrolTarget: THREE.Vector2;
   protected patrolWait = 0;
+  /** Wanders the whole level instead of its own corner (see `ROAM_SHARE`). */
+  readonly roamer: boolean;
+  private roamTime = 0;
   protected path: THREE.Vector2[] = [];
   protected repathTimer = 0;
   protected lastKnown = new THREE.Vector2();
@@ -137,6 +157,8 @@ export class Enemy {
     this.health = this.maxHealth;
     this.home = spawn.clone();
     this.patrolTarget = spawn.clone();
+    const b = this.stats.behaviour;
+    this.roamer = b !== "boss" && b !== "ceiling" && b !== "lurker" && Math.random() < ROAM_SHARE;
     this.body = body ?? buildBody(this.stats);
     this.root.add(this.body.group);
     this.root.position.set(spawn.x, 0, spawn.y);
@@ -256,6 +278,15 @@ export class Enemy {
     this.goInvestigate(pos);
   }
 
+  /** Wanders over to look around `pos`, not knowing what's there (the hunt drawing it towards you). */
+  drawnTo(pos: THREE.Vector2): void {
+    if (this.isDead || this.isHunting || this.state !== "patrol") return;
+    this.state = "investigate";
+    this.lastKnown.copy(pos);
+    this.path = [];
+    this.repathTimer = 0;
+  }
+
   /** Starts hunting the player at `pos` straight away (freshly summoned creatures). */
   alertTo(pos: THREE.Vector2): void {
     if (this.isDead) return;
@@ -360,9 +391,16 @@ export class Enemy {
       canSee = los && dist < sightRange && (inCone || hunting || dist < 2);
       if (canSee) {
         // Close = instant; far = suspicion builds over time (gives you a moment to duck away).
-        const rate = dist < sightRange * 0.4 ? 10 : 1.6 + (1 - dist / sightRange) * 2;
+        // A light in the dark is different: it knows at once what that is.
+        const rate = lit
+          ? Math.max(LIT_SUSPICION_RATE, dist < sightRange * 0.4 ? 10 : 0)
+          : dist < sightRange * 0.4
+            ? 10
+            : 1.6 + (1 - dist / sightRange) * 2;
         this.suspicion = Math.min(1, this.suspicion + rate * dt);
       }
+      // Your beam on it: it sees the light coming from you, from as far as the beam reaches.
+      if (!canSee && s.light === "sees" && this.inBeam(p, los)) this.suspicion = Math.min(1, this.suspicion + LIT_SUSPICION_RATE * dt);
     }
     if (!canSee) this.suspicion = Math.max(0, this.suspicion - dt * 0.35);
     const touch = !p.playerDead && los && dist < TOUCH_RANGE;
@@ -567,9 +605,19 @@ export class Enemy {
       this.speedNow = 0;
       return;
     }
-    if (this.followPathTo(dt, level, this.patrolTarget, this.stats.patrolSpeed, others)) {
-      this.patrolWait = 1.5 + Math.random() * 3;
-      this.patrolTarget = randomFloorNear(level, this.home.x, this.home.y, 2);
+    this.roamTime += dt;
+    const arrived = this.followPathTo(dt, level, this.patrolTarget, this.stats.patrolSpeed, others);
+    if (arrived || (this.roamer && this.roamTime > ROAM_GIVE_UP)) {
+      this.roamTime = 0;
+      if (this.roamer) {
+        // Somewhere else, from wherever it is now: over time it drifts through the whole level.
+        const me = this.position2D;
+        this.patrolWait = 0.5 + Math.random() * 2;
+        this.patrolTarget = randomFloorNear(level, me.x, me.y, ROAM_RADIUS);
+      } else {
+        this.patrolWait = 1.5 + Math.random() * 3;
+        this.patrolTarget = randomFloorNear(level, this.home.x, this.home.y, 2);
+      }
     }
   }
 
@@ -674,6 +722,13 @@ export class Enemy {
 
   /** Puppet: take the host's latest state. */
   applyNet(a: number[]): void {
+    const prev = this.net;
+    if (prev && this.netAge > 0.01) {
+      // Its speed from the last two snapshots, so it keeps moving between them.
+      this.netVel.set((a[0] - prev[0]) / this.netAge, (a[1] - prev[1]) / this.netAge);
+      if (this.netVel.length() > PUPPET_MAX_SPEED || Math.hypot(a[0] - prev[0], a[1] - prev[1]) > PUPPET_SNAP) this.netVel.set(0, 0);
+    }
+    this.netAge = 0;
     this.net = a;
     const state = STATES[a[3]] ?? "patrol";
     if (state === "dead" && !this.isDead) {
@@ -696,12 +751,18 @@ export class Enemy {
     }
     const a = this.net;
     if (a) {
+      this.netAge += dt;
       const k = 1 - Math.exp(-12 * dt);
       const p = this.root.position;
-      if (Math.hypot(a[0] - p.x, a[1] - p.z) > PUPPET_SNAP) p.set(a[0], p.y, a[1]);
+      // Where the host's copy is by now: the last snapshot carried forward at its speed
+      // (only briefly, so a late or lost packet doesn't stop it dead, nor send it through a wall).
+      const ahead = Math.min(this.netAge, PUPPET_EXTRAPOLATE) * (a[4] > 0.05 ? 1 : 0);
+      const tx = a[0] + this.netVel.x * ahead;
+      const tz = a[1] + this.netVel.y * ahead;
+      if (Math.hypot(tx - p.x, tz - p.z) > PUPPET_SNAP) p.set(tx, p.y, tz);
       else {
-        p.x += (a[0] - p.x) * k;
-        p.z += (a[1] - p.z) * k;
+        p.x += (tx - p.x) * k;
+        p.z += (tz - p.z) * k;
       }
       this.facing += wrapAngle(a[2] - this.facing) * k;
       this.speedNow = a[4];

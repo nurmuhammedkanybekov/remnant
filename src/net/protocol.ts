@@ -86,6 +86,8 @@ export interface PlayerState {
   held?: boolean;
   /** Talking on voice chat right now (creatures close by can hear it). */
   talk?: boolean;
+  /** Counts up with every state sent (see `EnemySnapshot.n`). */
+  n?: number;
 }
 
 /**
@@ -95,6 +97,8 @@ export interface PlayerState {
 export interface EnemySnapshot {
   t: "es";
   e: number[][];
+  /** Counts up with every snapshot: the fast channel can deliver out of order, and an older one is dropped. */
+  n?: number;
 }
 
 export type SessionMsg =
