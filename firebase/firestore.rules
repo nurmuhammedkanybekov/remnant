@@ -2,6 +2,10 @@ rules_version = '2';
 
 // REMNANT cloud saves: one document per player, saves/{their user id}.
 // Players can read and write only their own, and only a save-sized string.
+//
+// The leaderboard: one document per player, leaderboard/{their user id},
+// with a short name and their best times. Any signed-in player can read
+// the board; each player can write only their own entry.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /saves/{uid} {
@@ -11,6 +15,17 @@ service cloud.firestore {
         && request.resource.data.json is string
         && request.resource.data.json.size() < 200000
         && request.resource.data.savedAt is int;
+    }
+    match /leaderboard/{uid} {
+      allow read: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'times', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 16
+        && request.resource.data.times is map
+        && request.resource.data.times.size() <= 200
+        && request.resource.data.updatedAt is int;
     }
   }
 }

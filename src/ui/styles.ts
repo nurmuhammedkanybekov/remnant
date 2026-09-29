@@ -210,6 +210,12 @@ const CSS = /* css */ `
 .binds button.slot:hover, .binds button.slot:focus-visible { border-color: var(--ui-red); outline: none; }
 .binds button.slot.listening { color: var(--ui-amber); border-color: var(--ui-amber); animation: pulse .9s ease-in-out infinite; }
 .version { position: absolute; bottom: 26px; right: 28px; font-size: 11px; letter-spacing: 2px; color: rgba(232,226,214,.3); }
+.board { border-collapse: collapse; margin: 6px auto 18px; font-size: 13px; min-width: min(760px, 94vw); }
+.board th { font-size: 10px; letter-spacing: .25em; opacity: .5; font-weight: normal; padding: 0 10px 8px; text-align: left; }
+.board td { padding: 6px 10px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; white-space: nowrap; }
+.board td small { display: block; font-size: 11px; opacity: .6; letter-spacing: .08em; }
+.board td.me { color: var(--ui-amber); }
+.board td.dim { opacity: .3; }
 .stats { display: grid; grid-template-columns: auto auto; gap: 6px 36px; margin: 10px 0 34px; font-size: 14px; text-align: left; }
 .stats span:nth-child(odd) { color: var(--ui-dim); letter-spacing: 2px; }
 .stats span:nth-child(even) { text-align: right; }

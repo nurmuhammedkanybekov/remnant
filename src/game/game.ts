@@ -1,7 +1,7 @@
 import { BUILD_ID } from "../net/build";
 import { MusicDirector } from "../audio/music";
 import { SoundManager } from "../audio/soundManager";
-import { DIFFICULTIES, type DifficultyDef, type DifficultyId } from "../content/difficulty";
+import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyDef, type DifficultyId } from "../content/difficulty";
 import { cloneBindings, DEFAULT_BINDINGS, keyLabel, type Action } from "../core/actions";
 import { ENDINGS, PROLOGUE, TRANSMISSIONS, type EndingId } from "../content/story";
 import { PAD, padLabel } from "../core/gamepad";
@@ -14,6 +14,7 @@ import { loadSettings, saveSettings, type Settings } from "../core/settings";
 import type { Enemy } from "../enemies/enemy";
 import { hasRelay, relayState } from "../net/ice";
 import { CloudSync } from "../net/cloud";
+import { boardKey, Leaderboard, ranking, type BoardMode } from "../net/leaderboard";
 import { firebaseBackend, firebaseConfig } from "../net/firebaseBackend";
 import { describeClose, PeerLink } from "../net/link";
 import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg } from "../net/protocol";
@@ -79,6 +80,10 @@ export class Game {
   private readonly settings: Settings = loadSettings();
   private readonly save = new SaveStore(LEVELS.length);
   private readonly cloud: CloudSync;
+  private readonly board: Leaderboard;
+  /** Which board the leaderboard screen shows. */
+  private boardView: { difficulty: DifficultyId; mode: BoardMode } = { difficulty: "normal", mode: "solo" };
+  private boardToken = 0;
   /** A one-off line for the saves screen ("Save file loaded."). */
   private savesNote = "";
   private readonly debug = new URLSearchParams(location.search).has("debug");
@@ -113,7 +118,10 @@ export class Game {
     this.cloud = new CloudSync(this.save, LEVELS.length, fb ? () => firebaseBackend(fb) : null);
     this.cloud.onStatus = () => {
       if (this.screens?.showing("saves")) this.showSaves();
+      if (this.screens?.showing("leaderboard")) this.showLeaderboard();
     };
+    this.board = new Leaderboard(this.cloud);
+    this.cloud.onSignedIn = () => void this.board.upload();
     // A run or unlocks arrived from another device: show them.
     this.cloud.onMerged = () => {
       if (this.state === "menu" && this.screens.showing("main-menu")) this.showMainMenu();
@@ -240,6 +248,12 @@ export class Game {
           this.showSaves();
         },
       },
+      {
+        label: "Leaderboard",
+        detail: this.cloud.available ? "Best times of everyone signed in" : "Needs cloud saves",
+        disabled: !this.cloud.available,
+        action: () => this.showLeaderboard(),
+      },
       { label: "Settings", action: () => this.showSettings(() => this.showMainMenu()) },
       { label: "Controls", action: () => this.showControls(() => this.showMainMenu()) },
       { label: "Exit", detail: "Back to the title screen", action: () => this.exitToTitle() }
@@ -251,6 +265,83 @@ export class Game {
       LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, reached: i <= reached })),
       personalise(TRANSMISSIONS[Math.floor(Math.random() * TRANSMISSIONS.length)])
     );
+  }
+
+  /** The online leaderboard, for one difficulty and mode at a time. */
+  private showLeaderboard(): void {
+    const v = this.boardView;
+    const token = ++this.boardToken;
+    const tag = `${DIFFICULTIES[v.difficulty].name.toUpperCase()} · ${v.mode === "solo" ? "SOLO" : "CO-OP"}`;
+    const cycle = (dir: 1 | -1) => {
+      const i = DIFFICULTY_ORDER.indexOf(v.difficulty);
+      v.difficulty = DIFFICULTY_ORDER[(i + dir + DIFFICULTY_ORDER.length) % DIFFICULTY_ORDER.length];
+      this.showLeaderboard();
+    };
+    const controls: MenuItem[] = [
+      { label: "Difficulty", detail: DIFFICULTIES[v.difficulty].name, action: () => cycle(1) },
+      {
+        label: "Mode",
+        detail: v.mode === "solo" ? "Solo" : "Co-op",
+        action: () => {
+          v.mode = v.mode === "solo" ? "coop" : "solo";
+          this.showLeaderboard();
+        },
+      },
+    ];
+    const back: MenuItem = { label: "Back", action: () => this.showMainMenu() };
+    if (!this.cloud.user) {
+      this.screens.leaderboard(
+        "NOT SIGNED IN",
+        null,
+        "Sign in with Google to see everyone's best times and put yours up. Times you set before signing in are kept and uploaded then.",
+        [
+          {
+            label: "Sign In with Google",
+            primary: true,
+            disabled: this.cloud.status === "connecting",
+            action: () => void this.cloud.signIn(),
+          },
+          back,
+        ]
+      );
+      return;
+    }
+    this.screens.leaderboard(tag, null, "Loading…", [...controls, back]);
+    void this.board
+      .entries()
+      .then((entries) => {
+        if (token !== this.boardToken || !this.screens.showing("leaderboard")) return;
+        const me = this.cloud.user?.uid;
+        const rows = LEVELS.map((def) => {
+          const ranked = ranking(entries, boardKey(def.id, v.difficulty, v.mode));
+          const at = ranked.findIndex((r) => r.uid === me);
+          const own = this.board.best(boardKey(def.id, v.difficulty, v.mode));
+          return {
+            level: `${def.name} · ${def.subtitle}`,
+            top: ranked.slice(0, 3).map((r) => ({ name: r.name, time: r.time, me: r.uid === me })),
+            mine:
+              at >= 0
+                ? { time: ranked[at].time, rank: at + 1 }
+                : own !== undefined
+                  ? { time: own, rank: ranked.filter((r) => r.time < own).length + 1 }
+                  : null,
+          };
+        });
+        const players = entries.length;
+        this.screens.leaderboard(
+          tag,
+          rows,
+          `${players} ${players === 1 ? "player" : "players"} on the board. A level's time counts from its start to the exit, deaths not included.`,
+          [...controls, { label: "Refresh", action: () => void this.board.entries(true).then(() => this.showLeaderboard()) }, back]
+        );
+      })
+      .catch((e: unknown) => {
+        if (token !== this.boardToken || !this.screens.showing("leaderboard")) return;
+        this.screens.leaderboard(tag, null, e instanceof Error ? e.message : "The leaderboard can't be reached right now.", [
+          ...controls,
+          back,
+        ]);
+      });
   }
 
   /** Cloud sign-in and sync, and exporting / importing a save file. */
@@ -683,6 +774,7 @@ export class Game {
     this.hud.setVisible(false);
     addStats(run.stats, session.stats);
     const newBest = !run.coop && this.save.recordLevelTime(session.def.id, session.stats.time);
+    this.board.record(session.def.id, run.difficulty.id, run.coop ? "coop" : "solo", session.stats.time);
     this.music.setMode("silent");
 
     if (run.levelIndex >= LEVELS.length - 1) {

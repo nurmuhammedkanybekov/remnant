@@ -48,6 +48,13 @@ export interface ChapterEntry {
   bestTime?: number;
 }
 
+/** One level's line on the leaderboard. */
+export interface BoardRow {
+  level: string;
+  top: { name: string; time: number; me: boolean }[];
+  mine: { time: number; rank: number } | null;
+}
+
 export function formatTime(s: number): string {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
@@ -434,6 +441,34 @@ export class Screens {
   /** Cloud sync, and moving progress with a save file. */
   saves(tag: string, text: string, items: MenuItem[]): void {
     this.render(`<h2>SAVES</h2><div class="tag">${esc(tag)}</div><div class="sub">${esc(text)}</div>`, items, true, false, "saves");
+  }
+
+  /** The online leaderboard: one row per level, the top three and where you stand. */
+  leaderboard(tag: string, rows: BoardRow[] | null, note: string, items: MenuItem[]): void {
+    const body = rows
+      ? `<table class="board"><thead><tr><th>LEVEL</th><th>1ST</th><th>2ND</th><th>3RD</th><th>YOU</th></tr></thead><tbody>${rows
+          .map(
+            (r) =>
+              `<tr><td>${esc(r.level)}</td>${[0, 1, 2]
+                .map((i) => {
+                  const t = r.top[i];
+                  return t
+                    ? `<td class="${t.me ? "me" : ""}">${esc(t.name)}<small>${formatTime(t.time)}</small></td>`
+                    : `<td class="dim">—</td>`;
+                })
+                .join(
+                  ""
+                )}<td class="${r.mine ? "me" : "dim"}">${r.mine ? `#${r.mine.rank}<small>${formatTime(r.mine.time)}</small>` : "—"}</td></tr>`
+          )
+          .join("")}</tbody></table>`
+      : "";
+    this.render(
+      `<h2>LEADERBOARD</h2><div class="tag">${esc(tag)}</div>${body}${note ? `<div class="sub">${esc(note)}</div>` : ""}`,
+      items,
+      true,
+      true,
+      "leaderboard"
+    );
   }
 
   /** Whether the screen showing is the given one (for screens that refresh themselves). */
