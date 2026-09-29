@@ -19,7 +19,7 @@ import { describeClose, PeerLink } from "../net/link";
 import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg } from "../net/protocol";
 import { buildCommand, emptyCommand, type PlayerCommand } from "../player/command";
 import { fullName, LOOKS, personalise, setCharacter } from "../content/characters";
-import { MAX_MEDKITS } from "../content/items";
+import { MAX_MEDKITS, MAX_THROWABLES } from "../content/items";
 import { WEAPON_ORDER, WEAPONS } from "../content/weapons";
 import { MAX_BATTERY } from "../player/flashlight";
 import { Hud, speakerName } from "../ui/hud";
@@ -486,6 +486,8 @@ export class Game {
       maxBattery: MAX_BATTERY,
       medkits: loadout.medkits,
       maxMedkits: MAX_MEDKITS,
+      throwables: loadout.throwables,
+      maxThrowables: MAX_THROWABLES,
       keycard: s.hasKeycard,
       weapons: WEAPON_ORDER.map((id) => {
         const w = WEAPONS[id];
@@ -504,6 +506,7 @@ export class Game {
       notes,
       radio: [...s.radioLog].reverse().map((l) => ({ who: speakerName(l.speaker), speaker: l.speaker, text: l.text })),
       healKey: this.services.keyFor("heal"),
+      throwKey: this.services.keyFor("throw"),
       closeKey: this.services.keyFor("inventory"),
       live: this.run!.coop,
     };

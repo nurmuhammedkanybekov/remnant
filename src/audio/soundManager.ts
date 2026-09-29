@@ -608,6 +608,35 @@ export class SoundManager {
     this.burst(o, "bandpass", 700 * pitch, 0.7, t + period * 0.45, period * 0.35, v * 1.2, period * 0.08);
   }
 
+  /** A bottle leaving your hand: a quick swish. */
+  playThrow(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.burst(this.out(CENTER, 1, 0.1)!, "bandpass", 900, 0.6, t, 0.16, 0.12, 0.04);
+  }
+
+  /** Glass breaking somewhere: a crack, a spray of high glints, the tinkle of pieces landing. */
+  playShatter(sp: Spatial): void {
+    if (!this.ctx) return;
+    const o = this.out(sp, 45, 0.6);
+    if (!o) return;
+    const t = this.ctx.currentTime;
+    this.burst(o, "highpass", 2500, 0.7, t, 0.12, 0.9, 0.001);
+    this.burst(o, "bandpass", 5200, 3, t + 0.01, 0.35, 0.4, 0.002);
+    for (let i = 0; i < 7; i++) {
+      const at = t + 0.03 + Math.random() * 0.45;
+      this.tone(
+        o,
+        "sine",
+        3000 + Math.random() * 4000,
+        2500 + Math.random() * 3000,
+        at,
+        0.05 + Math.random() * 0.08,
+        0.06 + Math.random() * 0.08
+      );
+    }
+  }
+
   /** Holding your breath, letting it out, or gasping when you run out. */
   playBreath(kind: "hold" | "release" | "gasp"): void {
     if (!this.ctx) return;

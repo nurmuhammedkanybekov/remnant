@@ -65,6 +65,8 @@ const CSS = /* css */ `
 .medkits kbd { font-family: var(--font-mono); font-size: 10px; padding: 0 5px; border: 1px solid rgba(255,255,255,.3); border-radius: 2px;
   color: var(--ui-dim); }
 .medkits.none { opacity: .35; }
+.throwables { margin-top: 4px; }
+.throwables b { color: #9adfa0; }
 .keycard { margin-top: 10px; font-size: 12px; letter-spacing: 2px; color: var(--ui-green); display: none; }
 .keycard.show { display: block; }
 .partner { margin-top: 12px; font-size: 11px; letter-spacing: 2px; color: #7ab8ff; display: none; align-items: center; gap: 8px; }
@@ -323,6 +325,9 @@ const CSS = /* css */ `
 .inv-kits i.on { border-color: var(--ui-red); background: rgba(216,67,47,.15); }
 .inv-kits i.on::before, .inv-kits i.on::after { content: ""; position: absolute; background: var(--ui-red); left: 9px; top: 4px; width: 4px; height: 14px; }
 .inv-kits i.on::after { left: 4px; top: 9px; width: 14px; height: 4px; }
+.inv-kits.bottles i.on { border-color: #9adfa0; background: rgba(154,223,160,.12); }
+.inv-kits.bottles i.on::before { background: #9adfa0; left: 8px; top: 7px; width: 6px; height: 12px; border-radius: 2px; }
+.inv-kits.bottles i.on::after { background: #9adfa0; left: 10px; top: 3px; width: 2px; height: 5px; }
 .inv-hint { font-size: 12px; color: var(--ui-dim); margin: 4px 0 0; }
 .inv-weapon { display: flex; align-items: center; gap: 12px; padding: 8px 10px; margin-bottom: 6px; border: 1px solid rgba(255,255,255,.1);
   background: rgba(0,0,0,.3); font-size: 14px; }

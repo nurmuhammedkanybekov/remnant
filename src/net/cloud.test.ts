@@ -7,7 +7,7 @@ const LEVELS = 5;
 const run = (levelIndex: number) => ({
   difficulty: "normal" as const,
   levelIndex,
-  loadout: { health: 90, battery: 60, medkits: 1, weapons: { pistol: { mag: 8, reserve: 16 } }, current: "pistol" as const },
+  loadout: { health: 90, battery: 60, medkits: 1, throwables: 1, weapons: { pistol: { mag: 8, reserve: 16 } }, current: "pistol" as const },
   stats: freshStats(),
   checkpoint: null,
 });

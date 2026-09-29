@@ -1,5 +1,5 @@
 import type { DifficultyDef } from "../content/difficulty";
-import { MAX_MEDKITS } from "../content/items";
+import { MAX_MEDKITS, MAX_THROWABLES } from "../content/items";
 import { isWeaponId, WEAPON_ORDER, WEAPONS, type WeaponId } from "../content/weapons";
 import { MAX_BATTERY } from "../player/flashlight";
 
@@ -14,6 +14,8 @@ export interface Loadout {
   health: number;
   battery: number;
   medkits: number;
+  /** Bottles and cans to throw. */
+  throwables: number;
   /** Weapons carried, and their ammo. The pistol is always carried. */
   weapons: Partial<Record<WeaponId, WeaponAmmo>>;
   /** The weapon in hand. */
@@ -33,7 +35,7 @@ export function startingLoadout(difficulty: DifficultyDef, levelIds: readonly st
     if (w.foundIn !== null && !earlier.has(w.foundIn)) continue;
     weapons[id] = { mag: w.magSize, reserve: id === "pistol" ? difficulty.startingReserve : w.ammoPickup * 4 };
   }
-  return { health: 100, battery: MAX_BATTERY, medkits: difficulty.startingMedkits, weapons, current: "pistol" };
+  return { health: 100, battery: MAX_BATTERY, medkits: difficulty.startingMedkits, throwables: 1, weapons, current: "pistol" };
 }
 
 /**
@@ -99,6 +101,7 @@ export function parseLoadout(raw: unknown): Loadout | null {
     health: Math.min(100, Math.max(1, num(l.health, 100))),
     battery: Math.min(MAX_BATTERY, Math.max(0, num(l.battery, MAX_BATTERY))),
     medkits: Math.min(MAX_MEDKITS, Math.max(0, Math.floor(num(l.medkits, 0)))),
+    throwables: Math.min(MAX_THROWABLES, Math.max(0, Math.floor(num(l.throwables, 0)))),
     weapons,
     current,
   };

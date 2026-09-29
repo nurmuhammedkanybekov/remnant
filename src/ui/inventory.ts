@@ -33,12 +33,15 @@ export interface InventoryView {
   maxBattery: number;
   medkits: number;
   maxMedkits: number;
+  throwables: number;
+  maxThrowables: number;
   keycard: boolean;
   weapons: InventoryWeapon[];
   notes: InventoryNote[];
   radio: { who: string; speaker: string; text: string }[];
   /** Key labels for hints. */
   healKey: string;
+  throwKey: string;
   closeKey: string;
   /** Online: the world keeps going while the inventory is open. */
   live: boolean;
@@ -89,6 +92,15 @@ export function gearHtml(v: InventoryView): string {
               ? "At full health — save the medkits."
               : `Press ${esc(v.healKey)} in the field, or use one now.`
             : "No medkits. Look for the red crosses."
+        }</div>
+        <div class="inv-row"><span>Bottles</span><span class="inv-kits bottles">${Array.from(
+          { length: v.maxThrowables },
+          (_, i) => `<i class="${i < v.throwables ? "on" : ""}"></i>`
+        ).join("")}</span><b>${v.throwables}/${v.maxThrowables}</b></div>
+        <div class="inv-hint">${
+          v.throwables > 0
+            ? `Press ${esc(v.throwKey)} to throw one. Where it breaks, they go to look.`
+            : "Nothing to throw. Bottles lie about the levels."
         }</div>
         <h3>KEY ITEMS</h3>
         <div class="inv-row"><span>Keycard</span><b class="${v.keycard ? "ok" : "dim"}">${v.keycard ? "CARRIED" : "—"}</b></div>

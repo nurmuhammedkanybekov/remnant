@@ -108,6 +108,8 @@ export type SessionMsg =
   | { t: "hit"; i: number; dmg: number; part: "head" | "body"; x: number; z: number }
   | { t: "takedown"; i: number; x: number; z: number }
   | { t: "shove"; i: number; dx: number; dz: number }
+  /** A bottle thrown: start and velocity (both ways; each side flies it, only the thrower's makes noise). */
+  | { t: "toss"; p: number[]; v: number[] }
   // --- world
   /** Guest → host: "I pressed use on interactable i". Host → guest: "interactable i was used". */
   | { t: "use"; i: number }

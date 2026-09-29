@@ -1,7 +1,7 @@
 import type { WeaponId } from "./weapons";
 
 /** Pickups and what they give. Amounts are scaled by the difficulty's `pickupMultiplier`. */
-export type PickupType = "ammo" | "shells" | "rivets" | "medkit" | "battery" | "keycard" | "note" | "shotgun" | "rivetGun";
+export type PickupType = "ammo" | "shells" | "rivets" | "medkit" | "battery" | "keycard" | "note" | "shotgun" | "rivetGun" | "bottle";
 
 export interface ItemDef {
   /** Map glyph; notes use the digits 0–9 instead. */
@@ -26,10 +26,14 @@ export const ITEMS: Record<PickupType, ItemDef> = {
   note: { glyph: null, amount: 0, glow: 0xfff0c0 },
   shotgun: { glyph: "!", amount: 0, glow: 0xffd08a, weapon: "shotgun" },
   rivetGun: { glyph: "^", amount: 0, glow: 0xffd08a, weapon: "rivet" },
+  /** Thrown to make a noise somewhere else. Never on a map: scattered by `world/loot.ts`. */
+  bottle: { glyph: null, amount: 0, glow: 0x9adfa0 },
 };
 
 /** Medkits are carried, not used on the spot. */
 export const MAX_MEDKITS = 3;
+/** Bottles and cans you can carry. */
+export const MAX_THROWABLES = 3;
 /** Seconds to apply a medkit; you can't shoot meanwhile. */
 export const HEAL_TIME = 1.3;
 

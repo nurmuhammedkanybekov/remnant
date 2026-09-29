@@ -2,7 +2,15 @@ import * as THREE from "three";
 import type { PickupType } from "../content/items";
 import { cellCenter, isSolid, worldToCell } from "./grid";
 import type { ItemSpawn, ParsedLevel } from "./levelParser";
-import { hash, mulberry32, shuffle, walkingDistances } from "./reinforcements";
+import { hash, mulberry32, shuffle, walkingDistances as measure } from "./reinforcements";
+
+const distances = new WeakMap<ParsedLevel, (number | undefined)[]>();
+/** Walking distances from the start (worked out once per level). */
+function walkingDistances(level: ParsedLevel): (number | undefined)[] {
+  let d = distances.get(level);
+  if (!d) distances.set(level, (d = measure(level)));
+  return d;
+}
 
 /** Supplies that can be thinned out or added. Keycards, weapons and notes never are. */
 const SUPPLIES: ReadonlySet<PickupType> = new Set(["ammo", "shells", "rivets", "medkit", "battery"]);
@@ -21,6 +29,8 @@ const AMMO: ReadonlySet<PickupType> = new Set(["ammo", "shells", "rivets"]);
 const AMMO_SPLIT = 2;
 /** Caches are spread between this share of the level's walking length and its far end. */
 const AMMO_FROM = 0.2;
+/** Bottles to throw on each level, before the difficulty's supply. */
+const BOTTLES_PER_LEVEL = 2;
 /** Even the leanest level has at least this many caches of each kind it offers. */
 const MIN_CACHES = 3;
 
@@ -45,7 +55,8 @@ export function lootFor(level: ParsedLevel, supply: number): ItemSpawn[] {
     items.filter((i) => !AMMO.has(i.type)),
     supply
   );
-  return [...rest, ...spreadAmmo(level, supply, rest)];
+  const ammo = spreadAmmo(level, supply, rest);
+  return [...rest, ...ammo, ...scatterBottles(level, supply, [...rest, ...ammo])];
 }
 
 /** Medkits and batteries (and everything fixed): thinned out or added to, as before. */
@@ -98,46 +109,63 @@ function otherSupplies(level: ParsedLevel, items: ItemSpawn[], supply: number): 
 function spreadAmmo(level: ParsedLevel, supply: number, placed: ItemSpawn[]): ItemSpawn[] {
   const own = level.spawns.items.filter((i) => AMMO.has(i.type));
   if (own.length === 0) return [];
-  const rand = mulberry32(hash(`${level.def.id}:ammo:${supply}`));
-  const cells = openCells(level);
-  const far = Math.max(...cells.map((c) => c.dist));
-  const dist = walkingDistances(level);
-  const share = (p: THREE.Vector2) => {
-    const c = worldToCell(p.x, p.y);
-    return (dist[c.row * level.cols + c.col] ?? 0) / far;
-  };
-
   const left = new Map<PickupType, number>();
   for (const type of new Set(own.map((i) => i.type)))
     left.set(type, Math.max(MIN_CACHES, Math.round(own.filter((i) => i.type === type).length * AMMO_SPLIT * supply)));
-  const total = [...left.values()].reduce((a, b) => a + b, 0);
+  const far = farthest(level);
+  const keep: ItemSpawn[] = [];
+  for (const i of own) {
+    if (distanceShare(level, i.pos, far) < AMMO_FROM || !left.get(i.type)) continue;
+    left.set(i.type, left.get(i.type)! - 1);
+    keep.push(i);
+  }
+  const kinds = [...left].flatMap(([type, n]) => new Array<PickupType>(n).fill(type));
+  return spread(level, mulberry32(hash(`${level.def.id}:ammo:${supply}`)), kinds, keep, placed);
+}
+
+/**
+ * Bottles and cans to throw: a couple per level (more on easy settings and in
+ * co-op), scattered the same way as the ammunition.
+ */
+function scatterBottles(level: ParsedLevel, supply: number, placed: ItemSpawn[]): ItemSpawn[] {
+  const n = Math.max(1, Math.round(BOTTLES_PER_LEVEL * supply));
+  return spread(level, mulberry32(hash(`${level.def.id}:bottles:${supply}`)), new Array<PickupType>(n).fill("bottle"), [], placed);
+}
+
+/**
+ * Places `kinds` so that, together with `keep` (already placed, kept as they
+ * are), they cover the level evenly by walking distance: the stretch from
+ * `AMMO_FROM` to the far end is cut into one band per item, and each new
+ * item goes in the emptiest band, on open floor away from everything in
+ * `placed`, the notes and the creatures.
+ */
+function spread(level: ParsedLevel, rand: () => number, kinds: PickupType[], keep: ItemSpawn[], placed: ItemSpawn[]): ItemSpawn[] {
+  const cells = openCells(level);
+  const far = farthest(level);
+  const total = keep.length + kinds.length;
+  if (total === 0) return [];
   const band = (f: number) => Math.min(total - 1, Math.max(0, Math.floor(((f - AMMO_FROM) / (1 - AMMO_FROM)) * total)));
   const filled = new Array<number>(total).fill(0);
-
-  const out: ItemSpawn[] = [];
   const taken: THREE.Vector2[] = [
     ...placed.map((i) => i.pos),
     ...level.spawns.notes.map((n) => n.pos),
     ...level.spawns.enemies.map((e) => e.pos),
   ];
-  for (const i of own) {
-    const f = share(i.pos);
-    if (f < AMMO_FROM || !left.get(i.type)) continue;
-    left.set(i.type, left.get(i.type)! - 1);
-    filled[band(f)]++;
+  const out: ItemSpawn[] = [];
+  for (const i of keep) {
+    filled[band(distanceShare(level, i.pos, far))]++;
     taken.push(i.pos);
     out.push({ ...i, pos: i.pos.clone() });
   }
-
   const byBand: THREE.Vector2[][] = filled.map(() => []);
   for (const c of cells) if (c.dist / far >= AMMO_FROM) byBand[band(c.dist / far)].push(c.pos);
   for (const list of byBand) shuffle(list, rand);
-  const kinds = [...left].flatMap(([type, n]) => new Array<PickupType>(n).fill(type));
-  shuffle(kinds, rand);
-  for (const type of kinds) {
-    // The emptiest stretch of the level first, so the caches cover all of it.
-    const order = filled.map((n, b) => [n, b] as const).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-    for (const [, b] of order) {
+  const order = [...kinds];
+  shuffle(order, rand);
+  for (const type of order) {
+    // The emptiest stretch of the level first, so the items cover all of it.
+    const bands = filled.map((n, b) => [n, b] as const).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    for (const [, b] of bands) {
       const p = byBand[b].find((q) => !taken.some((t) => t.distanceTo(q) < MIN_SPACING));
       if (!p) continue;
       filled[b]++;
@@ -147,6 +175,16 @@ function spreadAmmo(level: ParsedLevel, supply: number, placed: ItemSpawn[]): It
     }
   }
   return out;
+}
+
+function farthest(level: ParsedLevel): number {
+  return Math.max(1, ...openCells(level).map((c) => c.dist));
+}
+
+/** How far along the level (0 = the start, 1 = its farthest point) a spot is, walking. */
+function distanceShare(level: ParsedLevel, p: THREE.Vector2, far: number): number {
+  const c = worldToCell(p.x, p.y);
+  return (walkingDistances(level)[c.row * level.cols + c.col] ?? 0) / far;
 }
 
 /** Floor cells an item can be put on, with their walking distance from the start. */
