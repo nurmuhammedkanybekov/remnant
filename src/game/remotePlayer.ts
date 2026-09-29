@@ -92,7 +92,10 @@ export class RemotePlayer {
     this.marker.position.y = 2.25;
     this.root.add(this.marker);
 
-    this.root.visible = false;
+    // The figure stays in the scene from the level's start, lights and all
+    // (at zero until they're here), so the renderer's light count never
+    // changes mid-level: a change would recompile every shader, a visible freeze.
+    this.showFigure(false);
     this.root.rotation.order = "YXZ";
     scene.add(this.root);
   }
@@ -110,9 +113,11 @@ export class RemotePlayer {
     this.arms.add(this.flash, this.flashLight);
   }
 
+  /** They're in the level (their state has arrived and they haven't left). */
   get visible(): boolean {
-    return this.root.visible;
+    return this.present;
   }
+  private present = false;
 
   get position2D(): THREE.Vector2 {
     return new THREE.Vector2(this.position.x, this.position.z);
@@ -139,7 +144,16 @@ export class RemotePlayer {
     }
     this.state = s;
     if (isCharacterLook(s.look)) this.setLook(s.look);
-    this.root.visible = true;
+    if (!this.present) this.showFigure(true);
+    this.present = true;
+  }
+
+  /** Shows or hides their body and marker, leaving the lights (at zero when hidden) where they are. */
+  private showFigure(v: boolean): void {
+    this.body.traverse((o) => {
+      if ((o instanceof THREE.Mesh || o instanceof THREE.Sprite) && o !== this.flash) o.visible = v;
+    });
+    this.marker.visible = v;
   }
 
   /** They fired. */
@@ -203,7 +217,8 @@ export class RemotePlayer {
 
   /** The partner left: hide them and put out their lights. */
   hide(): void {
-    this.root.visible = false;
+    this.present = false;
+    this.showFigure(false);
     this.lamp.intensity = 0;
     this.flashLight.intensity = 0;
     this.state = null;

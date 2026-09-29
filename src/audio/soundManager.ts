@@ -653,9 +653,10 @@ export class SoundManager {
     this.burst(this.out(CENTER, 1, 0.1)!, "bandpass", 900, 0.6, t, 0.16, 0.12, 0.04);
   }
 
-  /** Glass breaking somewhere: a crack, a spray of high glints, the tinkle of pieces landing. */
+  /** A bottle smashing somewhere: a real recording (synthesized glass if it didn't load). */
   playShatter(sp: Spatial): void {
     if (!this.ctx) return;
+    if (this.sample("bottleSmash", this.ctx.currentTime, sp, 1, 0.55, 1, 45)) return;
     const o = this.out(sp, 45, 0.6);
     if (!o) return;
     const t = this.ctx.currentTime;
@@ -1022,6 +1023,12 @@ export class SoundManager {
     const o = this.out(sp, 20, 1.6);
     if (!o) return;
     const r = Math.random();
+    if (r > 0.82) {
+      // Something that isn't there: a creature's breath behind the wall, or one far off, screaming.
+      const far: Spatial = { pan: Math.random() < 0.5 ? -0.9 : 0.9, distance: 14 + Math.random() * 12, muffled: true };
+      const id = r > 0.95 ? "creatureAlert" : "creatureIdle";
+      if (this.sample(id, t, far, id === "creatureAlert" ? 0.5 : 0.8, 1.4, 0.75 + Math.random() * 0.2, 34)) return;
+    }
     if (r < 0.4) {
       // Water drip
       this.tone(o, "sine", 1800 + Math.random() * 800, 600, t, 0.08, 0.35);

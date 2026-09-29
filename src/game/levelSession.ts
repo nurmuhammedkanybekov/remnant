@@ -23,7 +23,7 @@ import { DRY, NOISE_RADIUS, PlayerController, WATER } from "../player/playerCont
 import type { Hud } from "../ui/hud";
 import { Weapon } from "../weapons/weapon";
 import type { Viewmodel } from "../weapons/viewmodel";
-import { circleHitsWall, hasLineOfSight, isSolid, raycastWorld, worldToCell } from "../world/grid";
+import { circleHitsWall, hasLineOfSight, isSolid, randomFloorNear, raycastWorld, worldToCell } from "../world/grid";
 import { CheckpointMarker, DetonatorConsole, Door, Generator, Intercom, type Interactable } from "../world/interactables";
 import { LampSystem } from "../world/lamps";
 import { buildLevel, type LevelData } from "../world/levelBuilder";
@@ -59,6 +59,8 @@ const TAKEDOWN_NOISE = 1.5;
 const MELEE_FACING = Math.cos(THREE.MathUtils.degToRad(50));
 /** Co-op: talking carries this far (before a creature's hearing). Whisper, or hold it till you're clear. */
 const VOICE_NOISE = 4;
+/** Roughly how often (seconds) a creature is drawn towards you, by difficulty. */
+const DIRECTOR_INTERVAL: Record<DifficultyDef["id"], number> = { story: 150, normal: 80, nightmare: 55, ironman: 80, aizi: 40 };
 /** Creatures further than this (world units) never set your heart going. */
 const DREAD_RANGE = 13;
 /** The hold-breath hint shows once per page load. */
@@ -189,6 +191,8 @@ export class LevelSession {
   private readonly restock: [Pickup, number][] = [];
   /** 0..1: something close that you can't see (see `updateDread`). */
   private dread = 0;
+  /** Seconds until the next creature is drawn towards you (see `updateDirector`). */
+  private directorTimer = 40;
   /** Everything the boss has birthed; it dies with its mother. */
   private readonly brood = new Set<Enemy>();
   private humTimer = 0;
@@ -205,6 +209,9 @@ export class LevelSession {
   private readonly goneSlots = new Set<number>();
   /** Which player each entry of the last `perceptions()` list is (creatures' targets index into it). */
   private perceptionSlots: number[] = [0];
+  /** Numbers the states and snapshots this player sends, and the last one applied from each stream. */
+  private sentSeq = 0;
+  private readonly lastSeq = new Map<string, number>();
   /** Down and waiting for the partner, instead of dead. */
   private downed = false;
   private bleed = 0;
@@ -344,6 +351,9 @@ export class LevelSession {
     }
     this.currentWeapon = this.weapons.has(start.current) ? start.current : "pistol";
 
+    // Every partner's figure (and headlamp) exists from the start, so no light is added mid-level.
+    if (coop) for (let slot = 0; slot < coop.players; slot++) if (slot !== coop.slot) this.remoteFor(slot);
+
     this.muzzleLight = new THREE.PointLight(0xffb060, 0, 12, 1.6);
     this.muzzleLight.position.set(0.2, -0.1, -0.6);
     camera.add(this.muzzleLight);
@@ -448,8 +458,9 @@ export class LevelSession {
     this.updateCoop(dt, cmd);
     this.updateGenerators(dt);
     this.radio.update(dt);
-    this.lamps.update(dt, this.player.position, this.time);
+    this.lamps.update(dt, this.player.position, this.time, this.creaturePositions());
     this.effects.update(dt, engine.camera, this.player.flashlight.level, this.time);
+    this.updateDirector(dt);
 
     this.muzzleTime -= dt;
     this.muzzleLight.intensity = this.muzzleTime > 0 ? 40 : 0;
@@ -510,6 +521,35 @@ export class LevelSession {
     }
   }
 
+  /** Where the living creatures are (lamps near them stutter). */
+  private creaturePositions(): THREE.Vector2[] {
+    return this.enemies.enemies.filter((e) => !e.isDead).map((e) => e.position2D);
+  }
+
+  /**
+   * The hunt. Every so often (more often on harder settings) one creature
+   * that isn't after you yet is drawn towards roughly where you are, as if
+   * it could smell you: not straight to you, but close enough that the quiet
+   * never lasts. Only the host decides; guests see it happen.
+   */
+  private updateDirector(dt: number): void {
+    if (this.coop?.role === "guest" || this.finished) return;
+    this.directorTimer -= dt;
+    if (this.directorTimer > 0) return;
+    this.directorTimer = DIRECTOR_INTERVAL[this.difficulty.id] * (0.75 + Math.random() * 0.5);
+    const targets = [this.player.position2D, ...this.partners.map((r) => r.position2D)];
+    const near = (p: THREE.Vector2) => Math.min(...targets.map((t) => t.distanceTo(p)));
+    const candidates = this.enemies.enemies.filter(
+      (e) => !e.isDead && !e.isHunting && e !== this.boss && e.state === "patrol" && near(e.position2D) > 14 && near(e.position2D) < 60
+    );
+    if (candidates.length === 0) return;
+    // Roamers first, and the closest of those: the hunt should find you, not get lost.
+    candidates.sort((a, b) => Number(b.roamer) - Number(a.roamer) || near(a.position2D) - near(b.position2D));
+    const e = candidates[0];
+    const target = targets.reduce((best, t) => (t.distanceTo(e.position2D) < best.distanceTo(e.position2D) ? t : best));
+    e.drawnTo(randomFloorNear(this.level, target.x, target.y, 3));
+  }
+
   /** After death: the camera slumps while the world keeps moving. */
   stepDead(dt: number): void {
     const { engine } = this.services;
@@ -521,7 +561,7 @@ export class LevelSession {
     this.updateCoop(dt, emptyCommand());
     this.projectiles.update(dt, this.player.position, this.player.position.y, true);
     this.updateThrowables(dt);
-    this.lamps.update(dt, this.player.position, this.time);
+    this.lamps.update(dt, this.player.position, this.time, this.creaturePositions());
     this.effects.update(dt, cam, this.player.flashlight.level, this.time);
     this.damageFx = Math.max(0.4, this.damageFx - dt);
     engine.setPostFx(this.damageFx, 1, this.time);
@@ -561,6 +601,15 @@ export class LevelSession {
       eye: cam.getWorldPosition(new THREE.Vector3()),
       look: cam.getWorldDirection(new THREE.Vector3()),
     };
+  }
+
+  /** A state stream message older than the last one applied (they can arrive out of order): drop it. */
+  private stale(stream: string, n: number | undefined): boolean {
+    if (n === undefined) return false;
+    const last = this.lastSeq.get(stream) ?? 0;
+    if (n <= last) return true;
+    this.lastSeq.set(stream, n);
+    return false;
   }
 
   /** The Remnant is solid: you can't walk into it. */
@@ -1389,6 +1438,7 @@ export class LevelSession {
       look: this.services.look?.(),
       held: p.breath.held,
       talk: this.services.voice?.speaking || undefined,
+      n: ++this.sentSeq,
     };
     this.coop?.send(state, true);
   }
@@ -1442,7 +1492,7 @@ export class LevelSession {
       this.snapshotTimer -= dt;
       if (this.snapshotTimer <= 0) {
         this.snapshotTimer = SNAPSHOT_INTERVAL;
-        coop.send({ t: "es", e: this.enemies.enemies.map((e) => e.netState()) }, true);
+        coop.send({ t: "es", e: this.enemies.enemies.map((e) => e.netState()), n: ++this.sentSeq }, true);
       }
     }
     if (this.finished) return;
@@ -1501,13 +1551,14 @@ export class LevelSession {
     const host = this.coop?.role === "host";
     switch (m.t) {
       case "ps":
-        if (!this.goneSlots.has(from) && from !== this.mySlot) this.remoteFor(from).apply(m);
+        if (this.goneSlots.has(from) || from === this.mySlot || this.stale(`ps${from}`, m.n)) break;
+        this.remoteFor(from).apply(m);
         break;
       case "gone":
         if (m.slot !== this.mySlot) this.partnerLeft(m.slot);
         break;
       case "es":
-        if (!host) m.e.forEach((a, i) => enemy(i)?.applyNet(a));
+        if (!host && !this.stale("es", m.n)) m.e.forEach((a, i) => enemy(i)?.applyNet(a));
         break;
       case "vocal": {
         const e = enemy(m.i);
@@ -1649,6 +1700,7 @@ export class LevelSession {
       hasKeycard: this.hasKeycard,
       breath: this.player.breath.air,
       breathHeld: this.player.breath.held,
+      breathKey: this.services.keyFor("holdBreath"),
       throwables: this.throwablesHeld,
       mic: this.coop ? (this.services.voice?.open ? (this.services.voice.speaking ? "talking" : "open") : "off") : "off",
     });
