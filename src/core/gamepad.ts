@@ -46,7 +46,6 @@ export const PAD_BINDINGS: Record<Action, number[]> = {
   weapon3: [],
   holdBreath: [PAD.L3],
   throw: [PAD.R3],
-  camera: [],
   talk: [],
 };
 
