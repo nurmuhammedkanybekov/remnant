@@ -43,6 +43,8 @@ const EXIT_RADIUS = 1.6;
 const PICKUP_RADIUS = 1.1;
 const MUZZLE_FLASH_TIME = 0.05;
 const DOOR_NOISE = 9;
+/** Prying a loose panel: a scrape and a thud, much quieter than a door's motor. */
+const PANEL_NOISE = 4;
 const GENERATOR_START_NOISE = 26;
 const GENERATOR_HUM_NOISE = 11;
 const GENERATOR_HUM_INTERVAL = 4.5;
@@ -263,11 +265,18 @@ export class LevelSession {
 
     // ---- interactables
     this.doors = sp.doors.map((d) => {
-      const door = new Door(scene, this.level, d);
+      const door = new Door(scene, this.level, d, this.level.wallMaterial);
       door.isUnlocked = () => this.hasKeycard;
       door.onOpen = () => {
-        sound.playDoor(this.spatial(door.pos), door.security);
-        this.worldNoise(door.pos, DOOR_NOISE);
+        if (door.panel) {
+          sound.playPanel(this.spatial(door.pos));
+          this.worldNoise(door.pos, PANEL_NOISE);
+          this.stats.secrets++;
+          hud.toast("SECRET FOUND", "var(--ui-green)");
+        } else {
+          sound.playDoor(this.spatial(door.pos), door.security);
+          this.worldNoise(door.pos, DOOR_NOISE);
+        }
         this.broadcastUse(door);
       };
       door.onLocked = () => {

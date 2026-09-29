@@ -9,10 +9,12 @@ export interface RunStats {
   /** Silent melee kills from behind. */
   takedowns: number;
   damageTaken: number;
+  /** Hidden rooms found (loose panels pried open). */
+  secrets: number;
 }
 
 export function freshStats(): RunStats {
-  return { time: 0, kills: 0, shots: 0, hits: 0, headshots: 0, takedowns: 0, damageTaken: 0 };
+  return { time: 0, kills: 0, shots: 0, hits: 0, headshots: 0, takedowns: 0, damageTaken: 0, secrets: 0 };
 }
 
 export function addStats(into: RunStats, s: RunStats): void {
@@ -23,6 +25,7 @@ export function addStats(into: RunStats, s: RunStats): void {
   into.headshots += s.headshots;
   into.takedowns += s.takedowns;
   into.damageTaken += s.damageTaken;
+  into.secrets += s.secrets;
 }
 
 export function accuracy(s: RunStats): number {

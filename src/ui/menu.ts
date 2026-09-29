@@ -472,6 +472,7 @@ export class Screens {
       <span>HEADSHOTS</span><span>${s.headshots}</span>
       <span>TAKEDOWNS</span><span>${s.takedowns}</span>
       <span>DAMAGE TAKEN</span><span>${Math.round(s.damageTaken)}</span>
+      ${s.secrets > 0 ? `<span>SECRETS FOUND</span><span>${s.secrets}</span>` : ""}
     </div>`;
   }
 

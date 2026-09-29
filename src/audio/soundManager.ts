@@ -608,6 +608,18 @@ export class SoundManager {
     this.burst(o, "bandpass", 700 * pitch, 0.7, t + period * 0.45, period * 0.35, v * 1.2, period * 0.08);
   }
 
+  /** A loose panel pried out of the wall: a metal scrape, then it drops with a thud. */
+  playPanel(sp: Spatial): void {
+    if (!this.ctx) return;
+    const o = this.out(sp, 30, 0.5);
+    if (!o) return;
+    const t = this.ctx.currentTime;
+    this.burst(o, "bandpass", 1800, 4, t, 0.35, 0.25, 0.05);
+    this.tone(o, "sawtooth", 220, 160, t + 0.05, 0.3, 0.05);
+    this.tone(o, "sine", 90, 45, t + 0.7, 0.3, 0.6);
+    this.burst(o, "lowpass", 400, 0.8, t + 0.7, 0.25, 0.4);
+  }
+
   /** A bottle leaving your hand: a quick swish. */
   playThrow(): void {
     if (!this.ctx) return;
