@@ -32,6 +32,14 @@ export interface PlayerCommand {
   cycleWeapon: number;
   /** Weapon slot picked with a number key (1-based), or 0. */
   selectSlot: number;
+  /** The hold-breath key is held. */
+  holdBreath: boolean;
+  /** Edge-triggered: throw a bottle or can. */
+  throw: boolean;
+  /** Edge-triggered: switch between first- and third-person view. */
+  toggleCamera: boolean;
+  /** The push-to-talk key is held (co-op voice). */
+  talk: boolean;
 }
 
 export function emptyCommand(): PlayerCommand {
@@ -52,6 +60,10 @@ export function emptyCommand(): PlayerCommand {
     inventory: false,
     cycleWeapon: 0,
     selectSlot: 0,
+    holdBreath: false,
+    throw: false,
+    toggleCamera: false,
+    talk: false,
   };
 }
 
@@ -105,5 +117,9 @@ export function buildCommand(input: InputSource, bindings: Bindings, look: LookS
     inventory: pressed("inventory"),
     cycleWeapon: (pressed("nextWeapon") ? 1 : 0) - (pressed("prevWeapon") ? 1 : 0),
     selectSlot: pressed("weapon1") ? 1 : pressed("weapon2") ? 2 : pressed("weapon3") ? 3 : 0,
+    holdBreath: held("holdBreath"),
+    throw: pressed("throw"),
+    toggleCamera: pressed("camera"),
+    talk: held("talk"),
   };
 }

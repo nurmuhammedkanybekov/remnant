@@ -3,6 +3,7 @@ import type { RadioLine } from "../game/script";
 import { injectStyles } from "./styles";
 
 const ICON = {
+  lungs: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 3h2v7.5l1.6 1.1C15 8 16.6 5 19 5c2 0 3 3 3 8 0 5-1 7-3 7-2.5 0-5-1.5-5-5v-2.2L12 11.6 10 12.8V15c0 3.5-2.5 5-5 5-2 0-3-2-3-7 0-5 1-8 3-8 2.4 0 4 3 4.4 6.6L11 10.5z"/></svg>`,
   heart: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.8 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>`,
   run: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="14" cy="4" r="2.2"/><path d="M9 21l2.2-6 2.4 2.2V22h2v-6.2l-2.6-2.6.8-3.6c1.2 1.5 3 2.4 5.2 2.4v-2c-1.7 0-3.2-.9-4-2.2l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5 0-.8.1L6 7.6V12h2V9l1.8-.7L7 21h2z"/></svg>`,
   torch: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2h10v5l-3 4v11h-4V11L7 7V2zm2 2v2h6V4H9z"/></svg>`,
@@ -30,6 +31,9 @@ export interface WeaponSlot {
 export interface HudState {
   health: number; // 0..1
   stamina: number; // 0..1
+  /** Air left while holding your breath, 0..1 (1 = breathing normally). */
+  breath: number;
+  breathHeld: boolean;
   battery: number; // 0..1
   torchOn: boolean;
   mag: number;
@@ -87,6 +91,7 @@ export class Hud {
       <div class="vitals">
         <div class="vrow health">${ICON.heart}<div class="vbar"><b class="lag" data-k="hpLag"></b><b class="fill" data-k="hp"></b></div><div class="vnum" data-k="hpNum"></div></div>
         <div class="vrow stamina">${ICON.run}<div class="vbar"><b class="fill" data-k="st"></b></div><div class="vnum"></div></div>
+        <div class="vrow breath" data-k="brRow">${ICON.lungs}<div class="vbar"><b class="fill" data-k="br"></b></div><div class="vnum" data-k="brTxt"></div></div>
         <div class="vrow battery" data-k="batRow">${ICON.torch}<div class="vbar"><b class="fill" data-k="bat"></b></div><div class="vnum" data-k="batNum"></div></div>
         <div class="medkits" data-k="med"><b>✚</b><span data-k="medNum"></span><kbd data-k="medKey"></kbd></div>
         <div class="keycard" data-k="key">▣ KEYCARD</div>
@@ -193,6 +198,13 @@ export class Hud {
       this.el.hpNum.textContent = `${Math.ceil(s.health * 100)}`;
     }
     if (L.stamina !== s.stamina) this.el.st.style.width = `${s.stamina * 100}%`;
+    if (L.breath !== s.breath || L.breathHeld !== s.breathHeld) {
+      this.el.br.style.width = `${s.breath * 100}%`;
+      this.el.brRow.classList.toggle("on", s.breathHeld || s.breath < 1);
+      this.el.brRow.classList.toggle("held", s.breathHeld);
+      this.el.brRow.classList.toggle("low", s.breathHeld && s.breath < 0.3);
+      this.el.brTxt.textContent = s.breathHeld ? "HOLDING" : "";
+    }
     if (L.battery !== s.battery || L.torchOn !== s.torchOn) {
       this.el.bat.style.width = `${s.battery * 100}%`;
       this.el.batNum.textContent = `${Math.round(s.battery * 100)}%`;

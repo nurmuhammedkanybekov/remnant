@@ -17,6 +17,7 @@ import { r2, type PlayerState, type SessionMsg } from "../net/protocol";
 import type { Role } from "../net/link";
 import { emptyCommand, type PlayerCommand } from "../player/command";
 import { MAX_BATTERY } from "../player/flashlight";
+import { BREATH_NOISE, EXHALE_NOISE, GASP_NOISE } from "../player/breath";
 import { DRY, NOISE_RADIUS, PlayerController, WATER } from "../player/playerController";
 import type { Hud } from "../ui/hud";
 import { Weapon } from "../weapons/weapon";
@@ -53,6 +54,10 @@ const MELEE_DAMAGE = 20;
 const MELEE_NOISE = 4;
 const TAKEDOWN_NOISE = 1.5;
 const MELEE_FACING = Math.cos(THREE.MathUtils.degToRad(50));
+/** Creatures further than this (world units) never set your heart going. */
+const DREAD_RANGE = 13;
+/** The hold-breath hint shows once per page load. */
+let breathHinted = false;
 /** Ammo picked up this close to the boss while it is awake comes back after RESTOCK_TIME seconds. */
 const RESTOCK_RADIUS = 40;
 const RESTOCK_TIME = 25;
@@ -153,6 +158,8 @@ export class LevelSession {
   private armouredHits = 0;
   /** Supplies in the boss arena come back while the fight goes on: [pickup, seconds left]. */
   private readonly restock: [Pickup, number][] = [];
+  /** 0..1: something close that you can't see (see `updateDread`). */
+  private dread = 0;
   /** Everything the boss has birthed; it dies with its mother. */
   private readonly brood = new Set<Enemy>();
   private humTimer = 0;
@@ -217,6 +224,11 @@ export class LevelSession {
     this.player.health.onDamage = (amount, source) => this.handleDamage(amount, source);
     this.player.onFootstep = (gait, wet) => (wet ? sound.playSplash(gait) : sound.playFootstep(gait));
     this.player.flashlight.onToggle = (on) => sound.playFlashlight(on);
+    this.player.onBreath = (e) => {
+      sound.playBreath(e);
+      if (e === "gasp") this.playerNoise(this.player.position2D, GASP_NOISE);
+      else if (e === "release") this.playerNoise(this.player.position2D, EXHALE_NOISE);
+    };
 
     // Harder difficulties (and co-op, with two of you) bring extra creatures; co-op ones are tougher too.
     const extras = reinforcements(this.level, difficulty.extraEnemies + (coop ? COOP_EXTRA_ENEMIES : 0));
@@ -414,12 +426,48 @@ export class LevelSession {
     const hp = this.player.health.fraction;
     this.damageFx = Math.max(0, this.damageFx - dt * 2.2);
     engine.setPostFx(this.damageFx, THREE.MathUtils.clamp((0.4 - hp) / 0.4, 0, 1), this.time);
-    sound.updateHeartbeat(dt, hp);
+    this.updateDread(dt);
+    sound.updateHeartbeat(dt, hp, this.dread);
+    const winded = THREE.MathUtils.clamp((60 - this.player.stamina) / 60, 0, 1);
+    sound.updateBreathing(dt, this.dread, winded, this.player.breath.held);
     sound.updateAmbient(dt);
     this.updateHud();
     this.updateBossBar();
 
     if (!this.finished) this.checkExit();
+  }
+
+  /**
+   * How close something is that you can't see (0..1): a creature nearby,
+   * behind you, around a corner or out in the dark. It drives your heartbeat
+   * and breathing. One you're looking at in your light counts for less; one
+   * that's hunting you counts for more. Smoothed, so it swells and fades.
+   */
+  private updateDread(dt: number): void {
+    const cam = this.services.engine.camera;
+    const me = this.player.position2D;
+    const look = cam.getWorldDirection(new THREE.Vector3());
+    const facing = new THREE.Vector2(look.x, look.z).normalize();
+    const halfFov = THREE.MathUtils.degToRad((cam.fov * cam.aspect) / 2);
+    const lit = this.player.flashlight.on && this.player.flashlight.level > 0.3;
+    let target = 0;
+    for (const e of this.enemies.enemies) {
+      if (e.isDead) continue;
+      const to = e.position2D.sub(me);
+      const d = to.length();
+      if (d > DREAD_RANGE) continue;
+      const close = THREE.MathUtils.clamp((DREAD_RANGE - d) / (DREAD_RANGE - 3), 0, 1);
+      const inView = d > 0.01 && to.divideScalar(d).dot(facing) > Math.cos(halfFov) && hasLineOfSight(this.level, me, e.position2D);
+      const seen = inView && (lit || d < 4);
+      target = Math.max(target, close * (seen ? 0.35 : 1) * (e.isHunting ? 1 : 0.65));
+    }
+    if (this.player.health.isDead || this.downed) target = 0;
+    this.dread += (target - this.dread) * Math.min(1, dt * (target > this.dread ? 2.5 : 0.8));
+    // The first time something gets close, say how to keep quiet.
+    if (this.dread > 0.6 && !breathHinted) {
+      breathHinted = true;
+      this.services.hud.prompt(`Hold ${this.keyLabel("holdBreath") ?? "B"} to hold your breath`, 4);
+    }
   }
 
   /** After death: the camera slumps while the world keeps moving. */
@@ -446,7 +494,7 @@ export class LevelSession {
       const s = r.state;
       list.push({
         playerPos: r.position2D,
-        playerNoise: s.down ? 0 : NOISE_RADIUS[s.gait] * (s.wet ? WATER.noise : 1),
+        playerNoise: s.down ? 0 : Math.max(NOISE_RADIUS[s.gait] * (s.wet ? WATER.noise : 1), s.held ? 0 : BREATH_NOISE),
         torchOn: !s.down && s.torch > 0.3,
         playerDead: s.down || s.hp <= 0,
         eye: r.eyePosition,
@@ -1220,6 +1268,7 @@ export class LevelSession {
       down: this.downed || p.health.isDead,
       bleed: Math.ceil(this.bleed),
       look: this.services.look?.(),
+      held: p.breath.held,
     };
     this.coop?.send(state, true);
   }
@@ -1227,6 +1276,7 @@ export class LevelSession {
   private goDown(): void {
     const { hud, sound, viewmodel } = this.services;
     this.downed = true;
+    this.player.breath.reset();
     this.bleed = BLEED_TIME;
     this.healTimer = 0;
     this.weapon.cancelReload();
@@ -1460,6 +1510,8 @@ export class LevelSession {
       threat: this.enemies.threat,
       spreadPx: (Math.tan(spread) / halfFov) * (window.innerHeight / 2),
       hasKeycard: this.hasKeycard,
+      breath: this.player.breath.air,
+      breathHeld: this.player.breath.held,
     });
     const r = this.partnerHere ? this.remote?.state : null;
     hud.partner(r ? { hp: r.hp, down: r.down, bleed: r.bleed, name: isCharacterLook(r.look) ? LOOKS[r.look].firstName : undefined } : null);

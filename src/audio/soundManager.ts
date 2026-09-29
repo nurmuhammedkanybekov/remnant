@@ -41,6 +41,7 @@ export class SoundManager {
   /** Called once the audio context exists (the music hooks in here). */
   onReady: ((music: MusicOutput) => void) | null = null;
   private heartbeatTimer = 0;
+  private breathTimer = 0;
   private ambientTimer = 4;
   private volume = 0.8;
   private stepFlip = false;
@@ -568,18 +569,61 @@ export class SoundManager {
     this.tone(this.out(CENTER, 1, 0.1)!, "sine", 1400, 1200, t, 0.04, 0.06);
   }
 
-  /** Call every frame; beats faster and louder as health drops below ~40%. */
-  updateHeartbeat(dt: number, healthFrac: number): void {
-    if (!this.ctx || healthFrac > 0.4 || healthFrac <= 0) return;
+  /**
+   * Call every frame. The heart beats when you're badly hurt (below ~40%)
+   * or when something is close and you can't see it (`dread` 0..1), faster
+   * and louder the worse it gets.
+   */
+  updateHeartbeat(dt: number, healthFrac: number, dread = 0): void {
+    if (!this.ctx || healthFrac <= 0) return;
+    const hurt = healthFrac < 0.4 ? 1 - healthFrac / 0.4 : 0;
+    const danger = Math.max(hurt, dread);
     this.heartbeatTimer -= dt;
-    if (this.heartbeatTimer > 0) return;
-    const danger = 1 - healthFrac / 0.4;
-    this.heartbeatTimer = 1.1 - danger * 0.5;
+    if (danger < 0.08 || this.heartbeatTimer > 0) return;
+    this.heartbeatTimer = 1.1 - danger * 0.55;
     const t = this.ctx.currentTime;
     const o = this.out(CENTER, 1, 0)!;
-    const v = 0.35 + danger * 0.5;
+    const v = 0.25 + danger * 0.6;
     this.tone(o, "sine", 70, 40, t, 0.12, v);
     this.tone(o, "sine", 65, 38, t + 0.2, 0.12, v * 0.7);
+  }
+
+  /**
+   * Your own breathing, heard when you're afraid (`dread` 0..1) or out of
+   * breath (`winded` 0..1): quick, shaky, close. Nothing while you hold it.
+   */
+  updateBreathing(dt: number, dread: number, winded: number, held: boolean): void {
+    if (!this.ctx) return;
+    const level = Math.max(dread, winded * 0.8);
+    this.breathTimer -= dt;
+    if (held || level < 0.2 || this.breathTimer > 0) return;
+    const period = 2.8 - level * 1.5;
+    this.breathTimer = period * (0.9 + Math.random() * 0.2);
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.05)!;
+    const pitch = currentCharacter().voice;
+    const v = 0.05 + level * 0.12;
+    // In through the mouth, then out.
+    this.burst(o, "bandpass", 1300 * pitch, 0.8, t, period * 0.3, v, period * 0.12);
+    this.burst(o, "bandpass", 700 * pitch, 0.7, t + period * 0.45, period * 0.35, v * 1.2, period * 0.08);
+  }
+
+  /** Holding your breath, letting it out, or gasping when you run out. */
+  playBreath(kind: "hold" | "release" | "gasp"): void {
+    if (!this.ctx) return;
+    this.breathTimer = kind === "hold" ? 0 : 1.2;
+    const t = this.ctx.currentTime;
+    const o = this.out(CENTER, 1, 0.1)!;
+    const pitch = currentCharacter().voice;
+    if (kind === "hold") {
+      this.burst(o, "bandpass", 1500 * pitch, 1, t, 0.18, 0.12, 0.05);
+    } else if (kind === "release") {
+      this.burst(o, "bandpass", 650 * pitch, 0.8, t, 0.5, 0.1, 0.06);
+    } else {
+      this.burst(o, "bandpass", 1100 * pitch, 1.2, t, 0.35, 0.5, 0.02);
+      this.burst(o, "bandpass", 600 * pitch, 0.8, t + 0.4, 0.6, 0.3, 0.05);
+      this.burst(o, "bandpass", 1200 * pitch, 1, t + 1.1, 0.3, 0.25, 0.04);
+    }
   }
 
   // ---------------------------------------------------------------- world & radio

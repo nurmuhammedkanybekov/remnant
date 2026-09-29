@@ -75,6 +75,8 @@ export interface PlayerState {
   bleed: number;
   /** Their chosen look (`CharacterLook`); checked on arrival. */
   look?: string;
+  /** Holding their breath (creatures beside them can't hear them breathe). */
+  held?: boolean;
 }
 
 /**

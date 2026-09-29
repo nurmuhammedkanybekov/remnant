@@ -1,3 +1,4 @@
+import { Breath, type BreathEvent } from "./breath";
 import * as THREE from "three";
 import { resolveCollision, type LevelGrid } from "../world/grid";
 import type { PlayerCommand } from "./command";
@@ -36,6 +37,8 @@ export class PlayerController {
   /** Logical position (feet at y=0 → eye height in y). Camera adds bob/shake on top. */
   readonly position = new THREE.Vector3();
   stamina = MAX_STAMINA;
+  /** Your breathing: creatures right beside you hear it unless you hold it. */
+  readonly breath = new Breath();
   gait: Gait = "still";
   private exhausted = false;
   private yaw = 0;
@@ -55,6 +58,7 @@ export class PlayerController {
   /** Scales camera shake and head bob (the "reduced camera shake" setting). */
   motionScale = 1;
   onFootstep: ((gait: Gait, wet: boolean) => void) | null = null;
+  onBreath: ((e: BreathEvent) => void) | null = null;
 
   constructor(
     private readonly camera: THREE.PerspectiveCamera,
@@ -77,8 +81,9 @@ export class PlayerController {
     return this.gait === "sprint";
   }
 
+  /** How far you can be heard: your movement, or your breathing when that's louder. */
   get noiseRadius(): number {
-    return NOISE_RADIUS[this.gait] * this.terrain.noise;
+    return Math.max(NOISE_RADIUS[this.gait] * this.terrain.noise, this.health.isDead ? 0 : this.breath.noise);
   }
 
   /** 0..1 — current movement speed relative to sprint, used for weapon sway and spread. */
@@ -120,6 +125,8 @@ export class PlayerController {
     if (this.stamina <= 0) this.exhausted = true;
     if (this.exhausted && this.stamina >= EXHAUSTED_UNTIL) this.exhausted = false;
     const sprinting = cmd.sprint && wantsMove && mz < 0 && !crouching && !this.exhausted;
+    const breath = this.breath.update(dt, cmd.holdBreath && !sprinting && !this.health.isDead);
+    if (breath) this.onBreath?.(breath);
 
     this.stamina = sprinting
       ? Math.max(0, this.stamina - STAMINA_DRAIN_PER_SEC * dt)
