@@ -145,3 +145,16 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] Exit on the main menu, back to the silent title screen
 - [x] Free daily encrypted backups of the cloud saves through GitHub Actions,
       with a restore script
+
+## Phase 9 — Play it together, play it scared (done)
+
+- [x] Ammunition in small caches spread over each level, found by exploring;
+      an ammo floor only when retrying after a death
+- [x] Heartbeat and breathing that answer creatures you can't see
+- [x] Hold your breath: creatures beside you hear you breathe
+- [x] Bottles to throw, to lead creatures away without a shot
+- [x] A hidden room behind a loose panel on every level, and fifteen new notes
+- [x] An online leaderboard of best times per level, difficulty and mode
+- [x] Three-player co-op, with the host passing on what each guest needs
+- [x] Voice chat over the game's own connection, placed in the world, and
+      heard by the creatures
