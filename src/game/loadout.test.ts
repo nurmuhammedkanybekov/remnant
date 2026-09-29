@@ -26,7 +26,7 @@ describe("loadout", () => {
     expect(hive.weapons.shotgun!.mag).toBe(WEAPONS.shotgun.magSize);
   });
 
-  it("tops up health and battery between levels, but never lowers them", () => {
+  it("tops up health and battery between levels (not ammo), but never lowers them", () => {
     const d = DIFFICULTIES.normal;
     const base: Loadout = { health: 5, battery: 0, medkits: 1, weapons: { pistol: { mag: 3, reserve: 4 } }, current: "pistol" };
     const low = carryOver(base, d);
@@ -34,7 +34,6 @@ describe("loadout", () => {
       ...base,
       health: d.carryHealthFloor,
       battery: d.carryBatteryFloor,
-      weapons: { pistol: { mag: 3, reserve: d.carryAmmoFloor - 3 } },
     });
     expect(low.weapons).not.toBe(base.weapons);
     const high = carryOver({ ...base, health: 90, battery: 80 }, d);

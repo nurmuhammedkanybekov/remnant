@@ -27,7 +27,7 @@ export interface DifficultyDef {
   /** Health and battery are topped up to at least these between levels. */
   carryHealthFloor: number;
   carryBatteryFloor: number;
-  /** Pistol rounds (magazine + reserve) topped up to at least this between levels and when retrying after a death. */
+  /** Pistol rounds (magazine + reserve) topped up to at least this when retrying after a death. */
   carryAmmoFloor: number;
   /** One life for the whole campaign: death ends the run and deletes the save. */
   permadeath: boolean;

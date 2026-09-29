@@ -31,15 +31,20 @@ export function startingLoadout(difficulty: DifficultyDef, levelIds: readonly st
   for (const id of WEAPON_ORDER) {
     const w = WEAPONS[id];
     if (w.foundIn !== null && !earlier.has(w.foundIn)) continue;
-    weapons[id] = { mag: w.magSize, reserve: id === "pistol" ? difficulty.startingReserve : w.ammoPickup * 2 };
+    weapons[id] = { mag: w.magSize, reserve: id === "pistol" ? difficulty.startingReserve : w.ammoPickup * 4 };
   }
   return { health: 100, battery: MAX_BATTERY, medkits: difficulty.startingMedkits, weapons, current: "pistol" };
 }
 
-/** The loadout for the next level: what you finished with, plus a breather so a bad run isn't unwinnable. */
+/**
+ * The loadout for the next level: what you finished with, plus a breather so
+ * a bad run isn't unwinnable. Ammunition isn't topped up (it's found by
+ * searching the level); only a retry after a death gets the ammo floor.
+ */
 export function carryOver(end: Loadout, difficulty: DifficultyDef): Loadout {
   return {
-    ...withAmmoFloor(end, difficulty),
+    ...end,
+    weapons: cloneWeapons(end.weapons),
     health: Math.max(end.health, difficulty.carryHealthFloor),
     battery: Math.max(end.battery, difficulty.carryBatteryFloor),
   };
@@ -47,8 +52,8 @@ export function carryOver(end: Loadout, difficulty: DifficultyDef): Loadout {
 
 /**
  * Tops the pistol up to the difficulty's floor (magazine + reserve), so an
- * empty gun at a level's start or a checkpoint can't lock a run into dying
- * over and over. Never lowers anything.
+ * empty gun at a checkpoint can't lock a run into dying over and over.
+ * Never lowers anything.
  */
 export function withAmmoFloor(l: Loadout, difficulty: DifficultyDef): Loadout {
   const weapons = cloneWeapons(l.weapons);

@@ -29,7 +29,7 @@ import type { LevelDef } from "../world/levelDef";
 import { parseLevel } from "../world/levelParser";
 import { lootFor } from "../world/loot";
 import { reinforcements } from "../world/reinforcements";
-import type { CheckpointState } from "./checkpoint";
+import { CHECKPOINT_LAYOUT, type CheckpointState } from "./checkpoint";
 import { withAmmoFloor, type Loadout, type WeaponAmmo } from "./loadout";
 import { RadioChannel } from "./radio";
 import type { RadioLine, ScriptAction } from "./script";
@@ -180,7 +180,9 @@ export class LevelSession {
     loadout: Loadout,
     restore: CheckpointState | null = null,
     /** The link to the other player, in co-op. */
-    private readonly coop: CoopLink | null = null
+    private readonly coop: CoopLink | null = null,
+    /** Another go after a death: the pistol is topped up to the difficulty's floor. */
+    retry = false
   ) {
     const { engine, sound, hud, viewmodel } = services;
     const { scene, camera } = engine;
@@ -195,9 +197,11 @@ export class LevelSession {
     this.radio = new RadioChannel(hud, sound);
     this.objective = def.objective;
 
-    // A checkpoint carries the loadout from the moment it was reached, with
-    // the pistol topped up to the difficulty's floor (a retry after a death).
-    const start = restore ? withAmmoFloor(restore.loadout, difficulty) : loadout;
+    // A checkpoint carries the loadout from the moment it was reached. After a
+    // death (or resuming at a checkpoint) the pistol is topped up to the
+    // difficulty's floor, so an empty gun can't trap you in a loop of deaths.
+    const carried = restore?.loadout ?? loadout;
+    const start = restore || retry ? withAmmoFloor(carried, difficulty) : carried;
     this.player = new PlayerController(
       camera,
       this.level,
@@ -635,6 +639,7 @@ export class LevelSession {
   snapshot(): CheckpointState {
     const idx = <T>(list: T[], pred: (t: T) => boolean) => list.flatMap((t, i) => (pred(t) ? [i] : []));
     return {
+      layout: CHECKPOINT_LAYOUT,
       x: this.player.position.x,
       z: this.player.position.z,
       yaw: this.player.facing,
@@ -1017,7 +1022,7 @@ export class LevelSession {
         continue;
       }
       if (item.weapon) {
-        this.pickUpWeapon(item.weapon, amount(WEAPONS[item.weapon].ammoPickup * 2));
+        this.pickUpWeapon(item.weapon, amount(WEAPONS[item.weapon].ammoPickup * 4));
         this.collect(p);
         sound.playPickup(p.type);
         continue;
