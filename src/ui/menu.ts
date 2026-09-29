@@ -1,7 +1,7 @@
 import { ACTIONS, ACTION_LABELS, RESERVED_CODES, keyLabel, rebind, type Action, type Bindings } from "../core/actions";
 import { PAD_LAYOUT } from "../core/gamepad";
 import { QUALITY, QUALITY_ORDER } from "../core/quality";
-import { SUBTITLE_SIZES, type Settings } from "../core/settings";
+import { SUBTITLE_SIZES, VOICE_MODES, type Settings } from "../core/settings";
 import { fullName, LOOK_ORDER, LOOKS, type CharacterLook } from "../content/characters";
 import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyId } from "../content/difficulty";
 import type { Ending } from "../content/story";
@@ -67,7 +67,7 @@ function esc(s: string): string {
 
 type NumericKey = "sensitivity" | "padSensitivity" | "fov" | "volume" | "musicVolume" | "hudScale";
 type ToggleKey = "invertY" | "reducedShake" | "colorBlind";
-type CycleKey = "quality" | "subtitleSize" | "look";
+type CycleKey = "quality" | "subtitleSize" | "look" | "voice";
 
 /** Full-screen menus. Each method replaces whatever screen is showing. */
 export class Screens {
@@ -533,6 +533,7 @@ export class Screens {
            <div class="group">AUDIO</div>
            ${slider("VOLUME", "volume", 0, 1, 0.05)}
            ${slider("MUSIC", "musicVolume", 0, 1, 0.05)}
+           ${cycle("CO-OP VOICE", "voice")}
          </section>
          <section>
            <div class="group">DISPLAY</div>
@@ -545,7 +546,7 @@ export class Screens {
            ${toggle("COLOUR-BLIND FRIENDLY HUD", "colorBlind")}
          </section>
        </div>
-       <div class="note-line">Graphics quality fully applies from the next level you load. The radio calls you by your character's name, and your co-op partner sees them.</div>`,
+       <div class="note-line">Graphics quality fully applies from the next level you load. The radio calls you by your character's name, and your co-op partners see them. In co-op, creatures can hear you talk.</div>`,
       [{ label: "Back", action: back, primary: true }],
       false,
       false,
@@ -574,6 +575,7 @@ export class Screens {
       quality: { values: QUALITY_ORDER, label: (v) => QUALITY[v as keyof typeof QUALITY].name },
       subtitleSize: { values: SUBTITLE_SIZES, label: (v) => v[0].toUpperCase() + v.slice(1) },
       look: { values: LOOK_ORDER, label: (v) => fullName(v as CharacterLook) },
+      voice: { values: VOICE_MODES, label: (v) => ({ ptt: "Push to talk", open: "Open mic", off: "Off" })[v] ?? v },
     };
     this.root.querySelectorAll<HTMLButtonElement>("button.cycle").forEach((btn) => {
       const key = btn.dataset.c as CycleKey;

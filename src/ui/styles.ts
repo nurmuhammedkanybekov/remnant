@@ -75,6 +75,10 @@ const CSS = /* css */ `
 .partner .pbar b { display: block; height: 100%; background: #7ab8ff; transition: width .2s; }
 .partner.down { color: var(--ui-red); animation: pulse 1s infinite; }
 .partner.down .pbar b { background: var(--ui-red); }
+.partner.talking > span:first-child::after { content: " ◉"; color: var(--ui-amber); }
+.mic { margin-top: 8px; font-size: 10px; letter-spacing: .2em; display: none; opacity: .6; }
+.mic.open { display: block; }
+.mic.talking { opacity: 1; color: var(--ui-amber); }
 
 /* ---- ammo ---- */
 .ammo { position: absolute; right: 30px; bottom: 24px; text-align: right; }

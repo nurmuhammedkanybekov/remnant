@@ -37,6 +37,8 @@ export interface HudState {
   breathHeld: boolean;
   /** Bottles carried. */
   throwables: number;
+  /** Co-op voice: your microphone is off, live, or picking you up talking. */
+  mic: "off" | "open" | "talking";
   battery: number; // 0..1
   torchOn: boolean;
   mag: number;
@@ -100,6 +102,7 @@ export class Hud {
         <div class="medkits throwables" data-k="thr"><b>◆</b><span data-k="thrNum"></span><kbd data-k="thrKey"></kbd></div>
         <div class="keycard" data-k="key">▣ KEYCARD</div>
         <div class="partners" data-k="partners"></div>
+        <div class="mic" data-k="mic">● MIC</div>
       </div>
       <div class="boss" data-k="boss"><div class="name" data-k="bossName"></div><div class="bar"><b class="lag" data-k="bossLag"></b><b class="fill" data-k="bossHp"></b></div></div>
       <div class="noise"><div class="bars" data-k="noiseBars"></div><div class="lbl">NOISE</div></div>
@@ -128,11 +131,11 @@ export class Hud {
 
   /** Co-op: the other player's health and state, or null to hide it. */
   /** The other players' health, one line each (none outside co-op). */
-  partners(list: { hp: number; down: boolean; bleed: number; name?: string }[]): void {
+  partners(list: { hp: number; down: boolean; bleed: number; talking?: boolean; name?: string }[]): void {
     const html = list
       .map(
         (p) =>
-          `<div class="partner show${p.down ? " down" : ""}"><span>${esc((p.name ?? "PARTNER").toUpperCase())}</span><div class="pbar"><b style="width:${Math.round(
+          `<div class="partner show${p.down ? " down" : ""}${p.talking ? " talking" : ""}"><span>${esc((p.name ?? "PARTNER").toUpperCase())}</span><div class="pbar"><b style="width:${Math.round(
             p.hp * 100
           )}%"></b></div><span>${p.down ? `DOWN ${p.bleed}s` : ""}</span></div>`
       )
@@ -268,6 +271,10 @@ export class Hud {
     if (L.weapon !== s.weapon) this.el.wname.textContent = s.weapon.toUpperCase();
     if (L.slot !== s.slot)
       this.el.slots.querySelectorAll<HTMLElement>("i").forEach((i) => i.classList.toggle("on", Number(i.dataset.slot) === s.slot));
+    if (L.mic !== s.mic) {
+      this.el.mic.classList.toggle("open", s.mic !== "off");
+      this.el.mic.classList.toggle("talking", s.mic === "talking");
+    }
     if (L.throwables !== s.throwables) {
       this.el.thrNum.textContent = `×${s.throwables}`;
       this.el.thr.classList.toggle("none", s.throwables === 0);

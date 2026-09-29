@@ -15,6 +15,15 @@ import { DEFAULT_SIGNAL_URL, Signaling, type SignalMessage } from "./signaling";
  */
 
 export type Role = "host" | "guest";
+export type VoiceChannelId = "direct" | "relay";
+
+/** A connection's voice channels, in the order they were offered. */
+function audioTransceivers(pc: RTCPeerConnection): RTCRtpTransceiver[] {
+  return pc
+    .getTransceivers()
+    .filter((t) => t.receiver.track?.kind === "audio")
+    .sort((a, b) => Number(a.mid ?? 0) - Number(b.mid ?? 0));
+}
 
 /** Give up on a connection that hasn't opened by then (a relay takes a little longer to set up). */
 const CONNECT_TIMEOUT_MS = 30000;
@@ -83,6 +92,15 @@ export class PeerLink {
   onJoining: (() => void) | null = null;
   /** Each step of connecting, in words — shown in the lobby, and after a failure, so problems can be pinned down. */
   onStatus: ((step: string) => void) | null = null;
+  /**
+   * Voice (see `net/voice.ts`): a partner's voice arrived. Every connection
+   * carries two audio channels, set up with it so no renegotiation is ever
+   * needed: "direct" is the other end's own microphone, "relay" is a third
+   * player's voice that the host passes on.
+   */
+  onVoice: ((channel: VoiceChannelId, track: MediaStreamTrack) => void) | null = null;
+  /** Voices that have arrived so far, by channel. */
+  readonly voices = new Map<VoiceChannelId, MediaStreamTrack>();
   /** The last step reached (see `onStatus`). */
   lastStep = "starting";
   /** Every step with its time, for the failure screen. */
@@ -165,6 +183,12 @@ export class PeerLink {
     }
   }
 
+  /** Puts a voice on one of this connection's audio channels (null for silence). */
+  setVoice(channel: VoiceChannelId, track: MediaStreamTrack | null): void {
+    const t = this.pc && audioTransceivers(this.pc)[channel === "relay" ? 1 : 0];
+    if (t && t.sender.track !== track) void t.sender.replaceTrack(track).catch(() => undefined);
+  }
+
   close(reason = "left"): void {
     if (this.closed) return;
     this.closed = true;
@@ -225,6 +249,12 @@ export class PeerLink {
     if (this.role === "host")
       this.stops.push(steadyTimeout(CONNECT_TIMEOUT_MS, () => this.pc === pc && !this.isOpen && this.dropPending()));
     pc.ondatachannel = (e) => this.adopt(e.channel);
+    pc.ontrack = (e) => {
+      if (e.track.kind !== "audio") return;
+      const channel: VoiceChannelId = audioTransceivers(pc).indexOf(e.transceiver) === 1 ? "relay" : "direct";
+      this.voices.set(channel, e.track);
+      this.onVoice?.(channel, e.track);
+    };
     return pc;
   }
 
@@ -271,6 +301,9 @@ export class PeerLink {
     if (this.closed) return;
     this.adopt(pc.createDataChannel("reliable", { ordered: true }));
     this.adopt(pc.createDataChannel("fast", { ordered: false, maxRetransmits: 0 }));
+    // Two voice channels, silent until a microphone is put on them.
+    pc.addTransceiver("audio", { direction: "sendrecv" });
+    pc.addTransceiver("audio", { direction: "sendrecv" });
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     this.status("gathering network routes");
@@ -326,6 +359,8 @@ export class PeerLink {
         if (this.closed) return;
         await pc.setRemoteDescription((payload as unknown as Offer).sdp);
         await this.flushCandidates();
+        // Talk back on both voice channels the guest offered.
+        for (const t of audioTransceivers(pc)) t.direction = "sendrecv";
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         this.status("gathering network routes");

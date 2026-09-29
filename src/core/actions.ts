@@ -26,7 +26,6 @@ export const ACTIONS = [
   "weapon3",
   "holdBreath",
   "throw",
-  "camera",
   "talk",
 ] as const;
 
@@ -57,7 +56,6 @@ export const ACTION_LABELS: Record<Action, string> = {
   weapon3: "Shotgun",
   holdBreath: "Hold breath",
   throw: "Throw bottle / can",
-  camera: "First / third person",
   talk: "Push to talk (co-op)",
 };
 
@@ -82,7 +80,6 @@ export const DEFAULT_BINDINGS: Bindings = {
   weapon3: ["Digit3", null],
   holdBreath: ["KeyB", null],
   throw: ["KeyG", null],
-  camera: ["KeyP", null],
   talk: ["KeyT", null],
 };
 
