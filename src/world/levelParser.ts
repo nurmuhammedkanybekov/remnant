@@ -36,6 +36,8 @@ export interface CellSpawn {
 
 export interface DoorSpawn extends CellSpawn {
   security: boolean;
+  /** A loose wall panel (`+`) hiding a secret room: looks like the wall, pried open with Use. */
+  panel?: boolean;
 }
 
 export interface TriggerSpawn extends CellSpawn {
@@ -150,6 +152,10 @@ export function parseLevel(def: LevelDef): ParsedLevel {
         case "=":
           blocked = true;
           spawns.doors.push({ ...at, security: ch === "=" });
+          break;
+        case "+":
+          blocked = true;
+          spawns.doors.push({ ...at, security: false, panel: true });
           break;
         case "G":
           blocked = true;

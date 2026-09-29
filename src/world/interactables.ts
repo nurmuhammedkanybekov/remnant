@@ -117,14 +117,28 @@ export class Door implements Interactable {
   private readonly lightMat: THREE.MeshBasicMaterial;
   private openT = 0;
 
+  /** A loose panel hiding a secret room (see `DoorSpawn.panel`). */
+  readonly panel: boolean;
+
   constructor(
     scene: THREE.Scene,
     private readonly level: LevelGrid,
-    readonly spawn: DoorSpawn
+    readonly spawn: DoorSpawn,
+    /** The walls' material: a panel wears it, so it looks like any other wall. */
+    wallMaterial?: THREE.Material
   ) {
     this.pos = spawn.pos;
     this.security = spawn.security;
+    this.panel = !!spawn.panel;
     const { col, row } = spawn.cell;
+    if (this.panel) {
+      this.group.position.set(spawn.pos.x, 0, spawn.pos.y);
+      this.slab = buildPanel(wallMaterial ?? plated(0x2f3833));
+      this.group.add(this.slab);
+      this.lightMat = new THREE.MeshBasicMaterial();
+      scene.add(this.group);
+      return;
+    }
     // Corridor runs north–south if the cells east and west are walls: the slab then spans X.
     const spansX = isSolid(level, col - 1, row) && isSolid(level, col + 1, row);
     this.group.position.set(spawn.pos.x, 0, spawn.pos.y);
@@ -165,6 +179,7 @@ export class Door implements Interactable {
 
   get prompt(): string | null {
     if (this.isOpen) return null;
+    if (this.panel) return "PRY THE LOOSE PANEL";
     if (this.security && !this.isUnlocked()) return "LOCKED — NEEDS KEYCARD";
     return this.security ? "USE KEYCARD" : "OPEN DOOR";
   }
@@ -192,12 +207,59 @@ export class Door implements Interactable {
       this.lightMat.color.setHex(color);
       for (const l of this.lights) l.material.color.setHex(color);
     }
+    if (this.panel) {
+      // Pried loose: it tips back into the room and drops.
+      if (this.isOpen && this.openT < 1) this.openT = Math.min(1, this.openT + dt / 0.7);
+      this.slab.position.y = -easeInOut(this.openT) * (WALL_HEIGHT + 0.1);
+      this.group.visible = this.openT < 1;
+      return;
+    }
     if (this.isOpen && this.openT < 1) this.openT = Math.min(1, this.openT + dt / 1.1);
     // Judder while the motor strains, then slide up into the ceiling.
     const k = easeInOut(this.openT);
     this.slab.position.y = k * (WALL_HEIGHT + 0.2) + (this.openT > 0 && this.openT < 1 ? Math.sin(time * 60) * 0.01 : 0);
     this.group.visible = this.openT < 1;
   }
+}
+
+/**
+ * A wall cell that is really a loose panel: the wall's own material over the
+ * whole cell, so from a distance it's just wall. Up close, with a light on
+ * it, there's a tell: a dark seam round the edge and scratches where someone
+ * prised it before.
+ */
+function buildPanel(wallMaterial: THREE.Material): THREE.Group {
+  const g = new THREE.Group();
+  const block = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE), wallMaterial);
+  block.position.y = WALL_HEIGHT / 2;
+  g.add(block);
+  const seam = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1 });
+  const scratch = new THREE.MeshStandardMaterial({ color: 0x8a8578, roughness: 0.6, metalness: 0.4 });
+  // One seam frame and a few scratches on each face, just proud of the surface.
+  for (let side = 0; side < 4; side++) {
+    const face = new THREE.Group();
+    face.rotation.y = (side * Math.PI) / 2;
+    const z = CELL_SIZE / 2 + 0.005;
+    const w = CELL_SIZE * 0.55;
+    const h = WALL_HEIGHT * 0.62;
+    for (const [x, y, sx, sy] of [
+      [0, 0.05 + h, w, 0.025],
+      [-w / 2, 0.05 + h / 2, 0.025, h],
+      [w / 2, 0.05 + h / 2, 0.025, h],
+    ] as const) {
+      const bar = new THREE.Mesh(new THREE.PlaneGeometry(sx, sy), seam);
+      bar.position.set(x, y, z);
+      face.add(bar);
+    }
+    for (let i = 0; i < 3; i++) {
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.012), scratch);
+      s.position.set(w / 2 - 0.08, 0.9 + i * 0.06, z + 0.001);
+      s.rotation.z = -0.4 + i * 0.15;
+      face.add(s);
+    }
+    g.add(face);
+  }
+  return g;
 }
 
 /** A diesel generator. Loud to start, and it keeps humming — creatures come to see what the noise is. */

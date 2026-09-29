@@ -16,6 +16,8 @@ export interface LevelData extends ParsedLevel {
   lampFixtures: LampFixture[];
   exitSignMat: THREE.MeshBasicMaterial;
   exitLight: THREE.PointLight;
+  /** The walls' material, so a loose panel can look like the wall around it. */
+  wallMaterial: THREE.Material;
 }
 
 /**
@@ -68,12 +70,16 @@ function varyPanels(mat: THREE.MeshStandardMaterial): void {
 
 /** Builds a parsed level's geometry, props, lamps and exit into `scene`. `bumpMaps` is a quality option. */
 export function buildLevel(scene: THREE.Scene, level: ParsedLevel, bumpMaps = true): LevelData {
-  const lampFixtures = buildGeometry(scene, level, bumpMaps);
+  const { lampFixtures, wallMaterial } = buildGeometry(scene, level, bumpMaps);
   const exit = buildExit(scene, level, level.exitCell);
-  return { ...level, lampFixtures, exitSignMat: exit.signMat, exitLight: exit.light };
+  return { ...level, lampFixtures, exitSignMat: exit.signMat, exitLight: exit.light, wallMaterial };
 }
 
-function buildGeometry(scene: THREE.Scene, level: ParsedLevel, bumpMaps: boolean): LampFixture[] {
+function buildGeometry(
+  scene: THREE.Scene,
+  level: ParsedLevel,
+  bumpMaps: boolean
+): { lampFixtures: LampFixture[]; wallMaterial: THREE.Material } {
   const tex = textures();
   const theme = resolveTheme(level.def.theme);
   const { walls, crates, barrels } = level.props;
@@ -225,7 +231,7 @@ function buildGeometry(scene: THREE.Scene, level: ParsedLevel, bumpMaps: boolean
   scene.background = new THREE.Color(theme.fog);
   // A cool, very dim fill so nothing is ever pure black.
   scene.add(new THREE.HemisphereLight(theme.skyLight, theme.groundLight, theme.fillIntensity));
-  return fixtures;
+  return { lampFixtures: fixtures, wallMaterial: wallMat };
 }
 
 /** Door + glowing sign on the wall next to the exit cell. */

@@ -29,12 +29,16 @@ export const COLD_STORAGE: LevelDef = {
     "#.#..E#...#.K..E#.#...#..#",
     "#.#.#.#####.###.#.#.#.##.#",
     "#R..#.....L...#.....#..X.#",
+    "#############+############",
+    "#############.4###########",
+    "#############A.###########",
     "##########################",
   ],
   notes: {
     "1": "Security locked the lift behind a keycard. Hendricks had it on his belt. Hendricks went into the south freezers.",
     "2": "The big one doesn't run. It doesn't need to. Keep moving and keep your light off.",
     "3": "Nur — the radio voice asked me my name. I told it. Then it used it, like it had known it all along. Probably nothing. — Mara",
+    "4": "HENDRICKS — personal. Spare rounds, in case the freezers went bad. If you're reading this, they went bad.",
   },
   events: {
     start: [
