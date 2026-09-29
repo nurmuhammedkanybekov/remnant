@@ -1,6 +1,6 @@
 import { BUILD_ID } from "../net/build";
 import { MusicDirector } from "../audio/music";
-import { SoundManager } from "../audio/soundManager";
+import { SoundManager, type VoicePlayer } from "../audio/soundManager";
 import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyDef, type DifficultyId } from "../content/difficulty";
 import { cloneBindings, DEFAULT_BINDINGS, keyLabel, type Action } from "../core/actions";
 import { ENDINGS, PROLOGUE, TRANSMISSIONS, type EndingId } from "../content/story";
@@ -14,6 +14,7 @@ import { loadSettings, saveSettings, type Settings } from "../core/settings";
 import type { Enemy } from "../enemies/enemy";
 import { hasRelay, relayState } from "../net/ice";
 import { CloudSync } from "../net/cloud";
+import { VoiceChat } from "../net/voice";
 import { boardKey, Leaderboard, ranking, type BoardMode } from "../net/leaderboard";
 import { firebaseBackend, firebaseConfig } from "../net/firebaseBackend";
 import { describeClose, PeerLink, type Role } from "../net/link";
@@ -112,6 +113,10 @@ export class Game {
   private coopPlayers = 2;
   /** Co-op host: how each guest is connected ("directly", "through the relay"), for the lobby. */
   private readonly routes = new Map<number, string>();
+  /** Co-op voice: your microphone. */
+  private readonly voice: VoiceChat;
+  /** Co-op voice: the other players' voices, by slot. */
+  private readonly remoteVoices = new Map<number, VoicePlayer>();
   /** Bumped whenever the co-op menu is shown or left, so a late relay check can't redraw another screen. */
   private coopMenuToken = 0;
   /** Co-op: which level attempt this is (see `start` in net/protocol.ts). */
@@ -142,6 +147,9 @@ export class Game {
     this.engine.setQuality(QUALITY[this.settings.quality]);
     this.input = new Input(this.engine.domElement);
     this.hud = new Hud(container);
+    this.voice = new VoiceChat(this.sound);
+    this.voice.mode = this.settings.voice;
+    const voice = this.voice;
     this.screens = new Screens(container);
     this.screens.onUiSound = () => this.sound.playUi();
     this.viewmodel = new Viewmodel(this.engine.viewScene, this.engine.camera);
@@ -159,6 +167,16 @@ export class Game {
       motionScale: () => (this.settings.reducedShake ? REDUCED_MOTION : 1),
       noteRead: (key) => this.save.noteRead(key),
       look: () => this.settings.look,
+      voice: {
+        update: (dt, talk) => this.voice.update(dt, talk),
+        get speaking() {
+          return voice.speaking;
+        },
+        get open() {
+          return voice.open;
+        },
+        place: (slot, sp) => this.remoteVoices.get(slot)?.place(sp),
+      },
     };
     this.hud.setVisible(false);
     this.sound.setVolume(this.settings.volume);
@@ -491,6 +509,11 @@ export class Game {
         this.sound.setVolume(s.volume);
         this.sound.setMusicVolume(s.musicVolume);
         this.applyDisplaySettings();
+        if (this.voice.mode !== s.voice) {
+          this.voice.mode = s.voice;
+          if (s.voice === "off") this.voice.stop();
+          if (this.coopRole) void this.startVoice();
+        }
       },
       back
     );
@@ -692,6 +715,7 @@ export class Game {
       retry
     );
     session.onDeath = () => this.onDeath();
+    if (run.coop) this.wireVoices();
     session.onExit = (ending) => this.onLevelComplete(ending);
     session.onCheckpoint = (state) => {
       run.checkpoint = state;
@@ -971,6 +995,8 @@ export class Game {
       this.links.set(slot, link);
       link.send({ t: "hello", v: PROTOCOL_VERSION, app: __APP_VERSION__ });
       this.sound.playCheckpoint();
+      link.onVoice = () => this.wireVoices();
+      void this.startVoice();
       this.showHostLobby();
       void this.describeRoute(link).then((route) => {
         if (this.links.get(slot) !== link) return;
@@ -1056,6 +1082,7 @@ export class Game {
   private guestLeft(slot: number, reason: string): void {
     this.links.delete(slot);
     this.routes.delete(slot);
+    this.wireVoices();
     const playing = this.run?.coop && this.state !== "menu" && this.state !== "title";
     if (!playing) {
       // Still in the lobby: keep the room open for whoever comes next.
@@ -1110,9 +1137,11 @@ export class Game {
     link.onStatus = (step) => {
       if (!link.open && this.links.get(0) === link) showStep(step);
     };
+    link.onVoice = () => this.wireVoices();
     link.onOpen = async () => {
       link.send({ t: "hello", v: PROTOCOL_VERSION, app: __APP_VERSION__ });
       this.sound.playCheckpoint();
+      void this.startVoice();
       const show = (route: string) =>
         this.screens.lobby("CONNECTED", `ROOM ${code}`, `${route}\nWaiting for the host to start the game…`, [
           { label: "Leave", action: () => this.showCoopMenu() },
@@ -1133,6 +1162,60 @@ export class Game {
     this.routes.clear();
     this.coopRole = null;
     for (const l of links) l.close("left");
+    this.voice.stop();
+    this.wireVoices();
+  }
+
+  /** Co-op: asks for the microphone (once) and puts it on the connections. */
+  private async startVoice(): Promise<void> {
+    if (this.voice.mode === "off") return this.wireVoices();
+    const had = this.voice.denied;
+    await this.voice.start();
+    if (this.voice.denied && !had) this.hud.toast("NO MICROPHONE — VOICE CHAT IS OFF", "var(--ui-red)");
+    this.wireVoices();
+  }
+
+  /**
+   * Co-op voice routing. Your microphone goes out on every connection's
+   * "direct" channel. A guest hears the host on "direct" and the other guest
+   * on "relay"; the host hears each guest on their own connection, and
+   * passes each guest's voice on to the other on "relay".
+   */
+  private wireVoices(): void {
+    // The track itself goes silent when you're not talking (see `VoiceChat`).
+    const mic = this.voice.mode !== "off" ? this.voice.track : null;
+    const heard = new Map<number, MediaStreamTrack>();
+    if (this.coopRole === "host") {
+      for (const [slot, link] of this.links) {
+        const t = link.voices.get("direct");
+        if (t) heard.set(slot, t);
+      }
+      for (const [slot, link] of this.links) {
+        link.setVoice("direct", mic);
+        const other = [...heard].find(([s]) => s !== slot)?.[1] ?? null;
+        link.setVoice("relay", other);
+      }
+    } else if (this.coopRole === "guest") {
+      const link = this.links.get(0);
+      if (link) {
+        link.setVoice("direct", mic);
+        const host = link.voices.get("direct");
+        const other = link.voices.get("relay");
+        if (host) heard.set(0, host);
+        if (other && this.coopPlayers > 2) heard.set(this.mySlot === 1 ? 2 : 1, other);
+      }
+    }
+    // Players for new voices, and goodbye to the ones that left.
+    for (const [slot, player] of this.remoteVoices)
+      if (heard.get(slot) !== player.track) {
+        player.dispose();
+        this.remoteVoices.delete(slot);
+      }
+    for (const [slot, track] of heard) {
+      if (this.remoteVoices.has(slot)) continue;
+      const player = this.sound.voice(track);
+      if (player) this.remoteVoices.set(slot, player);
+    }
   }
 
   /** A connection problem outside a game: say what happened. */
@@ -1183,6 +1266,7 @@ export class Game {
         this.epoch = m.ep;
         this.mySlot = m.slot ?? 1;
         this.coopPlayers = m.players ?? 2;
+        this.wireVoices();
         if (m.fresh || !this.run) this.startCoopRun(m.level, m.difficulty);
         else {
           this.run.levelIndex = m.level;

@@ -620,6 +620,32 @@ export class SoundManager {
     this.burst(o, "lowpass", 400, 0.8, t + 0.7, 0.25, 0.4);
   }
 
+  /**
+   * A partner's voice, played through the world like any other sound: it
+   * comes from where they stand, fades with distance and is muffled through
+   * walls (see `VoicePlayer.place`). Null until the audio is running.
+   */
+  voice(track: MediaStreamTrack): VoicePlayer | null {
+    if (!this.ctx) return null;
+    return new VoicePlayer(this.ctx, track, this.dry, this.reverbIn);
+  }
+
+  /** How loud a microphone is right now (0..1), for "am I talking". */
+  meter(track: MediaStreamTrack): () => number {
+    if (!this.ctx) return () => 0;
+    const src = this.ctx.createMediaStreamSource(new MediaStream([track]));
+    const an = this.ctx.createAnalyser();
+    an.fftSize = 512;
+    src.connect(an);
+    const buf = new Float32Array(an.fftSize);
+    return () => {
+      an.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (const v of buf) sum += v * v;
+      return Math.min(1, Math.sqrt(sum / buf.length) * 6);
+    };
+  }
+
   /** A bottle leaving your hand: a quick swish. */
   playThrow(): void {
     if (!this.ctx) return;
@@ -1008,5 +1034,58 @@ export class SoundManager {
       this.burst(o, "bandpass", 900 + Math.random() * 900, 10, t, 0.4, 0.6);
       this.tone(o, "sine", 600, 580, t, 0.6, 0.15);
     }
+  }
+}
+
+/** Voices can be heard this far away (world units). */
+const VOICE_RANGE = 34;
+
+/** One partner's voice in the world. */
+export class VoicePlayer {
+  private readonly el: HTMLAudioElement;
+  private readonly src: MediaStreamAudioSourceNode;
+  private readonly gain: GainNode;
+  private readonly lowpass: BiquadFilterNode;
+  private readonly pan: StereoPannerNode;
+  private readonly send: GainNode;
+
+  constructor(
+    private readonly ctx: AudioContext,
+    readonly track: MediaStreamTrack,
+    dry: AudioNode,
+    reverb: AudioNode
+  ) {
+    const stream = new MediaStream([track]);
+    // Chrome only lets a remote stream's audio flow into Web Audio while a media element plays it too (muted).
+    this.el = new Audio();
+    this.el.muted = true;
+    this.el.srcObject = stream;
+    void this.el.play().catch(() => undefined);
+    this.src = ctx.createMediaStreamSource(stream);
+    this.gain = ctx.createGain();
+    this.lowpass = ctx.createBiquadFilter();
+    this.lowpass.type = "lowpass";
+    this.lowpass.frequency.value = 12000;
+    this.pan = ctx.createStereoPanner();
+    this.send = ctx.createGain();
+    this.send.gain.value = 0.15;
+    this.src.connect(this.gain).connect(this.lowpass).connect(this.pan).connect(dry);
+    this.pan.connect(this.send).connect(reverb);
+    this.gain.gain.value = 0;
+  }
+
+  /** Where they are relative to you this frame; null = not in the level (silent). */
+  place(sp: Spatial | null): void {
+    const t = this.ctx.currentTime;
+    const near = sp ? Math.max(0, 1 - sp.distance / VOICE_RANGE) : 0;
+    this.gain.gain.setTargetAtTime(sp ? 0.25 + near * near * 1.35 : 0, t, 0.05);
+    this.lowpass.frequency.setTargetAtTime(sp?.muffled ? 700 : 12000, t, 0.08);
+    this.pan.pan.setTargetAtTime(sp ? Math.max(-1, Math.min(1, sp.pan)) * 0.7 : 0, t, 0.05);
+  }
+
+  dispose(): void {
+    this.src.disconnect();
+    this.pan.disconnect();
+    this.el.srcObject = null;
   }
 }

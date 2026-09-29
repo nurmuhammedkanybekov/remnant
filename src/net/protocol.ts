@@ -84,6 +84,8 @@ export interface PlayerState {
   look?: string;
   /** Holding their breath (creatures beside them can't hear them breathe). */
   held?: boolean;
+  /** Talking on voice chat right now (creatures close by can hear it). */
+  talk?: boolean;
 }
 
 /**

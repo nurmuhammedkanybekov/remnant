@@ -5,6 +5,9 @@ import { readJson, writeJson } from "./storage";
 
 export type SubtitleSize = "small" | "medium" | "large";
 export const SUBTITLE_SIZES: SubtitleSize[] = ["small", "medium", "large"];
+/** Co-op voice: talk while holding a key, always on, or not at all. */
+export type VoiceMode = "ptt" | "open" | "off";
+export const VOICE_MODES: VoiceMode[] = ["ptt", "open", "off"];
 
 export interface Settings {
   /** Mouse sensitivity multiplier, 0.2..3. */
@@ -28,6 +31,7 @@ export interface Settings {
   colorBlind: boolean;
   /** How you look to your co-op partner, and your own hands. */
   look: CharacterLook;
+  voice: VoiceMode;
   bindings: Bindings;
 }
 
@@ -47,6 +51,7 @@ export function defaultSettings(): Settings {
     reducedShake: false,
     colorBlind: false,
     look: "light",
+    voice: "ptt",
     bindings: normalizeBindings(null),
   };
 }
@@ -73,6 +78,7 @@ export function normalizeSettings(raw: unknown): Settings {
     reducedShake: bool(s.reducedShake, d.reducedShake),
     colorBlind: bool(s.colorBlind, d.colorBlind),
     look: isCharacterLook(s.look) ? s.look : d.look,
+    voice: VOICE_MODES.includes(s.voice as VoiceMode) ? (s.voice as VoiceMode) : d.voice,
     bindings: normalizeBindings(s.bindings),
   };
 }

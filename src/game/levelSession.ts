@@ -57,6 +57,8 @@ const MELEE_DAMAGE = 20;
 const MELEE_NOISE = 4;
 const TAKEDOWN_NOISE = 1.5;
 const MELEE_FACING = Math.cos(THREE.MathUtils.degToRad(50));
+/** Co-op: talking carries this far (before a creature's hearing). Whisper, or hold it till you're clear. */
+const VOICE_NOISE = 4;
 /** Creatures further than this (world units) never set your heart going. */
 const DREAD_RANGE = 13;
 /** The hold-breath hint shows once per page load. */
@@ -119,6 +121,17 @@ export interface SessionServices {
   look?: () => CharacterLook;
   /** A note was picked up (its key goes in the journal). */
   noteRead?: (key: string) => void;
+  /** Co-op voice: your microphone, and the other players' voices placed in the world. */
+  voice?: {
+    /** Every frame, with the push-to-talk key. */
+    update(dt: number, talkHeld: boolean): void;
+    /** You're talking right now. */
+    readonly speaking: boolean;
+    /** Your microphone is live. */
+    readonly open: boolean;
+    /** Where a player's voice comes from this frame (null: they're not here). */
+    place(slot: number, sp: Spatial | null): void;
+  };
 }
 
 /**
@@ -525,7 +538,9 @@ export class LevelSession {
       this.perceptionSlots.push(slot);
       list.push({
         playerPos: r.position2D,
-        playerNoise: s.down ? 0 : Math.max(NOISE_RADIUS[s.gait] * (s.wet ? WATER.noise : 1), s.held ? 0 : BREATH_NOISE),
+        playerNoise: s.down
+          ? 0
+          : Math.max(NOISE_RADIUS[s.gait] * (s.wet ? WATER.noise : 1), s.held ? 0 : BREATH_NOISE, s.talk ? VOICE_NOISE : 0),
         torchOn: !s.down && s.torch > 0.3,
         playerDead: s.down || s.hp <= 0,
         eye: r.eyePosition,
@@ -540,7 +555,7 @@ export class LevelSession {
     const torch = this.player.flashlight;
     return {
       playerPos: this.player.position2D,
-      playerNoise: dead ? 0 : this.player.noiseRadius,
+      playerNoise: dead ? 0 : Math.max(this.player.noiseRadius, this.services.voice?.speaking && this.coop ? VOICE_NOISE : 0),
       torchOn: !dead && torch.on && torch.level > 0.3,
       playerDead: dead || this.player.health.isDead,
       eye: cam.getWorldPosition(new THREE.Vector3()),
@@ -1373,6 +1388,7 @@ export class LevelSession {
       bleed: Math.ceil(this.bleed),
       look: this.services.look?.(),
       held: p.breath.held,
+      talk: this.services.voice?.speaking || undefined,
     };
     this.coop?.send(state, true);
   }
@@ -1414,6 +1430,9 @@ export class LevelSession {
       return;
     }
     for (const r of this.remotes.values()) r.update(dt, this.time);
+    const voice = this.services.voice;
+    voice?.update(dt, cmd.talk && !this.player.health.isDead);
+    for (const [slot, r] of this.remotes) voice?.place(slot, r.visible ? this.spatial(r.position2D) : null);
     this.stateTimer -= dt;
     if (this.stateTimer <= 0) {
       this.stateTimer = STATE_INTERVAL;
@@ -1631,11 +1650,22 @@ export class LevelSession {
       breath: this.player.breath.air,
       breathHeld: this.player.breath.held,
       throwables: this.throwablesHeld,
+      mic: this.coop ? (this.services.voice?.open ? (this.services.voice.speaking ? "talking" : "open") : "off") : "off",
     });
     hud.partners(
       this.partners.flatMap((p) => {
         const r = p.state;
-        return r ? [{ hp: r.hp, down: r.down, bleed: r.bleed, name: isCharacterLook(r.look) ? LOOKS[r.look].firstName : undefined }] : [];
+        return r
+          ? [
+              {
+                hp: r.hp,
+                down: r.down,
+                bleed: r.bleed,
+                talking: !!r.talk,
+                name: isCharacterLook(r.look) ? LOOKS[r.look].firstName : undefined,
+              },
+            ]
+          : [];
       })
     );
   }
