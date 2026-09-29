@@ -1,3 +1,4 @@
+import { esc } from "./inventory";
 import { currentCharacter } from "../content/characters";
 import type { RadioLine } from "../game/script";
 import { injectStyles } from "./styles";
@@ -98,7 +99,7 @@ export class Hud {
         <div class="medkits" data-k="med"><b>✚</b><span data-k="medNum"></span><kbd data-k="medKey"></kbd></div>
         <div class="medkits throwables" data-k="thr"><b>◆</b><span data-k="thrNum"></span><kbd data-k="thrKey"></kbd></div>
         <div class="keycard" data-k="key">▣ KEYCARD</div>
-        <div class="partner" data-k="partner"><span data-k="partnerName">PARTNER</span><div class="pbar"><b data-k="partnerHp"></b></div><span data-k="partnerTxt"></span></div>
+        <div class="partners" data-k="partners"></div>
       </div>
       <div class="boss" data-k="boss"><div class="name" data-k="bossName"></div><div class="bar"><b class="lag" data-k="bossLag"></b><b class="fill" data-k="bossHp"></b></div></div>
       <div class="noise"><div class="bars" data-k="noiseBars"></div><div class="lbl">NOISE</div></div>
@@ -126,17 +127,19 @@ export class Hud {
   }
 
   /** Co-op: the other player's health and state, or null to hide it. */
-  partner(info: { hp: number; down: boolean; bleed: number; name?: string } | null): void {
-    const el = this.el.partner;
-    el.classList.toggle("show", info !== null);
-    if (!info) return;
-    const name = (info.name ?? "PARTNER").toUpperCase();
-    if (this.el.partnerName.textContent !== name) this.el.partnerName.textContent = name;
-    el.classList.toggle("down", info.down);
-    this.el.partnerHp.style.width = `${Math.round(info.hp * 100)}%`;
-    const txt = info.down ? `DOWN ${info.bleed}s` : "";
-    if (this.el.partnerTxt.textContent !== txt) this.el.partnerTxt.textContent = txt;
+  /** The other players' health, one line each (none outside co-op). */
+  partners(list: { hp: number; down: boolean; bleed: number; name?: string }[]): void {
+    const html = list
+      .map(
+        (p) =>
+          `<div class="partner show${p.down ? " down" : ""}"><span>${esc((p.name ?? "PARTNER").toUpperCase())}</span><div class="pbar"><b style="width:${Math.round(
+            p.hp * 100
+          )}%"></b></div><span>${p.down ? `DOWN ${p.bleed}s` : ""}</span></div>`
+      )
+      .join("");
+    if (html !== this.partnersHtml) this.el.partners.innerHTML = this.partnersHtml = html;
   }
+  private partnersHtml = "";
 
   setVisible(v: boolean): void {
     this.root.style.display = v ? "block" : "none";

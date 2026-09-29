@@ -16,8 +16,8 @@ import { hasRelay, relayState } from "../net/ice";
 import { CloudSync } from "../net/cloud";
 import { boardKey, Leaderboard, ranking, type BoardMode } from "../net/leaderboard";
 import { firebaseBackend, firebaseConfig } from "../net/firebaseBackend";
-import { describeClose, PeerLink } from "../net/link";
-import { makeRoomCode, normalizeRoomCode, PROTOCOL_VERSION, type NetMsg } from "../net/protocol";
+import { describeClose, PeerLink, type Role } from "../net/link";
+import { makeRoomCode, MAX_GUESTS, normalizeRoomCode, PROTOCOL_VERSION, RELAYED, type NetMsg } from "../net/protocol";
 import { buildCommand, emptyCommand, type PlayerCommand } from "../player/command";
 import { fullName, LOOKS, personalise, setCharacter } from "../content/characters";
 import { MAX_MEDKITS, MAX_THROWABLES } from "../content/items";
@@ -99,8 +99,19 @@ export class Game {
   /** "Use Medkit" was picked in the inventory: heal on the next frame of play. */
   private pendingHeal = false;
   private inventoryOpen = false;
-  /** Co-op: the connection to the other player, while there is one. */
-  private link: PeerLink | null = null;
+  /** Co-op: host or guest, while in a co-op game or lobby. */
+  private coopRole: Role | null = null;
+  /** Co-op: open connections by player slot. A host has one per guest (1, 2); a guest has the host's (0). */
+  private readonly links = new Map<number, PeerLink>();
+  /** Co-op host: the room open for the next guest, until the game starts or it's full. */
+  private room: PeerLink | null = null;
+  private roomCode = "";
+  /** Co-op: this player's slot (0 the host, 1 or 2 a guest). */
+  private mySlot = 0;
+  /** Co-op: how many players the current level was started for. */
+  private coopPlayers = 2;
+  /** Co-op host: how each guest is connected ("directly", "through the relay"), for the lobby. */
+  private readonly routes = new Map<number, string>();
   /** Bumped whenever the co-op menu is shown or left, so a late relay check can't redraw another screen. */
   private coopMenuToken = 0;
   /** Co-op: which level attempt this is (see `start` in net/protocol.ts). */
@@ -239,7 +250,7 @@ export class Game {
     items.push(
       { label: "New Game", primary: !saved, action: () => this.confirmReplaceRun(() => this.showDifficulty(0)) },
       { label: "Chapters", disabled: this.save.progress.unlockedLevel === 0, action: () => this.showChapters() },
-      { label: "Co-op", detail: "Two players, online", action: () => this.showCoopMenu() },
+      { label: "Co-op", detail: "Two or three players, online", action: () => this.showCoopMenu() },
       {
         label: "Saves",
         detail: this.cloud.user ? `Cloud: ${this.cloud.user.name}` : this.cloud.available ? "Cloud sync, save files" : "Save files",
@@ -817,29 +828,39 @@ export class Game {
   // ------------------------------------------------------------------ co-op
 
   private get isGuest(): boolean {
-    return this.link?.role === "guest";
+    return this.coopRole === "guest";
   }
 
-  /** The level session's view of the connection: its messages are stamped with this attempt's number. */
+  /** The level session's view of the connections: its messages are stamped with this attempt's number. */
   private sessionLink(): CoopLink | null {
-    const link = this.link;
-    if (!link) return null;
+    const role = this.coopRole;
+    if (!role) return null;
     const ep = this.epoch;
+    const links = this.links;
     return {
-      role: link.role,
+      role,
+      slot: this.mySlot,
+      players: this.coopPlayers,
       get connected() {
-        return link.open;
+        return [...links.values()].some((l) => l.open);
       },
-      send: (m, fast) => link.send({ ...m, ep }, fast),
+      send: (m, fast) => {
+        for (const l of links.values()) l.send({ ...m, ep }, fast);
+      },
+      sendTo: (slot, m) => links.get(slot)?.send({ ...m, ep }),
     };
   }
 
-  /** Host: start a level attempt for both (a new run, the next level or a retry). */
+  /** Host: start a level attempt for everyone (a new run, the next level or a retry). Nobody new joins after this. */
   private hostBegins(
     msg: { t: "start"; level: number; difficulty: DifficultyId; fresh: boolean } | { t: "restart"; checkpoint: boolean }
   ): void {
+    this.closeRoom();
     this.epoch++;
-    this.link?.send({ ...msg, ep: this.epoch });
+    this.coopPlayers = 1 + this.links.size;
+    const players = this.coopPlayers;
+    for (const [slot, l] of this.links)
+      l.send(msg.t === "start" ? { ...msg, ep: this.epoch, slot, players } : { ...msg, ep: this.epoch, players });
   }
 
   private showCoopMenu(): void {
@@ -849,8 +870,8 @@ export class Game {
     const show = (relay: string) =>
       this.screens.lobby(
         "CO-OP",
-        "TWO PLAYERS · ONLINE",
-        "One of you hosts and picks the sublevel; the other joins with the host's room code.\nYou leave each sublevel together — and when one of you goes down, the other has 45 seconds to get them back up.\n" +
+        "TWO OR THREE PLAYERS · ONLINE",
+        "One of you hosts and picks the sublevel; the others join with the host's room code.\nYou leave each sublevel together — and when one of you goes down, the others have 45 seconds to get them back up.\n" +
           relay +
           ` · build ${BUILD_ID}`,
         [
@@ -904,84 +925,149 @@ export class Game {
     );
   }
 
-  /** Opens a room and waits for the partner. Returns the room code. */
+  /** Opens a room and waits for partners. Returns the room code. */
   private hostGame(level: number, difficulty: DifficultyId, tries = 0, note = ""): string {
+    this.endCoop();
     this.coopMenuToken++;
+    this.coopRole = "host";
+    this.mySlot = 0;
     this.hosting = { level, difficulty, tries };
-    const code = makeRoomCode();
-    const link = this.openLink("host", code);
-    this.screens.lobby(
-      "HOST",
-      "ROOM CODE",
-      `${note}Send this code to your partner.\nWaiting for them to join…\n(build ${BUILD_ID})`,
-      [{ label: "Cancel", action: () => this.showCoopMenu() }],
-      code
-    );
-    link.onJoinFailed = () =>
-      this.screens.lobby(
-        "HOST",
-        "ROOM CODE",
-        `Someone tried to join but couldn't get through.\n${describeClose("timeout")}\nThe room is still open.`,
-        [{ label: "Cancel", action: () => this.showCoopMenu() }],
-        code
-      );
-    // Once someone knocks, show each step of the connection.
-    let joining = false;
-    const showStep = (step: string) =>
-      this.screens.lobby(
-        "HOST",
-        "ROOM CODE",
-        `Your partner is connecting…\n(${step})`,
-        [{ label: "Cancel", action: () => this.showCoopMenu() }],
-        code
-      );
-    link.onJoining = () => {
-      joining = true;
-      showStep("setting up");
-    };
-    link.onStatus = (step) => {
-      if (link.open || this.link !== link) return;
-      // Before anyone knocks, only show trouble with the room itself (e.g. matchmaking dropping).
-      if (joining) showStep(step);
-      else if (step !== "room open, waiting")
-        this.screens.lobby(
-          "HOST",
-          "ROOM CODE",
-          `Send this code to your partner.\nWaiting for them to join…\n(${step} · build ${BUILD_ID})`,
-          [{ label: "Cancel", action: () => this.showCoopMenu() }],
-          code
-        );
-    };
-    link.onOpen = () => void this.hostReady(link, code, level, difficulty);
-    return code;
+    this.roomCode = makeRoomCode();
+    this.openRoom();
+    this.showHostLobby(note);
+    return this.roomCode;
   }
 
-  /** Host: the partner is in. Say hello, show how you're connected, and offer Start. */
-  private async hostReady(link: PeerLink, code: string, level: number, difficulty: DifficultyId): Promise<void> {
-    link.send({ t: "hello", v: PROTOCOL_VERSION, app: __APP_VERSION__ });
-    this.sound.playCheckpoint();
-    const def = LEVELS[level];
-    const route = await this.describeRoute(link);
-    if (this.link !== link || this.state !== "menu") return;
+  /**
+   * Host: listens for the next guest under the room code. Each guest gets a
+   * connection of their own; once one is in, the room opens again (same
+   * code) for another, until there are two or the game starts.
+   */
+  private openRoom(attempt = 0): void {
+    if (this.coopRole !== "host" || this.room || this.links.size >= MAX_GUESTS || this.run) return;
+    const code = this.roomCode;
+    const link = new PeerLink("host", code, this.signalUrl);
+    this.room = link;
+    let joining = false;
+    let slot = 0;
+    link.onJoinFailed = () => {
+      joining = false;
+      this.showHostLobby(`Someone tried to join but couldn't get through.\n${describeClose("timeout")}\nThe room is still open.\n`);
+    };
+    link.onJoining = () => {
+      joining = true;
+      this.showHostLobby("", "setting up");
+    };
+    link.onStatus = (step) => {
+      if (link.open || this.room !== link) return;
+      // Before anyone knocks, only show trouble with the room itself (e.g. matchmaking dropping).
+      if (joining) this.showHostLobby("", step);
+      else if (step !== "room open, waiting" && this.links.size === 0) this.showHostLobby(`(${step})\n`);
+    };
+    link.onOpen = () => {
+      if (this.room !== link) return;
+      this.room = null;
+      slot = [1, 2].find((s) => !this.links.has(s)) ?? 1;
+      this.links.set(slot, link);
+      link.send({ t: "hello", v: PROTOCOL_VERSION, app: __APP_VERSION__ });
+      this.sound.playCheckpoint();
+      this.showHostLobby();
+      void this.describeRoute(link).then((route) => {
+        if (this.links.get(slot) !== link) return;
+        this.routes.set(slot, route);
+        if (this.state === "menu" && !this.run && this.screens.showing("host-lobby")) this.showHostLobby();
+      });
+      // Room for one more: open the door again (a moment later, once the code is free).
+      window.setTimeout(() => this.openRoom(), 1200);
+    };
+    link.onMessage = (m) => {
+      if (this.links.get(slot) === link) this.onHostNet(m as NetMsg, slot, link);
+    };
+    link.onClose = (reason) => {
+      if (this.room === link) {
+        // The room itself failed (nobody was in it through this connection).
+        this.room = null;
+        const h = this.hosting;
+        if (this.links.size === 0) {
+          // Someone else's room has this code: quietly open ours under another.
+          if (reason === "id-taken" && h && h.tries < 3 && !this.run) this.hostGame(h.level, h.difficulty, h.tries + 1);
+          else if (reason !== "left") this.showCoopError(link, reason);
+          return;
+        }
+        // A room for a third player: try again a couple of times (the code may still be settling).
+        if (reason !== "left" && attempt < 3) window.setTimeout(() => this.openRoom(attempt + 1), 2000);
+        return;
+      }
+      if (this.links.get(slot) === link) this.guestLeft(slot, reason);
+    };
+    link.start();
+  }
+
+  private closeRoom(): void {
+    const room = this.room;
+    this.room = null;
+    room?.close("left");
+  }
+
+  /** Host: the lobby, with the room code, who's in, and Start once someone is. */
+  private showHostLobby(note = "", step = ""): void {
+    if (this.coopRole !== "host" || this.run) return;
+    const h = this.hosting;
+    const guests = this.links.size;
+    const def = h ? LEVELS[h.level] : null;
+    const lines: string[] = [];
+    if (note) lines.push(note.trimEnd());
+    if (guests === 0) {
+      lines.push(step ? `A partner is connecting…\n(${step})` : "Send this code to your partners.\nWaiting for them to join…");
+    } else {
+      const who = [...this.links.keys()].sort().map((s) => `Player ${s + 1}: ${this.routes.get(s) ?? "connected."}`);
+      lines.push(`${guests + 1} of ${MAX_GUESTS + 1} players in the room.`, ...who);
+      if (step) lines.push(`Another player is connecting… (${step})`);
+      else if (guests < MAX_GUESTS) lines.push("A third player can still join with the same code.");
+      lines.push("Start when you're all ready.");
+    }
+    lines.push(`(build ${BUILD_ID})`);
     this.screens.lobby(
-      "PARTNER CONNECTED",
-      `${def.name.toUpperCase()} · ${def.subtitle.toUpperCase()} · ${DIFFICULTIES[difficulty].name.toUpperCase()}`,
-      `${route}\nStart when you're both ready.`,
+      guests > 0 ? `${guests + 1} PLAYERS` : "HOST",
+      def && h
+        ? `${def.name.toUpperCase()} · ${def.subtitle.toUpperCase()} · ${DIFFICULTIES[h.difficulty].name.toUpperCase()}`
+        : "ROOM CODE",
+      lines.join("\n"),
       [
         {
           label: "Start",
-          primary: true,
+          primary: guests > 0,
+          disabled: guests === 0,
           action: () => {
             // A double click must not start two games.
-            if (this.run || this.link !== link) return;
-            this.hostBegins({ t: "start", level, difficulty, fresh: true });
-            this.startCoopRun(level, difficulty);
+            if (this.run || this.links.size === 0 || !h) return;
+            this.hostBegins({ t: "start", level: h.level, difficulty: h.difficulty, fresh: true });
+            this.startCoopRun(h.level, h.difficulty);
           },
         },
         { label: "Cancel", action: () => this.showCoopMenu() },
       ],
-      code
+      this.roomCode,
+      "host-lobby"
     );
+  }
+
+  /** Host: a guest's connection ended. */
+  private guestLeft(slot: number, reason: string): void {
+    this.links.delete(slot);
+    this.routes.delete(slot);
+    const playing = this.run?.coop && this.state !== "menu" && this.state !== "title";
+    if (!playing) {
+      // Still in the lobby: keep the room open for whoever comes next.
+      if (this.coopRole === "host" && !this.run) {
+        this.openRoom();
+        this.showHostLobby(reason === "version" ? `${describeClose("version")}\n` : "A player left. The room is still open.\n");
+      }
+      return;
+    }
+    // The game goes on without them.
+    this.session?.partnerLeft(slot);
+    this.hud.toast(this.links.size > 0 ? "A PLAYER LEFT" : "YOUR PARTNER LEFT", "var(--ui-red)");
   }
 
   /** "Connected directly" or "through the relay", for the lobby. */
@@ -1005,14 +1091,24 @@ export class Game {
   private joinGame(input: string): void {
     const code = normalizeRoomCode(input);
     if (!code) return this.showJoin("Room codes are 5 letters and numbers.", input);
-    const link = this.openLink("guest", code);
+    this.endCoop();
+    this.coopRole = "guest";
+    this.mySlot = 1;
+    const link = new PeerLink("guest", code, this.signalUrl);
+    this.links.set(0, link);
+    link.onMessage = (m) => {
+      if (this.links.get(0) === link) this.onGuestNet(m as NetMsg, link);
+    };
+    link.onClose = (reason) => {
+      if (this.links.get(0) === link) this.onHostLost(link, reason);
+    };
     const showStep = (step: string) =>
-      this.screens.lobby("JOINING", `ROOM ${code}`, `Connecting to your partner…\n(${step})`, [
+      this.screens.lobby("JOINING", `ROOM ${code}`, `Connecting to the host…\n(${step})`, [
         { label: "Cancel", action: () => this.showCoopMenu() },
       ]);
     showStep("finding the room");
     link.onStatus = (step) => {
-      if (!link.open && this.link === link) showStep(step);
+      if (!link.open && this.links.get(0) === link) showStep(step);
     };
     link.onOpen = async () => {
       link.send({ t: "hello", v: PROTOCOL_VERSION, app: __APP_VERSION__ });
@@ -1024,61 +1120,39 @@ export class Game {
       show("Connected.");
       const route = await this.describeRoute(link);
       // Only if nothing has moved on (the host may have started already).
-      if (this.link === link && this.state === "menu" && !this.run) show(route);
-    };
-  }
-
-  private openLink(role: "host" | "guest", code: string): PeerLink {
-    this.endCoop();
-    const link = new PeerLink(role, code, this.signalUrl);
-    this.link = link;
-    link.onMessage = (m) => {
-      if (this.link === link) this.onNet(m as NetMsg);
-    };
-    link.onClose = (reason) => {
-      if (this.link === link) this.onLinkClosed(link, reason);
+      if (this.links.get(0) === link && this.state === "menu" && !this.run) show(route);
     };
     link.start();
-    return link;
   }
 
-  /** Hangs up (if connected). Safe to call any time. */
+  /** Hangs up everything (if connected). Safe to call any time. */
   private endCoop(): void {
-    const link = this.link;
-    this.link = null;
-    link?.close("left");
+    this.closeRoom();
+    const links = [...this.links.values()];
+    this.links.clear();
+    this.routes.clear();
+    this.coopRole = null;
+    for (const l of links) l.close("left");
   }
 
-  private onLinkClosed(link: PeerLink, reason: string): void {
-    this.link = null;
-    // Someone else's room has this code: quietly open ours under another.
-    const h = this.hosting;
-    if (reason === "id-taken" && link.role === "host" && !this.run && h && h.tries < 3) {
-      this.hostGame(h.level, h.difficulty, h.tries + 1);
-      return;
-    }
-    // The partner left the lobby before the game started: open the room again.
-    if ((reason === "left" || reason === "lost") && link.role === "host" && !this.run && h && this.state === "menu") {
-      this.hostGame(h.level, h.difficulty, 0, "Your partner left. The room is open again with a new code.\n");
-      return;
-    }
+  /** A connection problem outside a game: say what happened. */
+  private showCoopError(link: PeerLink, reason: string): void {
     // For failed connections, add how far it got — a screenshot of this pins the problem down.
     const text =
       describeClose(reason) +
       (["timeout", "no-answer", "lost", "closed"].includes(reason)
         ? `\n\nWhat happened (build ${BUILD_ID}):\n${link.log.slice(-5).join("\n")}`
         : "");
+    this.endCoop();
+    this.screens.lobby("CO-OP", "NOT CONNECTED", text, [{ label: "Back", primary: true, action: () => this.showCoopMenu() }]);
+  }
+
+  /** Guest: the connection to the host ended. The world was the host's, so it can't go on. */
+  private onHostLost(link: PeerLink, reason: string): void {
     const playing = this.run?.coop && this.state !== "menu" && this.state !== "title";
-    if (!playing) {
-      this.screens.lobby("CO-OP", "NOT CONNECTED", text, [{ label: "Back", primary: true, action: () => this.showCoopMenu() }]);
-      return;
-    }
-    // The host carries on alone (the session notices the partner is gone).
-    if (link.role === "host") {
-      if (this.state === "dead" || this.state === "levelComplete") this.hud.toast("YOUR PARTNER LEFT", "var(--ui-red)");
-      return;
-    }
-    // The guest's world was the host's: it can't go on.
+    if (!playing) return this.showCoopError(link, reason);
+    const text = describeClose(reason);
+    this.endCoop();
     this.leaveGameplay();
     this.hud.setVisible(false);
     this.music.setMode("silent");
@@ -1086,14 +1160,29 @@ export class Game {
     this.screens.lobby("CONNECTION LOST", "CO-OP", text, [{ label: "Main Menu", primary: true, action: () => this.showMainMenu() }]);
   }
 
-  private onNet(m: NetMsg): void {
+  /** Host: a message from the guest in `slot`. What the other guest needs is passed on to them. */
+  private onHostNet(m: NetMsg, slot: number, link: PeerLink): void {
+    if (m.t === "hello") {
+      if (m.v !== PROTOCOL_VERSION || m.app !== __APP_VERSION__) link.close("version");
+      return;
+    }
+    if (m.t === "start" || m.t === "restart") return;
+    // Only messages for the level attempt in progress.
+    if (m.ep !== this.epoch) return;
+    this.session?.receive(m, slot);
+    if (RELAYED.has(m.t)) for (const [s, l] of this.links) if (s !== slot) l.send({ ...m, from: slot }, m.t === "ps");
+  }
+
+  /** Guest: a message from the host (or, relayed by the host, from the other guest). */
+  private onGuestNet(m: NetMsg, link: PeerLink): void {
     switch (m.t) {
       case "hello":
-        if (m.v !== PROTOCOL_VERSION || m.app !== __APP_VERSION__) this.link?.close("version");
+        if (m.v !== PROTOCOL_VERSION || m.app !== __APP_VERSION__) link.close("version");
         return;
       case "start":
-        if (!this.isGuest) return;
         this.epoch = m.ep;
+        this.mySlot = m.slot ?? 1;
+        this.coopPlayers = m.players ?? 2;
         if (m.fresh || !this.run) this.startCoopRun(m.level, m.difficulty);
         else {
           this.run.levelIndex = m.level;
@@ -1102,14 +1191,14 @@ export class Game {
         }
         return;
       case "restart":
-        if (!this.isGuest || !this.run) return;
+        if (!this.run) return;
         this.epoch = m.ep;
+        this.coopPlayers = m.players ?? this.coopPlayers;
         if (!m.checkpoint) this.run.checkpoint = null;
         this.startLevel(false, true);
         return;
       default:
-        // Only messages for the level attempt in progress.
-        if (m.ep === this.epoch) this.session?.receive(m);
+        if (m.ep === this.epoch) this.session?.receive(m, m.from ?? 0);
     }
   }
 
@@ -1172,7 +1261,7 @@ export class Game {
    * the game ticking 20 times a second, without drawing.
    */
   private onVisibilityChange(): void {
-    const hidden = document.hidden && !!this.link;
+    const hidden = document.hidden && this.links.size > 0;
     if (hidden && !this.backgroundTicker) {
       try {
         const src = "setInterval(() => postMessage(0), 50);";

@@ -5,16 +5,23 @@ import type { WeaponId } from "../content/weapons";
 import type { Gait } from "../player/playerController";
 
 /**
- * Everything the two copies of the game say to each other.
+ * Everything the copies of the game say to each other: two or three players.
  *
  * The host runs the world: creatures, doors, generators, the boss, the level
  * ending. Each player moves their own character (so movement never feels
  * laggy) and reports where they are 20 times a second. Everything else is an
- * event: the guest asks, the host decides and tells both.
+ * event: a guest asks, the host decides and tells everyone.
+ *
+ * Each guest is connected to the host only. The host passes on what one
+ * guest says that the other needs to see (`RELAYED`), stamped with who said
+ * it (`from`: 0 is the host, 1 and 2 the guests).
  */
 
 /** Bump when messages change shape: mismatched versions refuse to play together. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
+
+/** Guests a host takes: three players in all. */
+export const MAX_GUESTS = 2;
 
 /** No 0/O or 1/I/L, so a code read out loud or off a screen can't be misread. */
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -48,9 +55,9 @@ export type FlowMsg =
    * `ep` numbers each level attempt; in-level messages carry it, and ones from an
    * earlier attempt (still in flight after a retry) are dropped.
    */
-  | { t: "start"; level: number; difficulty: DifficultyId; fresh: boolean; ep: number }
+  | { t: "start"; level: number; difficulty: DifficultyId; fresh: boolean; ep: number; slot?: number; players?: number }
   /** Host → guest: retry the level after a wipe, from the checkpoint if `checkpoint`. */
-  | { t: "restart"; checkpoint: boolean; ep: number };
+  | { t: "restart"; checkpoint: boolean; ep: number; players?: number };
 
 // ------------------------------------------------------------------ in a level
 
@@ -119,14 +126,20 @@ export type SessionMsg =
   | { t: "trigger"; key: string }
   | { t: "marker"; i: number }
   // --- the team
-  | { t: "revive" }
+  /** `who` (a player slot) is back on their feet. */
+  | { t: "revive"; who: number }
+  /** Host → guests: the player in `slot` left the game. */
+  | { t: "gone"; slot: number }
   /** Everyone is down (or someone bled out): the level is lost. */
   | { t: "wipe" }
   /** Host → guest: the level is done. */
   | { t: "finish"; ending: EndingId | null };
 
-/** In-level messages on the wire carry the level attempt they belong to. */
-export type NetMsg = FlowMsg | (SessionMsg & { ep?: number });
+/** In-level messages on the wire carry the level attempt they belong to, and (relayed) who sent them. */
+export type NetMsg = FlowMsg | (SessionMsg & { ep?: number; from?: number });
+
+/** What a guest says that the other guest needs too: the host passes these on. */
+export const RELAYED: ReadonlySet<SessionMsg["t"]> = new Set(["ps", "shot", "toss", "pickup", "trigger", "revive", "wipe"]);
 
 /** Rounds for the wire: centimetres are plenty and keep packets small. */
 export function r2(v: number): number {

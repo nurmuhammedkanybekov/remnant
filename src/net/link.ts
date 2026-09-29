@@ -51,7 +51,7 @@ export const CLOSE_REASONS: Record<string, string> = {
     "No game with that code. Check it with the host — it's the five characters on their screen, and it's new every time they host.",
   "no-answer":
     "Nobody answered in that room. Check the code with the host — it's the five characters on their screen, and it's new every time they host.",
-  full: "That game already has two players.",
+  full: "That game already has three players.",
   unreachable: "Couldn't reach the matchmaking server. Check your connection.",
   server: "The matchmaking server refused the connection. Try again in a moment.",
   closed:
