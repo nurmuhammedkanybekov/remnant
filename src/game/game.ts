@@ -548,7 +548,7 @@ export class Game {
   private restartLevelFresh(): void {
     if (!this.run) return;
     this.run.checkpoint = null;
-    this.startLevel();
+    this.startLevel(false, true);
   }
 
   private persistRun(): void {
@@ -568,7 +568,7 @@ export class Game {
    * there is one. Coming in from a menu shows the level's title card first;
    * a retry drops straight back in.
    */
-  private startLevel(card = false): void {
+  private startLevel(card = false, retry = false): void {
     const run = this.run;
     if (!run) return;
     this.sound.init();
@@ -583,7 +583,8 @@ export class Game {
       run.difficulty,
       run.loadout,
       run.checkpoint,
-      run.coop ? this.sessionLink() : null
+      run.coop ? this.sessionLink() : null,
+      retry
     );
     session.onDeath = () => this.onDeath();
     session.onExit = (ending) => this.onLevelComplete(ending);
@@ -659,7 +660,11 @@ export class Game {
         runOver
           ? [{ label: "Main Menu", primary: true, action: () => this.showMainMenu() }]
           : [
-              { label: run.checkpoint ? "Retry from Checkpoint" : "Retry Level", primary: true, action: () => this.startLevel() },
+              {
+                label: run.checkpoint ? "Retry from Checkpoint" : "Retry Level",
+                primary: true,
+                action: () => this.startLevel(false, true),
+              },
               ...(run.checkpoint ? [{ label: "Restart Level", action: () => this.restartLevelFresh() }] : []),
               { label: "Quit to Menu", action: () => this.showMainMenu() },
             ],
@@ -1005,7 +1010,7 @@ export class Game {
         if (!this.isGuest || !this.run) return;
         this.epoch = m.ep;
         if (!m.checkpoint) this.run.checkpoint = null;
-        this.startLevel();
+        this.startLevel(false, true);
         return;
       default:
         // Only messages for the level attempt in progress.
@@ -1030,7 +1035,7 @@ export class Game {
     const retry = (checkpoint: boolean) => () => {
       if (!checkpoint) run.checkpoint = null;
       this.hostBegins({ t: "restart", checkpoint });
-      this.startLevel();
+      this.startLevel(false, true);
     };
     return [
       { label: run.checkpoint ? "Retry from Checkpoint" : "Retry Level", primary: true, action: retry(!!run.checkpoint) },

@@ -6,7 +6,17 @@ import { freshStats, type RunStats } from "./stats";
  * things appear in the parsed level, which is deterministic for a given map.
  * Enemies that were alive restart from their spawn points.
  */
+/**
+ * Bumped whenever the order of a level's pickups or creatures changes (the
+ * checkpoint stores indices into them). A checkpoint from another layout is
+ * dropped, and the level restarts from its beginning instead.
+ * 2: ammunition split into caches spread over each level.
+ */
+export const CHECKPOINT_LAYOUT = 2;
+
 export interface CheckpointState {
+  /** `CHECKPOINT_LAYOUT` when it was taken. */
+  layout: number;
   x: number;
   z: number;
   yaw: number;
@@ -31,11 +41,13 @@ export function parseCheckpoint(raw: unknown): CheckpointState | null {
   if (!raw || typeof raw !== "object") return null;
   const c = raw as Record<string, unknown>;
   const loadout = parseLoadout(c.loadout);
+  if (c.layout !== CHECKPOINT_LAYOUT) return null;
   if (!isNum(c.x) || !isNum(c.z) || !isNum(c.yaw) || !loadout || typeof c.objective !== "string") return null;
   const stats = freshStats();
   const s = c.stats as Record<string, unknown> | undefined;
   if (s) for (const k of Object.keys(stats) as (keyof RunStats)[]) if (isNum(s[k])) stats[k] = Math.max(0, s[k] as number);
   return {
+    layout: CHECKPOINT_LAYOUT,
     x: c.x,
     z: c.z,
     yaw: c.yaw,
