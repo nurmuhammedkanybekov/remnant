@@ -7,7 +7,7 @@ const LEVELS = 3;
 const campaign = {
   difficulty: "normal" as const,
   levelIndex: 1,
-  loadout: { health: 80, battery: 50, medkits: 1, weapons: { pistol: { mag: 8, reserve: 16 } }, current: "pistol" as const },
+  loadout: { health: 80, battery: 50, medkits: 1, throwables: 1, weapons: { pistol: { mag: 8, reserve: 16 } }, current: "pistol" as const },
   stats: { ...freshStats(), kills: 3 },
   checkpoint: null,
 };
@@ -47,6 +47,7 @@ describe("parseSave", () => {
       health: 100,
       battery: 0,
       medkits: 1,
+      throwables: 0,
       weapons: { pistol: { mag: 2, reserve: 0 } },
       current: "pistol",
     });
@@ -86,6 +87,7 @@ describe("parseSave", () => {
       health: 70,
       battery: 40,
       medkits: 0,
+      throwables: 0,
       weapons: { pistol: { mag: 5, reserve: 20 } },
       current: "pistol",
     });

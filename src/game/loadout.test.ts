@@ -28,7 +28,14 @@ describe("loadout", () => {
 
   it("tops up health and battery between levels (not ammo), but never lowers them", () => {
     const d = DIFFICULTIES.normal;
-    const base: Loadout = { health: 5, battery: 0, medkits: 1, weapons: { pistol: { mag: 3, reserve: 4 } }, current: "pistol" };
+    const base: Loadout = {
+      health: 5,
+      battery: 0,
+      medkits: 1,
+      throwables: 0,
+      weapons: { pistol: { mag: 3, reserve: 4 } },
+      current: "pistol",
+    };
     const low = carryOver(base, d);
     expect(low).toEqual({
       ...base,
@@ -43,7 +50,14 @@ describe("loadout", () => {
 
   it("tops the pistol up to the difficulty's floor, but never lowers it", () => {
     const d = DIFFICULTIES.nightmare;
-    const empty: Loadout = { health: 50, battery: 50, medkits: 0, weapons: { pistol: { mag: 0, reserve: 0 } }, current: "pistol" };
+    const empty: Loadout = {
+      health: 50,
+      battery: 50,
+      medkits: 0,
+      throwables: 0,
+      weapons: { pistol: { mag: 0, reserve: 0 } },
+      current: "pistol",
+    };
     const topped = withAmmoFloor(empty, d);
     expect(topped.weapons.pistol).toEqual({ mag: 0, reserve: d.carryAmmoFloor });
     expect(empty.weapons.pistol!.reserve).toBe(0);
@@ -88,6 +102,13 @@ describe("parseLoadout", () => {
 
   it("upgrades a single-pistol loadout from an older save", () => {
     const up = parseLoadout(upgradeLegacyLoadout({ health: 80, battery: 50, mag: 6, reserve: 12 }))!;
-    expect(up).toEqual({ health: 80, battery: 50, medkits: 0, weapons: { pistol: { mag: 6, reserve: 12 } }, current: "pistol" });
+    expect(up).toEqual({
+      health: 80,
+      battery: 50,
+      medkits: 0,
+      throwables: 0,
+      weapons: { pistol: { mag: 6, reserve: 12 } },
+      current: "pistol",
+    });
   });
 });
