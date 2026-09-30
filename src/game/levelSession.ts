@@ -1715,6 +1715,7 @@ export class LevelSession {
                 bleed: r.bleed,
                 talking: !!r.talk,
                 name: isCharacterLook(r.look) ? LOOKS[r.look].firstName : undefined,
+                color: isCharacterLook(r.look) ? LOOKS[r.look].accent : undefined,
               },
             ]
           : [];
