@@ -45,6 +45,19 @@ const AMBUSH_RADIUS = 3.2;
 /** The flashlight beam: half-angle and how far it holds a Watcher. */
 const BEAM_HALF_ANGLE = 0.42;
 const BEAM_REACH = 20;
+/**
+ * A Watcher stays locked this long after the beam slips off it, so sweeping
+ * the light across it doesn't make it stop and start every other frame...
+ */
+const FREEZE_HOLD = 0.35;
+/** ...and then its muscles unlock over this long: it gathers speed instead of lunging off at once. */
+const THAW_TIME = 0.6;
+/**
+ * How quickly the walk animation follows the creature's actual speed (per
+ * second). Without it the legs snapped straight the frame a creature
+ * stopped and back to full stride the frame it set off, which reads as lag.
+ */
+const ANIM_EASE = 8;
 /** Behind = more than this far round from where it's facing. */
 const BEHIND_ANGLE = THREE.MathUtils.degToRad(105);
 const MELEE_WINDUP_MAX = 0.45;
@@ -132,6 +145,12 @@ export class Enemy {
   protected facing = Math.random() * Math.PI * 2;
   protected walkPhase = Math.random() * 10;
   protected speedNow = 0;
+  /** `speedNow`, eased: what the walk animation uses. */
+  private animSpeed = 0;
+  /** Watcher: how much longer the light holds it after the beam has gone. */
+  private lightHold = 0;
+  /** Watcher: 0 just released from the light, 1 moving freely. */
+  private thaw = 1;
   protected hitFlash = 0;
   protected stagger = 0;
   protected deathT = 0;
@@ -383,11 +402,14 @@ export class Enemy {
     const angleTo = Math.atan2(toPlayer.x, toPlayer.y);
     const s = this.stats;
 
-    // Anyone's beam holds a Watcher.
-    this.frozen =
+    // Anyone's beam holds a Watcher (and it stays held a moment after the beam moves on).
+    const beamed =
       s.light === "freezes" &&
       this.state !== "drop" &&
       (Array.isArray(ps) ? ps : [ps]).some((q) => this.inBeam(q, q === p ? los : !q.playerDead && hasLineOfSight(level, me, q.playerPos)));
+    this.lightHold = beamed ? FREEZE_HOLD : Math.max(0, this.lightHold - dt);
+    this.frozen = beamed || (this.lightHold > 0 && this.state !== "drop");
+    this.thaw = this.frozen ? 0 : Math.min(1, this.thaw + dt / THAW_TIME);
 
     // --- Sight (blind creatures skip it; "ignores" means the beam doesn't give you away) ---
     const hunting = this.isHunting;
@@ -587,10 +609,11 @@ export class Enemy {
       if (!silent && !this.puppet) this.onVocal?.(this, "idle");
     }
     this.root.rotation.y = this.facing;
-    this.walkPhase += dt * this.speedNow * this.stats.stride;
+    this.animSpeed += (this.speedNow - this.animSpeed) * (1 - Math.exp(-ANIM_EASE * dt));
+    this.walkPhase += dt * this.animSpeed * this.stats.stride;
     this.body.pose({
       time: this.time,
-      speed: this.speedNow,
+      speed: this.animSpeed,
       walkPhase: this.walkPhase,
       hunting: this.isHunting || this.state === "drop",
       attack:
@@ -670,7 +693,8 @@ export class Enemy {
     }
     dir.normalize();
 
-    const step = Math.min(d, speed * dt);
+    // Just out of the light, a Watcher starts slow and gathers speed.
+    const step = Math.min(d, speed * (0.2 + 0.8 * this.thaw) * dt);
     const r = this.stats.radius;
     let nx = me.x + dir.x * step;
     let nz = me.y + dir.y * step;
