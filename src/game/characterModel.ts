@@ -60,12 +60,15 @@ function segment(a: THREE.Vector3, b: THREE.Vector3, radius: number, m: THREE.Ma
 export function buildCharacter(look: LookDef): CharacterParts {
   const coverall = mat(look.coverall, 0.9);
   const vest = mat(0xc7861c, 0.65, { emissive: 0x1c1000 });
-  const reflective = mat(0xd8d8cc, 0.3, { emissive: 0x2a2a26, metalness: 0.2 });
+  // Reflective tape: faintly lit even in the dark and bright in any light, like the real thing,
+  // so partners can find each other down a black corridor.
+  const reflective = mat(0xe8e8dc, 0.25, { emissive: 0x4a4a42, metalness: 0.35 });
+  const glove = mat(0x221b16, 0.75);
   const dark = mat(0x1b1c1e, 0.6, { metalness: 0.3 });
   const leather = mat(0x2a2018, 0.8);
   const skin = mat(look.skin, 0.7);
   const hair = mat(look.hair, 0.95);
-  const helmet = mat(0xc9a227, 0.4);
+  const helmet = mat(look.helmet, 0.38);
   const eyeWhite = mat(0xe8e2d8, 0.5);
   const iris = mat(0x1a1410, 0.3);
   const s = look.shoulders;
@@ -81,6 +84,9 @@ export function buildCharacter(look: LookDef): CharacterParts {
     knee.add(limb(0.075, 0.42, coverall));
     const boot = mesh(new THREE.BoxGeometry(0.15, 0.12, 0.28), leather, 0, -0.41, -0.05);
     knee.add(boot);
+    knee.add(mesh(new THREE.BoxGeometry(0.13, 0.13, 0.05), dark, 0, -0.02, -0.075)); // knee pad
+    const tape = new THREE.CylinderGeometry(0.078, 0.074, 0.035, 12, 1, true);
+    knee.add(mesh(tape, reflective, 0, -0.26, 0)); // tape round the shin
     knee.add(mesh(new THREE.BoxGeometry(0.16, 0.03, 0.3), dark, 0, -0.465, -0.05)); // sole
     g.add(knee);
     hips.add(g);
@@ -109,6 +115,20 @@ export function buildCharacter(look: LookDef): CharacterParts {
   torso.add(mesh(belt, leather, 0, 0.04, 0));
   torso.add(mesh(new THREE.BoxGeometry(0.06, 0.05, 0.02), mat(0x8a8a80, 0.4, { metalness: 0.7 }), 0, 0.04, -0.115)); // buckle
   torso.add(mesh(new THREE.BoxGeometry(0.3 * s, 0.36, 0.13), dark, 0, 0.36, 0.17)); // pack
+  for (const x of [-1, 1]) {
+    // Pack straps over the shoulders, and a chest pocket each side.
+    const strap = mesh(new THREE.BoxGeometry(0.035, 0.42, 0.012), leather, x * 0.1 * s, 0.37, -0.128);
+    strap.rotation.z = x * 0.08;
+    torso.add(strap);
+    torso.add(mesh(new THREE.BoxGeometry(0.075, 0.07, 0.015), vest, x * 0.1 * s, 0.33, -0.137));
+    // Tape crossed on the back of the pack, so you know them from behind too.
+    const cross = mesh(new THREE.BoxGeometry(0.34 * s, 0.03, 0.01), reflective, 0, 0.36, 0.237);
+    cross.rotation.z = x * 0.8;
+    torso.add(cross);
+  }
+  const collar = new THREE.TorusGeometry(0.075, 0.022, 6, 14);
+  collar.rotateX(Math.PI / 2);
+  torso.add(mesh(collar, coverall, 0, 0.64, 0));
   torso.add(mesh(new THREE.BoxGeometry(0.05, 0.05, 0.03), mat(0x2a5a2a, 0.5, { emissive: 0x0a3a0a }), 0.1, 0.5, -0.12)); // radio
   for (const x of [-1, 1]) torso.add(mesh(new THREE.SphereGeometry(0.075, 10, 8), coverall, x * 0.2 * s, 0.56, 0)); // shoulders
 
@@ -183,7 +203,9 @@ export function buildCharacter(look: LookDef): CharacterParts {
     arms.add(segment(shoulder, elbow, 0.062, coverall));
     arms.add(segment(elbow, wrist, 0.052, coverall));
     arms.add(mesh(new THREE.SphereGeometry(0.055, 10, 8), coverall, elbow.x, elbow.y, elbow.z));
-    const hand = mesh(new THREE.BoxGeometry(0.06, 0.08, 0.075), skin, x * 0.035, -0.07, -0.47);
+    // A band of tape round each upper arm.
+    arms.add(segment(shoulder.clone().lerp(elbow, 0.45), shoulder.clone().lerp(elbow, 0.62), 0.066, reflective));
+    const hand = mesh(new THREE.BoxGeometry(0.065, 0.085, 0.08), glove, x * 0.035, -0.07, -0.47);
     hand.rotation.x = 0.3;
     arms.add(hand);
   }

@@ -132,11 +132,11 @@ export class Hud {
 
   /** Co-op: the other player's health and state, or null to hide it. */
   /** The other players' health, one line each (none outside co-op). */
-  partners(list: { hp: number; down: boolean; bleed: number; talking?: boolean; name?: string }[]): void {
+  partners(list: { hp: number; down: boolean; bleed: number; talking?: boolean; name?: string; color?: string }[]): void {
     const html = list
       .map(
         (p) =>
-          `<div class="partner show${p.down ? " down" : ""}${p.talking ? " talking" : ""}"><span>${esc((p.name ?? "PARTNER").toUpperCase())}</span><div class="pbar"><b style="width:${Math.round(
+          `<div class="partner show${p.down ? " down" : ""}${p.talking ? " talking" : ""}"><span${p.color && !p.down ? ` style="color:${esc(p.color)}"` : ""}>${esc((p.name ?? "PARTNER").toUpperCase())}</span><div class="pbar"><b style="width:${Math.round(
             p.hp * 100
           )}%"></b></div><span>${p.down ? `DOWN ${p.bleed}s` : ""}</span></div>`
       )

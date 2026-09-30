@@ -22,6 +22,10 @@ export interface LookDef {
   /** Overall height relative to the default build. */
   height: number;
   coverall: number;
+  /** Hard hat colour: each survivor's own, so partners know each other at a glance. */
+  helmet: number;
+  /** Their colour on name tags and the HUD. */
+  accent: string;
   /** Playback rate for recorded pain sounds (a higher voice for Nuraiza). */
   voice: number;
 }
@@ -40,6 +44,8 @@ export const LOOKS: Record<CharacterLook, LookDef> = {
     shoulders: 1,
     height: 1,
     coverall: 0x4a4f3c,
+    helmet: 0xd4a51c,
+    accent: "#f0c840",
     voice: 1,
   },
   dark: {
@@ -55,6 +61,8 @@ export const LOOKS: Record<CharacterLook, LookDef> = {
     shoulders: 1.06,
     height: 1.03,
     coverall: 0x3c4552,
+    helmet: 0xe4e2da,
+    accent: "#e8eef4",
     voice: 0.9,
   },
   woman: {
@@ -70,6 +78,8 @@ export const LOOKS: Record<CharacterLook, LookDef> = {
     shoulders: 0.86,
     height: 0.95,
     coverall: 0x4f3f3a,
+    helmet: 0xd8621a,
+    accent: "#ff9a52",
     voice: 1.32,
   },
 };
