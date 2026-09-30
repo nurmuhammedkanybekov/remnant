@@ -92,7 +92,7 @@ export const ENEMIES = {
     id: "husk",
     name: "Husk",
     glyph: "E",
-    health: 60,
+    health: 72,
     scale: 1,
     tint: 0x2a201c,
     patrolSpeed: 1.0,
@@ -109,7 +109,7 @@ export const ENEMIES = {
     radius: 0.35,
     stride: 3.6,
     voicePitch: 1,
-    look: { rig: "humanoid", veins: 0xff5a2a },
+    look: { rig: "humanoid", veins: 0x7a5236 },
   },
   brute: {
     id: "brute",
@@ -132,7 +132,7 @@ export const ENEMIES = {
     radius: 0.5,
     stride: 2.6,
     voicePitch: 0.6,
-    look: { rig: "humanoid", veins: 0xff3a1a, build: 1.45, arms: 1.1, extraHead: true, hunch: 0.7 },
+    look: { rig: "humanoid", veins: 0x7a2c1c, build: 1.45, arms: 1.1, extraHead: true, hunch: 0.7 },
   },
   listener: {
     id: "listener",
@@ -155,7 +155,7 @@ export const ENEMIES = {
     radius: 0.35,
     stride: 3.4,
     voicePitch: 1.3,
-    look: { rig: "humanoid", veins: 0xffa040, eyes: 0, skull: "open", hunch: 0.35 },
+    look: { rig: "humanoid", veins: 0x8a6a32, eyes: 0, skull: "open", hunch: 0.35 },
   },
   watcher: {
     id: "watcher",
@@ -178,13 +178,13 @@ export const ENEMIES = {
     radius: 0.35,
     stride: 3,
     voicePitch: 0.85,
-    look: { rig: "humanoid", veins: 0x7ab8e0, build: 0.8, arms: 1.35, legs: 1.3, eyes: 6, hunch: 0.15 },
+    look: { rig: "humanoid", veins: 0x5a88a8, build: 0.8, arms: 1.35, legs: 1.3, eyes: 6, hunch: 0.15 },
   },
   crawler: {
     id: "crawler",
     name: "Crawler",
     glyph: "V",
-    health: 45,
+    health: 55,
     scale: 0.95,
     tint: 0x2e2622,
     patrolSpeed: 0.9,
@@ -202,7 +202,7 @@ export const ENEMIES = {
     radius: 0.32,
     stride: 4.2,
     voicePitch: 1.5,
-    look: { rig: "humanoid", veins: 0xff6a2a, build: 0.85, arms: 1.5, legs: 1.1, eyes: 4, hunch: 1.0, gait: "crawl" },
+    look: { rig: "humanoid", veins: 0x7a4428, build: 0.85, arms: 1.5, legs: 1.1, eyes: 4, hunch: 1.0, gait: "crawl" },
   },
   spitter: {
     id: "spitter",
@@ -227,7 +227,7 @@ export const ENEMIES = {
     radius: 0.38,
     stride: 3,
     voicePitch: 0.8,
-    look: { rig: "humanoid", veins: 0xb8ff3a, build: 1.15, sac: true, skull: "split", hunch: 0.45 },
+    look: { rig: "humanoid", veins: 0x6a8a2a, build: 1.15, sac: true, skull: "split", hunch: 0.45 },
   },
   swarm: {
     id: "swarm",
@@ -251,7 +251,7 @@ export const ENEMIES = {
     radius: 0.16,
     stride: 9,
     voicePitch: 3,
-    look: { rig: "rat", veins: 0xff5a2a },
+    look: { rig: "rat", veins: 0x6a3a28 },
   },
   mimic: {
     id: "mimic",
@@ -275,7 +275,7 @@ export const ENEMIES = {
     radius: 0.36,
     stride: 3.4,
     voicePitch: 0.9,
-    look: { rig: "humanoid", veins: 0xff4a8a, skull: "split", eyes: 0, hunch: 0.55 },
+    look: { rig: "humanoid", veins: 0x7a3a58, skull: "split", eyes: 0, hunch: 0.55 },
   },
   remnant: {
     id: "remnant",

@@ -220,7 +220,8 @@ class HumanoidBody implements CreatureBody {
     const dark = new THREE.MeshStandardMaterial({ color: 0x120c0a, roughness: 0.9 });
     const bone = new THREE.MeshStandardMaterial({ color: 0x9a8a6c, roughness: 0.55 });
     const teethMat = new THREE.MeshStandardMaterial({ color: 0xc8b890, roughness: 0.3 });
-    const inner = new THREE.MeshBasicMaterial({ color: look.veins });
+    // Inside the split skull: wet, dark flesh. Not lit from within: you only see it in your light.
+    const inner = new THREE.MeshStandardMaterial({ color: new THREE.Color(look.veins).multiplyScalar(0.3), roughness: 0.35 });
 
     const L = look.legs;
     this.pelvisY = 0.95 * L;
@@ -387,8 +388,8 @@ class HumanoidBody implements CreatureBody {
     jawMesh.scale.set(0.95, 0.55, look.skull === "split" ? 1.5 : 1.15);
     jawMesh.position.set(0, -0.01, 0.06 + (look.skull === "split" ? 0.03 : 0));
     this.jaw.add(jawMesh);
-    // The mouth: a glowing gullet behind rows of too many teeth, torn back into one cheek.
-    const gullet = new THREE.MeshBasicMaterial({ color: new THREE.Color(look.veins).multiplyScalar(0.14) });
+    // The mouth: a dark, wet gullet behind rows of too many teeth, torn back into one cheek.
+    const gullet = new THREE.MeshStandardMaterial({ color: 0x1c0605, roughness: 0.3 });
     const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.05, 0.03), look.skull === "split" ? inner : gullet);
     mouth.position.set(0, -0.075, 0.135);
     this.head.add(mouth);
@@ -422,7 +423,7 @@ class HumanoidBody implements CreatureBody {
         const lit = new THREE.Color(0xff4a2a);
         eye.onBeforeRender = (_r, _s, camera) => {
           const d = camera.getWorldPosition(camTmp).distanceTo(eye.getWorldPosition(eyeTmp));
-          eyeMat.color.copy(lit).multiplyScalar(0.15 + 0.85 * eyeFade(d, this.eyeAgitation));
+          eyeMat.color.copy(lit).multiplyScalar(eyeFade(d, this.eyeAgitation));
         };
       }
       eye.position.set(x, y, 0.145 - row * 0.012);

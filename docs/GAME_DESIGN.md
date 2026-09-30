@@ -571,7 +571,9 @@ Each creature type has its own rig, all from primitives:
 
 Skin is a procedural flesh texture tinted per creature, with the Remnant's
 **veins** as an emissive map that pulses faster when the creature is
-agitated. Eyes, veins, growths and the Spitter's sac stay dark beyond about
+agitated. Nothing on a creature lights itself except those: the mouth
+and the split skulls are dark wet flesh your light has to find, and vein
+colours are dull (rust, ochre, bile) rather than bright. Eyes, veins, growths and the Spitter's sac stay dark beyond about
 9 units and brighten as a creature closes in (further when it is hunting), so a shape in the dark gives nothing
 away until it is near (the Remnant's glow is left as it is). A hit flashes
 the whole body, at any distance. Procedural walk cycles are driven by
