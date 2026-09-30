@@ -42,6 +42,7 @@ export class RemotePlayer {
   private readonly flash: THREE.Sprite;
   private readonly flashLight: THREE.PointLight;
   private readonly marker: THREE.Sprite;
+  private readonly tag: THREE.Sprite;
   private look: CharacterLook | null = null;
   private eye = STAND_EYE;
   private walkPhase = 0;
@@ -74,7 +75,6 @@ export class RemotePlayer {
     this.lamp.target = this.lampTarget;
 
     this.root.add(this.body);
-    this.setLook("light");
 
     // A faint glow above them, so you can find each other in the dark.
     this.marker = new THREE.Sprite(
@@ -88,13 +88,29 @@ export class RemotePlayer {
         depthTest: false,
       })
     );
-    this.marker.scale.setScalar(0.35);
-    this.marker.position.y = 2.25;
+    this.marker.scale.setScalar(0.22);
+    this.marker.position.y = 2.2;
     this.root.add(this.marker);
+
+    // Their name over their head, the same size on screen at any distance
+    // and seen through walls, fading out when they're right beside you or far off.
+    this.tag = new THREE.Sprite(
+      new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false })
+    );
+    this.tag.position.y = 2.42;
+    this.tag.renderOrder = 10;
+    this.tag.onBeforeRender = (_r, _s, camera) => {
+      const d = camera.getWorldPosition(tagTmp).distanceTo(this.root.getWorldPosition(tagTmp2));
+      this.tag.material.opacity = this.present
+        ? THREE.MathUtils.clamp((d - 2.5) / 2, 0, 1) * THREE.MathUtils.clamp((45 - d) / 15, 0, 1)
+        : 0;
+    };
+    this.root.add(this.tag);
 
     // The figure stays in the scene from the level's start, lights and all
     // (at zero until they're here), so the renderer's light count never
     // changes mid-level: a change would recompile every shader, a visible freeze.
+    this.setLook("light");
     this.showFigure(false);
     this.root.rotation.order = "YXZ";
     scene.add(this.root);
@@ -111,6 +127,11 @@ export class RemotePlayer {
     this.body.scale.setScalar(LOOKS[look].height);
     this.head.add(this.lamp, this.lampTarget, lensMesh(this.lens));
     this.arms.add(this.flash, this.flashLight);
+    this.tag.material.map?.dispose();
+    this.tag.material.map = nameTexture(LOOKS[look].firstName, LOOKS[look].accent);
+    this.tag.material.needsUpdate = true;
+    this.tag.scale.set(0.16, 0.04, 1);
+    (this.marker.material as THREE.SpriteMaterial).color.set(LOOKS[look].accent);
   }
 
   /** They're in the level (their state has arrived and they haven't left). */
@@ -211,7 +232,7 @@ export class RemotePlayer {
     this.flashLight.intensity = this.flash.visible ? 30 : 0;
     // Pulses red while they're down.
     const mm = this.marker.material;
-    mm.color.set(s.down ? 0xff4030 : 0x7ab8ff);
+    mm.color.set(s.down ? 0xff4030 : this.look ? LOOKS[this.look].accent : 0x7ab8ff);
     mm.opacity = s.down ? 0.45 + 0.35 * Math.sin(time * 5) : 0.3;
   }
 
@@ -227,6 +248,27 @@ export class RemotePlayer {
   dispose(): void {
     this.scene.remove(this.root);
   }
+}
+
+const tagTmp = new THREE.Vector3();
+const tagTmp2 = new THREE.Vector3();
+
+/** A name tag: their first name in their colour, on a dark band. */
+function nameTexture(name: string, color: string): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 64;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "rgba(0,0,0,0.45)";
+  g.fillRect(28, 12, 200, 40);
+  g.font = "600 30px 'Courier New', monospace";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillStyle = color;
+  g.fillText(name.toUpperCase(), 128, 33);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 /** The headlamp's glass, on the front of the hard hat. */
