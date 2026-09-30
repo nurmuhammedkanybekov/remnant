@@ -297,11 +297,39 @@ with its racks nearly all empty. Each is furnished against its walls
 hooks, benches, tool racks, bunks, pipes and valves, specimen tanks,
 control panels, growths in the hive), and gets a stencilled sign by its
 entrance in Russian with the consortium's English under it (ПАЛАТА 1 /
-WARD 1). Corridors get pipes and cable trays under the ceiling; every note
-lies on a small table where it was left; two or three of the dead lie
-under tarps in quiet corners. Planned purely and seeded (the same for every
-co-op player), built as one merged mesh per material. Props are shallow
-and stand against walls, so collision stays with the map.
+WARD 1). Every note lies on a small table where it was left; two or three
+of the dead lie under tarps in quiet corners.
+
+Each level also has a style (`STYLES`) for its services and small things.
+The corridors carry one connected network (`CorridorRun`: which sides each
+corridor cell continues through, and where it meets a room): a bundle of
+pipes along one pair of walls, each pipe at its own distance from them so
+the bundle turns corners together, joined by elbows, with flanges at the
+joints, hangers on rods from the ceiling, paint bands, the odd valve
+handwheel and gauge, and blanked-off ends; where a corridor opens into a
+room the pipes turn up into the ceiling. The pipes are painted to the
+Soviet code (green water, red steam, blue air, yellow gas) or lagged with
+strapped insulation. A cable tray runs along the other walls; ventilation
+has square ducts instead. By level: cold storage frosts its pipes, hangs
+icicles off them and the tops of freezer walls, lays frost on the floor and
+hangs PVC strip curtains in the freezer doorways; the labs have benches of
+glassware and reagents, fume hoods, specimen tanks, a centrifuge, cages,
+Arkadin's chalkboard (R-7's frequency, "ГОЛОС = ПЕРЕНОСЧИК", the voice is
+the carrier) and one restraint chair; the infirmary has cubicle curtains,
+glass-fronted medicine cabinets, wheelchairs, trolleys, an operating table
+under its lamp and a wall of morgue drawers; the pumping station has pumps
+with their motors and pressure vessels; the power plant switchboards and a
+transformer; the armory ammunition boxes and sandbags; the hive pods and
+strands of sinew across its corridors. Walls carry extinguishers, junction
+boxes with conduit, stopped clocks, gauges, posters (the station's own and
+the consortium's) and, from ventilation on, what the crew scrawled
+("НЕ ОТВЕЧАЙ ГОЛОСУ", "IT KNOWS YOUR NAME"); floors have papers, stains
+and frost.
+
+Planned purely and seeded (the same for every co-op player), built as one
+merged mesh per material (posters and scrawls per texture): about 15–25
+draw calls and 15–200k triangles a level. Props stand against walls and
+stay clear of pickups, so collision stays with the map.
 
 **Hidden rooms.** A `+` is a loose panel: a door (`DoorSpawn.panel`) that
 wears the walls' own material over the whole cell, with only a faint seam
@@ -532,9 +560,18 @@ Creatures share the state machine; what makes them different is data in
 A husk out-runs your walk but not your sprint. A Watcher out-runs almost
 anything — keep the light on it.
 
+The walk animation follows each creature's speed eased (`ANIM_EASE`, 8 per
+second), not its speed that frame, so legs settle when it stops and pick up
+when it sets off instead of snapping; on a co-op guest this also smooths
+over the host's snapshots.
+
 - **Watcher**: frozen while the lit beam (within ~0.42 rad of your aim and 20
-  units) is on it and it's in line of sight. Frozen, it can't move or finish
-  a wind-up, and can be taken down from any side.
+  units) is on it and it's in line of sight, and for 0.35 s after the beam
+  moves on (so a sweep past it doesn't make it stop and start). Frozen, it
+  can't move or finish a wind-up, and can be taken down from any side. It
+  recoils rather than stopping dead: arms up against the light, head
+  turned away, a slow shudder, blended in and out. Released, it gathers
+  speed over 0.6 s instead of lunging off at once.
 - **Crawler**: moves on all fours. On the ceiling it spider-walks upside
   down, with limbs in the concrete, and clicks. It flips and falls when it
   drops, then hunts like a husk.
