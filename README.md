@@ -63,10 +63,13 @@ most of the sound) is generated in code.
 
 **The campaign.** Ten hand-built levels, from the deepest sublevel up to the
 surface, with a story told over the radio, notes left by the people who were
-there before you, a three-phase boss and two endings. Every note is a piece
-of the same story, found in the order you climb. The rooms have a purpose
-and are furnished to match, with signs by their doors, and every level
-hides a room behind a loose wall panel.
+there before you, a three-phase boss and two endings. Every note answers a
+question the last one raised: why the station was sealed, who the voice on
+the radio really is, and what is waiting at the top, so the story comes
+together as you climb. The rooms have a purpose (wards, labs, freezers,
+pump halls, an armory with its racks nearly empty) and are furnished to
+match, with signs by their doors, and every level hides a room behind a
+loose wall panel.
 
 **Stealth that matters.** The creatures are blind, but they hear everything.
 Every step makes noise, sprinting and wading make more, and a creature right
@@ -79,15 +82,19 @@ somewhere else.
 previous one taught you: one that only hears, one that freezes in your light,
 one that waits on the ceiling, one that imitates the voice on the radio. Some
 of them wander the whole level, and every so often one is drawn towards
-wherever you are, so nowhere stays safe for long. Lamps stutter when one is
-near, and your heart beats faster when something is close that you can't see.
+wherever you are, so nowhere stays safe for long. They are dark and hard
+to pick out until they are close, and their eyes only catch your light at
+short range. Lamps stutter when one is near, and your heart beats faster
+when something is close that you can't see.
 
 **Scarce supplies.** Three weapons, silent takedowns from behind, and
 medkits you carry and use when you choose. Ammunition comes in small caches
 spread across each level, so you find it by exploring.
 
 **Together.** Online co-op for two or three players with a room code, and
-voice chat that comes from where each player stands. No accounts, no
+voice chat that comes from where each player stands. Each character has
+their own helmet colour and reflective tape, and a name tag floats above
+every partner, so you can find each other in the dark. No accounts, no
 installs.
 
 **And the rest.** Three characters to play as (the radio and the notes call
@@ -155,7 +162,8 @@ You choose who you play when you start a new game (or in the co-op menu):
 
 The story is the same for all three, but the voice on the radio, the notes
 and the subtitles use your character's name. In co-op the others see your
-character, and their names are on your HUD.
+character (yellow, white or orange helmet), their name above their head,
+and their names on your HUD in the same colour.
 
 ## Co-op
 
@@ -438,9 +446,10 @@ The game is then at http://localhost:5173. Other useful commands:
   session: joining with a code, shared doors and pickups, reviving, retrying,
   finishing a level together and leaving.
 
-There are 224 unit tests covering level validation, collision, pathfinding,
+There are 235 unit tests covering level validation, collision, pathfinding,
 movement, breathing, weapons, thrown bottles, creature AI, loot placement,
-co-op, save merging, cloud sync, the leaderboard, settings and more. Adding `?debug` to the URL exposes test hooks on `window.game`.
+room furnishing, co-op, save merging, cloud sync, the leaderboard, settings
+and more. Adding `?debug` to the URL exposes test hooks on `window.game`.
 
 Every push to `main` is checked and deployed to GitHub Pages. The optional
 repository variables are the relay and cloud save settings described above.
