@@ -30,9 +30,9 @@ export const VENTILATION: LevelDef = {
     "#############################",
   ],
   notes: {
-    "1": "Note to self: count the turns. Left, left, right. If the radio tells you a different way, count again.",
+    "1": "Count the turns: left, left, right. If the radio tells you a different way, count again. It walks you past them on purpose.",
     "2": "MAINTENANCE: rivet guns are NOT to be used with the interlock removed. They will fire across a room. — Site Safety",
-    "3": "Someone lived in here. A bedroll, tins, a child's drawing of the sun. Written under it: 'Day 212. Still me.'",
+    "3": "Someone lived in here long before us: a bedroll, tins stamped 1991, a child's drawing of the sun. Under it: 'Day 212. Still me. The doors upstairs won't open for me any more.'",
     "4": "Scratched into the duct: THE VOICE IS NOT THE SUPERVISOR. THE SUPERVISOR DIED ON DAY TWO. I WAS THERE.",
   },
   events: {

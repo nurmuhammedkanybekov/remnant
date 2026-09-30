@@ -35,10 +35,10 @@ export const COLD_STORAGE: LevelDef = {
     "##########################",
   ],
   notes: {
-    "1": "Security locked the lift behind a keycard. Hendricks had it on his belt. Hendricks went into the south freezers.",
-    "2": "The big one doesn't run. It doesn't need to. Keep moving and keep your light off.",
-    "3": "Nur — the radio voice asked me my name. I told it. Then it used it, like it had known it all along. Probably nothing. — Mara",
-    "4": "HENDRICKS — personal. Spare rounds, in case the freezers went bad. If you're reading this, they went bad.",
+    "1": "SECURITY: the lift keycard stays with Hendricks. Nobody goes up until the samples are packed and cold. — Site Management",
+    "2": "The big one in the freezers used to be three of us. I know by the boots. Kept close, they grow together. It doesn't run. It doesn't need to. — Orlov, kitchens",
+    "3": "Nur — the radio asked me my name, and I told it. Now when it says it, something in my head answers before I do. It has to learn you before it can have you. Give it nothing. — Mara",
+    "4": "HENDRICKS — personal. Head office wants one live sample topside before anyone asks questions. If the freezers go bad, I blow the shafts and nobody leaves. Nobody was meant to leave anyway.",
   },
   events: {
     start: [

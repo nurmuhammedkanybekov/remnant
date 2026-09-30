@@ -20,8 +20,8 @@ export const LIFT_SHAFT: LevelDef = {
     fillIntensity: 1.5,
   },
   notes: {
-    "1": "SURFACE CREW ROSTER, taped inside the hatch. Forty-one names. Forty have been scratched out.",
-    "2": "Tag on the lift cable: INSPECTED. Under it, in pencil: 'It rode up with me yesterday. It was holding my hand.'",
+    "1": "SURFACE CREW ROSTER, taped inside the hatch. Forty-one names. Forty have been scratched out. The one left is yours.",
+    "2": "ARKADIN, LOG 190 (1991). I have built the blast doors to open only for the unchanged, and wired this shaft all the way down. If it ever learns to wear one of us well enough to pass, bring the mountain down.",
   },
   map: [
     "########################",
@@ -51,7 +51,7 @@ export const LIFT_SHAFT: LevelDef = {
   triggers: {
     a: [
       radio(
-        nur("The consortium's demolition charges. Wired all the way down the shaft."),
+        nur("Arkadin's charges. Wired all the way down the shaft, thirty years ago."),
         nur("If I press that, nothing comes out of this mountain. Including me.")
       ),
       objective("Walk out through the blast door — or trigger the charges."),

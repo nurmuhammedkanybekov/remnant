@@ -32,7 +32,7 @@ export const ARMORY: LevelDef = {
     "###################################",
   ],
   notes: {
-    "1": "Don't trust the radio. It knew my name before I told it. It knows yours. I'm going up the long way. — Mara",
+    "1": "Nur — it's the radio. Every time it talks to you it leaves a little of itself behind; that's how it changes people. I've heard too much. You haven't yet. Don't let it talk you all the way to the top. — Mara",
     "2": "Security's private locker. The last line in the log: 'Bullets run out. Its voice doesn't. Stop listening to it.'",
     "3": "INVENTORY. Rifles: 40. Shotguns: 12. Rounds: 900. Signed out: everything. Returned: nothing. Remarks: 'They were already inside.'",
   },

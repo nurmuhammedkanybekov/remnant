@@ -31,9 +31,9 @@ export const INFIRMARY: LevelDef = {
     "########################",
   ],
   notes: {
-    "1": "PATIENT 14 — KESSLER, T. Drilling crew. Admitted with 'mineral dermatitis'. Refuses light. Asked for the lamps off. Asked us to be quiet. Asked, and asked, and asked.",
-    "2": "Nur — if you wake up before I get back: I've gone up to find the others. Keep your light off when you can. They follow it. — Mara",
-    "3": "Hid this behind the panel so the others wouldn't take it all. If you found it, you're the kind who looks. Good. Keep looking. — M.",
+    "1": "PATIENT 14 — KESSLER, T. Drilling crew, admitted day 3 with 'mineral dermatitis'. Hums the same four notes all night. By day 5 the whole drill crew hums them. None of them can say where they heard it.",
+    "2": "Nur — you hit your head in the collapse. I've kept you sedated, in the dark, with the radio unplugged. Don't ask why yet. If you wake before I'm back: keep your light off, and never tell the radio anything about yourself. — Mara",
+    "3": "Supplies I hid from the others. They stopped eating on day six and sat by the radio instead, listening. You slept through all of it. That's why you're still you. — M.",
   },
   events: {
     start: [radio(unknown("...is anyone on ten? Anyone at all? Pick up the intercom."), nur("My head. How long was I out?"))],
