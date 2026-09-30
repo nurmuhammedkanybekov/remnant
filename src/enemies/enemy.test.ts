@@ -61,6 +61,21 @@ function run(e: Enemy, p: Perception, seconds: number, others: Enemy[] = [e]): v
 }
 
 describe("creature senses", () => {
+  it("a creature the hunt draws towards you isn't 'suspicious' until it notices something", () => {
+    const e = spawn("husk", 3);
+    e.drawnTo(cellCenter(8, 2));
+    expect(e.state).toBe("investigate");
+    expect(e.drawn).toBe(true);
+    // Shipped to a guest's puppet too.
+    const puppet = spawn("husk", 3);
+    puppet.applyNet(e.netState());
+    puppet.updatePuppet(1 / 30);
+    expect(puppet.drawn).toBe(true);
+    // It hears you: now it's checking on you.
+    e.hearNoise(cellCenter(5, 2), 20);
+    expect(e.drawn).toBe(false);
+  });
+
   it("a light in the dark gives you away at once: it comes for you", () => {
     const lit = spawn("husk", 3);
     run(lit, perceive(6, { torchOn: true }), 0.5);

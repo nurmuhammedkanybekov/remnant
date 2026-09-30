@@ -282,6 +282,11 @@ it unlocks the exit. If a level has generators, the exit has no power until
 every one is running. If a level has a boss, the exit stays sealed until
 it's dead.
 
+**Water** is two thin, dark, glossy layers over each flooded cell, each with
+a seamless ripple normal map (whole-number wave frequencies, so it tiles
+from cell to cell) drifting its own way (`animateWater`). The floor tiles
+barely show through; your light and the lamps glint on the moving ripples.
+
 **Hidden rooms.** A `+` is a loose panel: a door (`DoorSpawn.panel`) that
 wears the walls' own material over the whole cell, with only a faint seam
 and pry marks to give it away. Use pries it loose (quietly, noise 4, where a
@@ -362,11 +367,15 @@ your noise whenever you're quieter than that), so a creature right beside
 you can hear you standing still. **Hold your breath** (hold B, pad L3) to
 silence it for up to 7 s; not while sprinting. Let go early and you breathe
 out quietly (noise 1.2); run out and you **gasp** (noise 6), and your lungs
-take 4 s to refill after a short pause. A bar under stamina always shows
-your air (with the key next to it), and brightens while you hold it. Co-op partners send `held` with their
+take 4 s to refill after a short pause. While you hold it, and while your
+lungs refill, a bar the width of the others shows under stamina, with the
+seconds of air left beside it. Co-op partners send `held` with their
 state, so the host's creatures hear them the same way.
 
-**The hunt** (`updateDirector` in `game/levelSession.ts`). About 40% of the
+**The hunt** (`updateDirector` in `game/levelSession.ts`). A creature the
+hunt sends doesn't know you're there, so it doesn't count as suspicious on
+the HUD (`Enemy.drawn`, shipped to guests in the snapshot's flag bits) until
+it hears or sees something. About 40% of the
 creatures that walk are **roamers**: instead of keeping to their corner they
 pick a spot up to 7 cells from wherever they are, again and again, and drift
 through the whole level. And every so often (about 150 / 80 / 55 / 40 s on
@@ -620,7 +629,11 @@ compressor.
 - **Player**: recorded boot footsteps on concrete (walking, heavier when
   sprinting, soft when crouched) and wading splashes, a real flashlight
   switch, a recorded pain sound under a synthesized thump when hurt,
-  heartbeat below 40% health (faster as it drops), death drone.
+  a heartbeat below 40% health or when something unseen is close (55 to
+  about 140 beats a minute; each beat a low thud with a muffled knock around
+  120-180 Hz on top, because laptop speakers can't play a real heartbeat's
+  40-70 Hz), your own breathing, quick and shaky, when something is close,
+  death drone.
 - **Enemies** (panned + distance-attenuated + muffled through walls): one
   recorded voice for everything the Remnant has rewritten — growls when
   idle, an angry roar on alert, attack grunts, pain and death — pitched

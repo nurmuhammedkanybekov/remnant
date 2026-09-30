@@ -1,3 +1,4 @@
+import { HOLD_TIME } from "../player/breath";
 import { esc } from "./inventory";
 import { currentCharacter } from "../content/characters";
 import type { RadioLine } from "../game/script";
@@ -35,8 +36,6 @@ export interface HudState {
   /** Air left while holding your breath, 0..1 (1 = breathing normally). */
   breath: number;
   breathHeld: boolean;
-  /** Label of the hold-breath key, shown next to the bar. */
-  breathKey: string;
   /** Bottles carried. */
   throwables: number;
   /** Co-op voice: your microphone is off, live, or picking you up talking. */
@@ -210,12 +209,13 @@ export class Hud {
       this.el.hpNum.textContent = `${Math.ceil(s.health * 100)}`;
     }
     if (L.stamina !== s.stamina) this.el.st.style.width = `${s.stamina * 100}%`;
-    if (L.breath !== s.breath || L.breathHeld !== s.breathHeld || L.breathKey !== s.breathKey) {
+    if (L.breath !== s.breath || L.breathHeld !== s.breathHeld) {
       this.el.br.style.width = `${s.breath * 100}%`;
       this.el.brRow.classList.toggle("on", s.breathHeld || s.breath < 1);
       this.el.brRow.classList.toggle("held", s.breathHeld);
       this.el.brRow.classList.toggle("low", s.breathHeld && s.breath < 0.3);
-      this.el.brTxt.textContent = s.breathHeld ? "HOLDING" : s.breath < 1 ? "" : s.breathKey;
+      // Seconds of air left while you hold it; the bar alone while you get it back.
+      this.el.brTxt.textContent = s.breathHeld ? `${Math.ceil(s.breath * HOLD_TIME)}s` : "";
     }
     if (L.battery !== s.battery || L.torchOn !== s.torchOn) {
       this.el.bat.style.width = `${s.battery * 100}%`;
