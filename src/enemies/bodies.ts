@@ -196,6 +196,9 @@ class HumanoidBody implements CreatureBody {
   private readonly scale: number;
   /** 0 = upright, 1 = on all fours. Crawlers rear up to strike. */
   private crawl = 0;
+  /** 0..1: how far into its recoil from the light (a Watcher's freeze). */
+  private freeze = 0;
+  private lastTime = 0;
   private deathPose: { lean: number; head: number } | null = null;
 
   constructor(def: EnemyDef) {
@@ -497,12 +500,10 @@ class HumanoidBody implements CreatureBody {
 
   pose(p: Pose): void {
     const t = p.time;
-    if (p.frozen) {
-      // Locked by the light: hold whatever pose it was in, shaking with effort.
-      this.head.rotation.z = Math.sin(t * 41) * 0.04;
-      this.torso.rotation.y = Math.sin(t * 37) * 0.02;
-      return;
-    }
+    const dt = Math.min(0.1, Math.max(0, t - this.lastTime));
+    this.lastTime = t;
+    // Caught in the light it recoils quickly, and unfolds again more slowly.
+    this.freeze += ((p.frozen ? 1 : 0) - this.freeze) * (1 - Math.exp(-dt * (p.frozen ? 12 : 4)));
     this.torso.rotation.y = 0;
     const crawlTarget = this.look.gait === "crawl" ? (p.attack?.kind === "melee" ? 0.35 : 1) : 0;
     this.crawl += (crawlTarget - this.crawl) * 0.25;
@@ -581,6 +582,30 @@ class HumanoidBody implements CreatureBody {
     // The Listener's skull plates flex open when it's listening hard.
     const flare = p.hunting ? 0.9 : 0.5 + Math.sin(t * 1.7) * 0.15;
     for (const petal of this.petals) petal.rotation.x = -flare;
+    if (this.freeze > 0.001) this.recoil(t);
+  }
+
+  /**
+   * A Watcher held by the light: it throws its arms up over its face, turns
+   * its head away and leans back, shuddering. Blended in by `freeze`, so it
+   * flinches into it and eases out of it instead of stopping mid-stride.
+   */
+  private recoil(t: number): void {
+    const f = this.freeze;
+    const mix = (from: number, to: number) => from + (to - from) * f;
+    // A slow, visible shudder (a fast one looks like the game stuttering).
+    const shake = (Math.sin(t * 7.3) * 0.6 + Math.sin(t * 11.9 + 1.3) * 0.4) * 0.05;
+    this.armL.rotation.x = mix(this.armL.rotation.x, -1.3 + shake);
+    this.armR.rotation.x = mix(this.armR.rotation.x, -1.15 - shake);
+    this.armL.rotation.z = mix(this.armL.rotation.z, 0.75);
+    this.armR.rotation.z = mix(this.armR.rotation.z, -0.65);
+    this.foreL.rotation.x = mix(this.foreL.rotation.x, -1.25);
+    this.foreR.rotation.x = mix(this.foreR.rotation.x, -1.05);
+    this.head.rotation.y = mix(this.head.rotation.y, 0.75 + shake);
+    this.head.rotation.z = mix(this.head.rotation.z, 0.25 + shake * 0.5);
+    this.torso.rotation.x = mix(this.torso.rotation.x, this.look.hunch - 0.3 + shake * 0.4);
+    this.torso.rotation.y = mix(0, -0.2);
+    this.jaw.rotation.x = mix(this.jaw.rotation.x, 0.5 + Math.abs(shake) * 4);
   }
 
   die(k: number): void {
