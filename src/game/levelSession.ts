@@ -26,7 +26,7 @@ import type { Viewmodel } from "../weapons/viewmodel";
 import { circleHitsWall, hasLineOfSight, isSolid, randomFloorNear, raycastWorld, worldToCell } from "../world/grid";
 import { CheckpointMarker, DetonatorConsole, Door, Generator, Intercom, type Interactable } from "../world/interactables";
 import { LampSystem } from "../world/lamps";
-import { buildLevel, type LevelData } from "../world/levelBuilder";
+import { animateWater, buildLevel, type LevelData } from "../world/levelBuilder";
 import type { LevelDef } from "../world/levelDef";
 import { parseLevel } from "../world/levelParser";
 import { lootFor } from "../world/loot";
@@ -62,7 +62,7 @@ const VOICE_NOISE = 4;
 /** Roughly how often (seconds) a creature is drawn towards you, by difficulty. */
 const DIRECTOR_INTERVAL: Record<DifficultyDef["id"], number> = { story: 150, normal: 80, nightmare: 55, ironman: 80, aizi: 40 };
 /** Creatures further than this (world units) never set your heart going. */
-const DREAD_RANGE = 13;
+const DREAD_RANGE = 16;
 /** The hold-breath hint shows once per page load. */
 let breathHinted = false;
 /** Ammo picked up this close to the boss while it is awake comes back after RESTOCK_TIME seconds. */
@@ -460,6 +460,7 @@ export class LevelSession {
     this.radio.update(dt);
     this.lamps.update(dt, this.player.position, this.time, this.creaturePositions());
     this.effects.update(dt, engine.camera, this.player.flashlight.level, this.time);
+    animateWater(this.level, this.time);
     this.updateDirector(dt);
 
     this.muzzleTime -= dt;
@@ -1700,7 +1701,6 @@ export class LevelSession {
       hasKeycard: this.hasKeycard,
       breath: this.player.breath.air,
       breathHeld: this.player.breath.held,
-      breathKey: this.services.keyFor("holdBreath"),
       throwables: this.throwablesHeld,
       mic: this.coop ? (this.services.voice?.open ? (this.services.voice.speaking ? "talking" : "open") : "off") : "off",
     });

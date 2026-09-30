@@ -18,6 +18,65 @@ export interface LevelData extends ParsedLevel {
   exitLight: THREE.PointLight;
   /** The walls' material, so a loose panel can look like the wall around it. */
   wallMaterial: THREE.Material;
+  /** The water's layers, whose ripples `animateWater` moves. */
+  waterMaterials: THREE.MeshStandardMaterial[];
+}
+
+/** Drifts the water's ripples: each layer its own way, so they cross and never look like a pattern. */
+export function animateWater(level: LevelData, time: number): void {
+  level.waterMaterials.forEach((m, i) => {
+    const map = m.normalMap;
+    if (!map) return;
+    if (i === 0) map.offset.set(time * 0.021, time * 0.013);
+    else map.offset.set(-time * 0.034, time * 0.027);
+  });
+}
+
+let rippleTexture: THREE.CanvasTexture | null = null;
+
+/**
+ * A tileable normal map of small ripples: a height field made of waves whose
+ * frequencies are whole numbers over the tile, so it wraps seamlessly from
+ * one flooded cell to the next, turned into normals.
+ */
+function waterNormals(): THREE.CanvasTexture {
+  if (rippleTexture) return rippleTexture;
+  const n = 128;
+  const waves = [
+    [3, 1, 0.9, 0.3],
+    [-2, 4, 0.7, 1.7],
+    [5, -3, 0.45, 2.9],
+    [1, 6, 0.4, 0.8],
+    [-7, 2, 0.3, 4.1],
+    [8, 5, 0.2, 5.3],
+  ];
+  const h = new Float32Array(n * n);
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      let v = 0;
+      for (const [fx, fy, a, p] of waves) v += a * Math.sin(((fx * x + fy * y) / n) * Math.PI * 2 + p);
+      h[y * n + x] = v;
+    }
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = n;
+  const ctx = canvas.getContext("2d")!;
+  const img = ctx.createImageData(n, n);
+  const at = (x: number, y: number) => h[((y + n) % n) * n + ((x + n) % n)];
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * 1.6;
+      const dy = (at(x, y + 1) - at(x, y - 1)) * 1.6;
+      const len = Math.hypot(dx, dy, 1);
+      const o = (y * n + x) * 4;
+      img.data[o] = ((-dx / len) * 0.5 + 0.5) * 255;
+      img.data[o + 1] = ((dy / len) * 0.5 + 0.5) * 255;
+      img.data[o + 2] = ((1 / len) * 0.5 + 0.5) * 255;
+      img.data[o + 3] = 255;
+    }
+  ctx.putImageData(img, 0, 0);
+  rippleTexture = new THREE.CanvasTexture(canvas);
+  rippleTexture.wrapS = rippleTexture.wrapT = THREE.RepeatWrapping;
+  return rippleTexture;
 }
 
 /**
@@ -70,16 +129,16 @@ function varyPanels(mat: THREE.MeshStandardMaterial): void {
 
 /** Builds a parsed level's geometry, props, lamps and exit into `scene`. `bumpMaps` is a quality option. */
 export function buildLevel(scene: THREE.Scene, level: ParsedLevel, bumpMaps = true): LevelData {
-  const { lampFixtures, wallMaterial } = buildGeometry(scene, level, bumpMaps);
+  const { lampFixtures, wallMaterial, waterMaterials } = buildGeometry(scene, level, bumpMaps);
   const exit = buildExit(scene, level, level.exitCell);
-  return { ...level, lampFixtures, exitSignMat: exit.signMat, exitLight: exit.light, wallMaterial };
+  return { ...level, lampFixtures, exitSignMat: exit.signMat, exitLight: exit.light, wallMaterial, waterMaterials };
 }
 
 function buildGeometry(
   scene: THREE.Scene,
   level: ParsedLevel,
   bumpMaps: boolean
-): { lampFixtures: LampFixture[]; wallMaterial: THREE.Material } {
+): { lampFixtures: LampFixture[]; wallMaterial: THREE.Material; waterMaterials: THREE.MeshStandardMaterial[] } {
   const tex = textures();
   const theme = resolveTheme(level.def.theme);
   const { walls, crates, barrels } = level.props;
@@ -205,33 +264,51 @@ function buildGeometry(
     scene.add(halo);
   }
 
-  // Shallow water: one instanced sheet per flooded cell, slightly above the floor.
+  // Shallow water: two thin layers over each flooded cell, dark and glossy,
+  // with ripples that drift in different directions (see `animateWater`), so
+  // your light and the lamps glint and move on it. Most of the floor beneath
+  // is hidden; you see the water, not the tiles.
+  const waterMaterials: THREE.MeshStandardMaterial[] = [];
   if (level.spawns.water.length) {
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x1d3438,
-      emissive: 0x04110f, // a faint sheen, so flooded floors read even in the dark
-      roughness: 0.18,
-      metalness: 0.15,
-      transparent: true,
-      opacity: 0.78,
-      depthWrite: false,
-    });
-    const waterMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE), waterMat, level.spawns.water.length);
-    level.spawns.water.forEach((w, i) => {
-      dummy.position.set(w.pos.x, 0.32, w.pos.y);
-      dummy.rotation.set(-Math.PI / 2, 0, 0);
-      dummy.updateMatrix();
-      waterMesh.setMatrixAt(i, dummy.matrix);
-    });
-    waterMesh.instanceMatrix.needsUpdate = true;
-    scene.add(waterMesh);
+    const ripples = waterNormals();
+    const layers = [
+      { y: 0.3, opacity: 0.84, color: 0x0e2022, rough: 0.07, repeat: 1, scale: 0.8 },
+      { y: 0.305, opacity: 0.35, color: 0x1a3033, rough: 0.04, repeat: 2, scale: 0.45 },
+    ];
+    for (const l of layers) {
+      const map = ripples.clone();
+      map.needsUpdate = true;
+      map.repeat.set(l.repeat, l.repeat);
+      const mat = new THREE.MeshStandardMaterial({
+        color: l.color,
+        emissive: 0x020909, // a faint sheen, so flooded floors read even in the dark
+        roughness: l.rough,
+        metalness: 0.05,
+        normalMap: map,
+        normalScale: new THREE.Vector2(l.scale, l.scale),
+        transparent: true,
+        opacity: l.opacity,
+        depthWrite: false,
+      });
+      waterMaterials.push(mat);
+      const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE), mat, level.spawns.water.length);
+      level.spawns.water.forEach((w, i) => {
+        dummy.position.set(w.pos.x, l.y, w.pos.y);
+        dummy.rotation.set(-Math.PI / 2, 0, 0);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.renderOrder = 1;
+      scene.add(mesh);
+    }
   }
 
   scene.fog = new THREE.FogExp2(theme.fog, theme.fogDensity);
   scene.background = new THREE.Color(theme.fog);
   // A cool, very dim fill so nothing is ever pure black.
   scene.add(new THREE.HemisphereLight(theme.skyLight, theme.groundLight, theme.fillIntensity));
-  return { lampFixtures: fixtures, wallMaterial: wallMat };
+  return { lampFixtures: fixtures, wallMaterial: wallMat, waterMaterials };
 }
 
 /** Door + glowing sign on the wall next to the exit cell. */
