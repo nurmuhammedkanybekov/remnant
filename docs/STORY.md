@@ -66,19 +66,51 @@ noise and the flashlight are what give you away.
 
 ---
 
-## The twist
+## The truth, and how the player learns it
 
-The Operator is not a survivor. It is the Remnant, speaking through the
-facility's radio network with a voice assembled from everyone it has
-absorbed. It needs a living, _unchanged_ host to carry a fragment of it past
-the surface blast doors — the consortium's emergency protocol only unseals
-them for a biometric match with an uninfected crew member.
+**How it spreads: by voice.** The Remnant learns people by listening to
+them and talking to them. Anyone who listens to it long enough is slowly
+rewritten: first a hum they can't place, then the smile, then the rest. Its
+creatures are what's left of the people it finished with. It keeps every
+voice it ever learned, and it can speak in any of them.
 
-Clues are planted from the first level: the Operator never answers questions
-about the surface, knows things no one in a control room could know, and on
-Sublevel 6 a Mimic uses the exact same voice.
+**The Operator is the Remnant**, speaking over the facility radio in a
+voice assembled from everyone it has absorbed. It needs a living, _unchanged_
+host to carry a fragment of it up the shaft: the blast doors at the top were
+built in 1991 by Dr. Arkadin to open only for someone unchanged. So it guides
+Nur up, and talks to him all the way, a little at a time.
 
----
+**Why Nur is still Nur.** Mara Voss, the medic, kept Nur sedated in the dark
+with the radio unplugged after the collapse. He slept through the eleven
+days in which everyone else sat listening.
+
+**Why the consortium came.** Not for rare earth metals: Project GLASS was
+to bring one living Zenit sample (R-7) to the surface. The crew were not
+told. When it went wrong, security chief Hendricks blew the shafts himself,
+so nobody could leave.
+
+**The ending choice.** Arkadin wired the shaft with charges in 1991, for
+the day the Remnant learned to wear someone well enough to pass the doors.
+At the top, Nur can walk out (and the last scene hints what came with him),
+or bring the mountain down.
+
+### What each note reveals
+
+Notes are found in the order you climb. Arkadin's logs run from 1987 to 1991;
+Mara's notes are always one floor ahead of you.
+
+| Level              | Notes (hidden-room note marked \*)                                                                                                                                                                                                 |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Infirmary        | Kessler hums four notes, then the whole drill crew does. Mara kept you sedated with the radio unplugged: tell it nothing. \*The others stopped eating and listened; you slept through it.                                          |
+| 2 Maintenance Wing | The radio switched itself on and claims to be the surface; the surface line is dead. They click to find walls; humming means one of us. The rota: "Heard singing. Sent home." \*1988: three fitters listened at a vent all night.  |
+| 3 Cold Storage     | The keycard stays with Hendricks until the samples are packed. The Brute was three of the crew, kept close. Mara: it has to learn you before it can have you. \*Hendricks: head office wants a live sample; he'll blow the shafts. |
+| 4 Pumping Station  | Arkadin 1988: it learns from voices, so they stopped talking. Mara: the collapse was Hendricks, detonator in his hand. \*Arkadin 1988: the walls answered in a dead man's voice.                                                   |
+| 5 Containment Labs | 1987 protocol: not to be spoken to. Arkadin 1989: it said his daughter's name; it keeps what it hears. Project GLASS memo. Kessler sat with R-7 and was the first to hum. \*Arkadin 1990: his blood, red or not.                   |
+| 6 Ventilation      | The radio walks you past them on purpose. Rivet gun safety. The supervisor died on day two. \*A 1991 survivor: the doors upstairs won't open for him any more.                                                                     |
+| 7 Power Plant      | The lift needs all three generators. Mara's plan. Arkadin 1991: it can't climb; it wants to be carried by someone the doors open for. \*A 1991 engineer's list, Arkadin crossed out.                                               |
+| 8 Armory           | Mara: every time it talks to you it leaves a little of itself behind. The inventory: "They were already inside." \*Security: bullets run out, its voice doesn't.                                                                   |
+| 9 The Hive         | It keeps them, every voice it learned. Mara, absorbed, calling you in. \*Mara's photograph of the valley village: tell them never to answer a radio.                                                                               |
+| 10 Lift Shaft      | Arkadin 1991: the doors open only for the unchanged, and the shaft is wired to bring the mountain down. \*The crew roster: forty scratched out, one left.                                                                          |
 
 ## Weapons
 
