@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { buildDressing } from "./dressing";
 import { textures, type Surface } from "../fx/textures";
 import { CELL_SIZE, WALL_HEIGHT, cellCenter, isSolid, type Cell } from "./grid";
 import type { ParsedLevel } from "./levelParser";
@@ -303,6 +304,8 @@ function buildGeometry(
       scene.add(mesh);
     }
   }
+
+  buildDressing(scene, level);
 
   scene.fog = new THREE.FogExp2(theme.fog, theme.fogDensity);
   scene.background = new THREE.Color(theme.fog);

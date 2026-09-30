@@ -63,8 +63,10 @@ most of the sound) is generated in code.
 
 **The campaign.** Ten hand-built levels, from the deepest sublevel up to the
 surface, with a story told over the radio, notes left by the people who were
-there before you, a three-phase boss and two endings. Every level also hides
-a room behind a loose wall panel.
+there before you, a three-phase boss and two endings. Every note is a piece
+of the same story, found in the order you climb. The rooms have a purpose
+and are furnished to match, with signs by their doors, and every level
+hides a room behind a loose wall panel.
 
 **Stealth that matters.** The creatures are blind, but they hear everything.
 Every step makes noise, sprinting and wading make more, and a creature right
