@@ -287,6 +287,22 @@ a seamless ripple normal map (whole-number wave frequencies, so it tiles
 from cell to cell) drifting its own way (`animateWater`). The floor tiles
 barely show through; your light and the lamps glint on the moving ripples.
 
+**Set dressing** (`world/dressing.ts`). Every open area of 2×2 cells or
+more is a room with a purpose from the level's list (`LEVEL_DRESSING`,
+biggest rooms first): wards, surgery and a morgue in the infirmary; a
+workshop, lockers and bunks in maintenance; freezers and a butchery in cold
+storage; pump halls; Arkadin's labs; generator and switch rooms; the armory
+with its racks nearly all empty. Each is furnished against its walls
+(beds, IV stands, lockers, desks with terminals, shelves, freezers, meat
+hooks, benches, tool racks, bunks, pipes and valves, specimen tanks,
+control panels, growths in the hive), and gets a stencilled sign by its
+entrance in Russian with the consortium's English under it (ПАЛАТА 1 /
+WARD 1). Corridors get pipes and cable trays under the ceiling; every note
+lies on a small table where it was left; two or three of the dead lie
+under tarps in quiet corners. Planned purely and seeded (the same for every
+co-op player), built as one merged mesh per material. Props are shallow
+and stand against walls, so collision stays with the map.
+
 **Hidden rooms.** A `+` is a loose panel: a door (`DoorSpawn.panel`) that
 wears the walls' own material over the whole cell, with only a faint seam
 and pry marks to give it away. Use pries it loose (quietly, noise 4, where a
