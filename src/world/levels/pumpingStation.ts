@@ -34,9 +34,9 @@ export const PUMPING_STATION: LevelDef = {
     "############################",
   ],
   notes: {
-    "1": "ARKADIN, LOG 112. It hears the water. Every drop that falls in this station, it hears. We have stopped the pumps. We have stopped talking.",
-    "2": "Took the pump control card off what was left of Hendricks. Left it in the east intake for whoever comes next. Wade slowly. — M.",
-    "3": "ARKADIN, LOG 98. We built this room so we could talk without being heard. Tonight the walls answered.",
+    "1": "ARKADIN, LOG 112 (1988). It hears the water. Every drop in this station, it hears. It learns from voices, so we give it none: we have stopped the pumps, and we have stopped talking.",
+    "2": "Took the pump control card off what was left of Hendricks. The collapse was him: the detonator was still in his hand. Card's in the east intake for whoever comes next. Wade slowly. — M.",
+    "3": "ARKADIN, LOG 98 (1988). We built this room so we could talk without being heard. Tonight the walls answered in Sergei's voice. Sergei has been dead for a month.",
   },
   events: {
     start: [

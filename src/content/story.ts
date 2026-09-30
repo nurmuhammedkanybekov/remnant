@@ -4,9 +4,9 @@ export const PROLOGUE = {
   title: "OBJECT 9",
   lines: [
     "1961. The Soviet Union cuts a research station two and a half kilometres into the Tian Shan mountains. Officially, it studies geothermal energy.",
-    "1987. At the bottom of the deepest shaft, the drill breaks into a cavity lined with something that is neither rock nor tissue. The researchers call it the Remnant.",
-    "1991. The station is sealed and struck from every record.",
-    "Now. A mining consortium reopens Object 9 to strip it for rare earth metals. Forty-one contractors go down. Eleven days ago, the shafts collapsed behind them.",
+    "1987. At the bottom of the deepest shaft, the drill breaks into a cavity lined with something that is neither rock nor tissue. The researchers call it the Remnant. Their first rule: it is not to be spoken to.",
+    "1991. The station is sealed, its shaft wired with charges, and Object 9 is struck from every record.",
+    "Now. A mining consortium reopens Object 9, officially for rare earth metals. Forty-one contractors go down. Eleven days ago, the shafts collapsed behind them.",
     "You are Nur Kanybekov, structural engineer. You wake up on Sublevel 10.",
   ],
 };

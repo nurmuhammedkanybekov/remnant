@@ -45,9 +45,9 @@ export const HIVE: LevelDef = {
     "############################################",
   ],
   notes: {
-    "1": "It isn't eating them. It's keeping them. You can hear them in there, talking. All of them at once.",
-    "2": "Nur. It's me. It's Mara. It doesn't hurt. Come and see. It's warm here and nobody is ever alone.",
-    "3": "Mara's pack, empty but for a photograph of a village in the valley. On the back: 'If I don't come out, go there. Tell them to leave.'",
+    "1": "It isn't eating them. It's keeping them. You can hear them in there, talking, all of them at once. Every voice it ever learned.",
+    "2": "Nur. It's me. It's Mara. It doesn't hurt. Come and see. It's warm here, and nobody is ever alone.",
+    "3": "Mara's pack, empty but for a photograph of a village in the valley. On the back: 'If I don't come out, go there. Tell them never to answer a radio.'",
   },
   events: {
     start: [radio(nur("The walls are... soft. Warm. It's grown through everything."), unknown("Keep going, Nur. You're nearly home."))],

@@ -29,10 +29,10 @@ export const MAINTENANCE_WING: LevelDef = {
     "#########################",
   ],
   notes: {
-    "1": "Ration crates are gone. Whatever came through here ate through the locks first.",
-    "2": "If you hear them clicking, don't move. If you hear them breathing, it's already too late.",
+    "1": "DAY 4. The break-room radio keeps switching itself on. A calm voice, says it's the surface. The surface line has been dead since the collapse. Petrov talks to it for hours.",
+    "2": "They click to find the walls, like bats. If you hear clicking, stop moving. If you hear somebody humming, it used to be one of us.",
     "3": "SHIFT ROTA. Every name after the fourteenth has the same note beside it: 'Heard singing. Sent home.' Nobody was sent home.",
-    "4": "ZENIT MAINTENANCE, 1988. Crawlspace sealed after the noise incident. Do not reopen. The noise is not in the pipes.",
+    "4": "ZENIT MAINTENANCE, 1988. Crawlspace sealed after the 'noise incident': three fitters spent a night listening at this vent, and in the morning they could not stop smiling. Do not reopen. Do not listen.",
   },
   events: {
     start: [radio(op("Nine. The tunnels loop back on themselves. The next stairwell is in the far south-east corner."))],

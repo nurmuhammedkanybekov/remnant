@@ -30,11 +30,11 @@ export const CONTAINMENT_LABS: LevelDef = {
     "##############################",
   ],
   notes: {
-    "1": "ZENIT — LAB 3 PROTOCOL. Sample R-7 is to be kept in darkness at 4°C. It is not to be spoken to. (Someone has underlined 'spoken' three times.)",
-    "2": "ARKADIN, LOG 140. R-7 has begun repeating the words we say near it. Tonight it said my daughter's name. I have never said her name down here.",
-    "3": "CONSORTIUM MEMO: all Zenit-era material is scrap. Anything 'soft' goes to the incinerator. Do NOT open containment. — Site Management",
-    "4": "Kessler talked his way into the labs. He wanted to see it. He came out smiling. None of us had ever seen him smile.",
-    "5": "ARKADIN, LOG 151. The last clean sample of my blood is in this cabinet. If it is still red when you find it, burn it. If it isn't, run.",
+    "1": "ZENIT — LAB 3 PROTOCOL, 1987. Sample R-7 is to be kept in darkness at 4°C. It is not to be spoken to. (Someone has underlined 'spoken' three times.)",
+    "2": "ARKADIN, LOG 140 (1989). R-7 repeats the words we say near it. Tonight it said my daughter's name. I have never said her name down here. It is not only listening to us. It is keeping what it hears.",
+    "3": "CONSORTIUM — INTERNAL. PROJECT GLASS. The rare-earth survey is cover. Recover one living Zenit sample (R-7) and bring it to the surface intact. Crew are not to be told. — K. Hale, Site Management",
+    "4": "Kessler talked his way in here to see it. He sat with it for an hour. He came out smiling, and that night he started humming. He was the first.",
+    "5": "ARKADIN, LOG 151 (1990). The last clean sample of my blood is in this cabinet. If it is still red when you find it, burn it. If it isn't, run.",
   },
   events: {
     start: [
