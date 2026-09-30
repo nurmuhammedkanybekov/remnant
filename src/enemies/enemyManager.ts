@@ -96,12 +96,19 @@ export class EnemyManager {
   }
 
   /** 0..1 — the highest suspicion/hunting level, drives the HUD "awareness" eye. */
+  /**
+   * For the HUD: 1 when something is hunting you, up to 0.6 when something
+   * is suspicious (checking out a noise it heard, or half-sure it saw you).
+   * A creature the hunt is drawing along (`Enemy.drawn`) doesn't count: it
+   * doesn't know you're there yet, and neither should the HUD say so.
+   */
   get threat(): number {
     let t = 0;
     for (const e of this.enemies) {
       if (e.isDead) continue;
       if (e.isHunting || e.state === "drop") return 1;
-      t = Math.max(t, e.state === "investigate" || e.state === "search" ? 0.6 : e.suspicion * 0.6);
+      const checking = (e.state === "investigate" || e.state === "search") && !e.drawn;
+      t = Math.max(t, checking ? 0.6 : e.suspicion * 0.6);
     }
     return t;
   }

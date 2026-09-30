@@ -278,9 +278,16 @@ export class Enemy {
     this.goInvestigate(pos);
   }
 
+  /**
+   * Walking over to look around because the hunt drew it (see `drawnTo`),
+   * not because it noticed anything: it doesn't count as suspicious of you.
+   */
+  drawn = false;
+
   /** Wanders over to look around `pos`, not knowing what's there (the hunt drawing it towards you). */
   drawnTo(pos: THREE.Vector2): void {
     if (this.isDead || this.isHunting || this.state !== "patrol") return;
+    this.drawn = true;
     this.state = "investigate";
     this.lastKnown.copy(pos);
     this.path = [];
@@ -297,6 +304,7 @@ export class Enemy {
   }
 
   protected enterChase(): void {
+    this.drawn = false;
     if (this.state !== "chase" && this.state !== "attack") this.onAlert?.(this);
     this.state = "chase";
     this.path = [];
@@ -304,6 +312,7 @@ export class Enemy {
   }
 
   private goInvestigate(pos: THREE.Vector2): void {
+    this.drawn = false;
     if (this.state === "patrol" || this.state === "lurk") this.onAlert?.(this);
     this.state = "investigate";
     this.lastKnown.copy(pos);
@@ -496,6 +505,7 @@ export class Enemy {
           this.speedNow = 0;
         }
         if (this.searchTimer <= 0) {
+          this.drawn = false;
           this.state = "patrol";
           this.patrolTarget = s.behaviour === "lurker" ? this.home.clone() : randomFloorNear(level, this.home.x, this.home.y, 2);
         }
@@ -713,7 +723,7 @@ export class Enemy {
       this.state === "attack" ? attack : 0,
       r(k),
       r(this.stagger),
-      this.frozen ? 1 : 0,
+      (this.frozen ? 1 : 0) + (this.drawn ? 2 : 0),
       r(this.hitFlash),
       r(this.suspicion),
       Math.round(this.health),
@@ -772,7 +782,8 @@ export class Enemy {
       this.attackDuration = 1;
       this.attackTimer = 1 - a[6];
       this.stagger = a[7];
-      this.frozen = a[8] === 1;
+      this.frozen = (a[8] & 1) === 1;
+      this.drawn = (a[8] & 2) === 2;
       this.suspicion = a[10];
     }
     if (this.onCeiling) this.hangFromCeiling(1);

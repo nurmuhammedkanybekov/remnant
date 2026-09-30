@@ -573,19 +573,29 @@ export class SoundManager {
    * Call every frame. The heart beats when you're badly hurt (below ~40%)
    * or when something is close and you can't see it (`dread` 0..1), faster
    * and louder the worse it gets.
+   *
+   * A real heartbeat is mostly below what laptop speakers can play, so each
+   * beat is a low thud with a firmer, muffled knock on top (~120-180 Hz)
+   * that small speakers do reproduce: "lub", then a softer "dub".
    */
   updateHeartbeat(dt: number, healthFrac: number, dread = 0): void {
     if (!this.ctx || healthFrac <= 0) return;
     const hurt = healthFrac < 0.4 ? 1 - healthFrac / 0.4 : 0;
     const danger = Math.max(hurt, dread);
     this.heartbeatTimer -= dt;
-    if (danger < 0.08 || this.heartbeatTimer > 0) return;
-    this.heartbeatTimer = 1.1 - danger * 0.55;
+    if (danger < 0.06 || this.heartbeatTimer > 0) return;
+    // 55 beats a minute when uneasy, up to about 140 when it's on top of you.
+    this.heartbeatTimer = 1.1 - danger * 0.68;
     const t = this.ctx.currentTime;
     const o = this.out(CENTER, 1, 0)!;
-    const v = 0.25 + danger * 0.6;
-    this.tone(o, "sine", 70, 40, t, 0.12, v);
-    this.tone(o, "sine", 65, 38, t + 0.2, 0.12, v * 0.7);
+    const v = 0.35 + danger * 0.9;
+    const beat = (at: number, gain: number) => {
+      this.tone(o, "sine", 62, 38, at, 0.14, gain);
+      this.tone(o, "triangle", 150, 95, at, 0.09, gain * 0.55, 0.003);
+      this.burst(o, "lowpass", 220, 0.7, at, 0.07, gain * 0.5, 0.002);
+    };
+    beat(t, v);
+    beat(t + 0.19, v * 0.65);
   }
 
   /**
@@ -596,16 +606,17 @@ export class SoundManager {
     if (!this.ctx) return;
     const level = Math.max(dread, winded * 0.8);
     this.breathTimer -= dt;
-    if (held || level < 0.2 || this.breathTimer > 0) return;
-    const period = 2.8 - level * 1.5;
+    if (held || level < 0.12 || this.breathTimer > 0) return;
+    const period = 3 - level * 1.8;
     this.breathTimer = period * (0.9 + Math.random() * 0.2);
     const t = this.ctx.currentTime;
     const o = this.out(CENTER, 1, 0.05)!;
     const pitch = currentCharacter().voice;
-    const v = 0.05 + level * 0.12;
-    // In through the mouth, then out.
-    this.burst(o, "bandpass", 1300 * pitch, 0.8, t, period * 0.3, v, period * 0.12);
-    this.burst(o, "bandpass", 700 * pitch, 0.7, t + period * 0.45, period * 0.35, v * 1.2, period * 0.08);
+    const v = 0.1 + level * 0.28;
+    // In through the mouth (a little ragged when it's bad), then out.
+    this.burst(o, "bandpass", 1250 * pitch, 0.9, t, period * 0.26, v, period * 0.1);
+    if (level > 0.5) this.burst(o, "bandpass", 1500 * pitch, 1.2, t + period * 0.12, period * 0.1, v * 0.5, 0.02);
+    this.burst(o, "bandpass", 650 * pitch, 0.8, t + period * 0.42, period * 0.34, v * 1.15, period * 0.06);
   }
 
   /** A loose panel pried out of the wall: a metal scrape, then it drops with a thud. */
