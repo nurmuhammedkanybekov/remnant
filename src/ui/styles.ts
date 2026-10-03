@@ -19,6 +19,13 @@ const CSS = /* css */ `
   font-variant-numeric: lining-nums; }
 
 /* ---- crosshair ---- */
+/* Inside a locker: dark steel, light only through the horizontal slats, edges in shadow. */
+.slats { position: absolute; inset: 0; opacity: 0; transition: opacity .35s; pointer-events: none;
+  background:
+    radial-gradient(ellipse 46% 30% at 50% 47%, rgba(0,0,0,0) 0%, rgba(0,0,0,.55) 70%, rgba(0,0,0,.97) 100%),
+    linear-gradient(to bottom, #000 0 31%, transparent 31% 63%, #000 63% 100%),
+    repeating-linear-gradient(to bottom, rgba(6,6,7,.98) 0 22px, rgba(0,0,0,0) 22px 36px); }
+.slats.show { opacity: 1; }
 .xhair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transition: opacity .15s; }
 .xhair i { position: absolute; background: rgba(240,236,228,0.85); box-shadow: 0 0 2px rgba(0,0,0,.9); }
 .xhair i.t, .xhair i.b { width: 2px; height: 7px; left: -1px; }

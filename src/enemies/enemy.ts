@@ -88,6 +88,11 @@ export interface Perception {
   /** The flashlight is on and actually lit. */
   torchOn: boolean;
   playerDead: boolean;
+  /**
+   * Hiding in a locker: it can't be seen, and only one that watched you get
+   * in knows where you are (it comes and pulls you out).
+   */
+  hidden?: boolean;
   /** Eye position and view direction (for "is the beam on me?"). */
   eye: THREE.Vector3;
   look: THREE.Vector3;
@@ -151,6 +156,10 @@ export class Enemy {
   private lightHold = 0;
   /** Watcher: 0 just released from the light, 1 moving freely. */
   private thaw = 1;
+  /** It could see its target last frame (so it saw them climb into a locker). */
+  private sawTarget = false;
+  /** Its target hid while it was watching: it knows which locker. */
+  private knowsHide = false;
   protected hitFlash = 0;
   protected stagger = 0;
   protected deathT = 0;
@@ -419,7 +428,7 @@ export class Enemy {
       const sightRange = (lit ? SIGHT_LIT : SIGHT_DARK) * this.mods.perception * s.sight;
       const inCone = Math.abs(wrapAngle(angleTo - this.facing)) < VISION_HALF_ANGLE;
       // Once hunting, they track you all round (they know roughly where you are).
-      canSee = los && dist < sightRange && (inCone || hunting || dist < 2);
+      canSee = !p.hidden && los && dist < sightRange && (inCone || hunting || dist < 2);
       if (canSee) {
         // Close = instant; far = suspicion builds over time (gives you a moment to duck away).
         // A light in the dark is different: it knows at once what that is.
@@ -434,7 +443,12 @@ export class Enemy {
       if (!canSee && s.light === "sees" && this.inBeam(p, los)) this.suspicion = Math.min(1, this.suspicion + LIT_SUSPICION_RATE * dt);
     }
     if (!canSee) this.suspicion = Math.max(0, this.suspicion - dt * 0.35);
-    const touch = !p.playerDead && los && dist < TOUCH_RANGE;
+    // In a locker you're out of sight; one that watched you get in still knows where.
+    if (!p.hidden) this.knowsHide = false;
+    else if (this.sawTarget) this.knowsHide = true;
+    this.sawTarget = canSee;
+    if (p.hidden && this.knowsHide) this.lastKnown.copy(p.playerPos);
+    const touch = !p.playerDead && los && dist < TOUCH_RANGE && (!p.hidden || this.knowsHide);
 
     // --- Hearing (movement noise; walls muffle it to 40%) ---
     const heardRadius = p.playerNoise * s.hearing * this.mods.perception * (los ? 1 : 0.4);
@@ -547,9 +561,11 @@ export class Enemy {
     const target = this.sinceContact < 0.2 ? p.playerPos : this.lastKnown;
     const speed = s.chaseSpeed * (this.mods.speed ?? 1) * (1 - this.stagger * 0.7);
     const r = s.behaviour === "ranged" ? s.ranged : undefined;
-    if (dist < s.attackRange && los) {
+    // Someone hiding is only a target to one that saw them get in.
+    const reachable = !p.hidden || this.knowsHide;
+    if (dist < s.attackRange && los && reachable) {
       this.startAttack("melee");
-    } else if (r && los && dist <= r.range && this.rangedCooldown <= 0 && this.sinceContact < 0.5) {
+    } else if (r && los && reachable && dist <= r.range && this.rangedCooldown <= 0 && this.sinceContact < 0.5) {
       this.startAttack("ranged");
     } else if (r && los && dist < r.minRange) {
       // Too close for comfort: back off, still facing you.
@@ -585,7 +601,7 @@ export class Enemy {
         const target = new THREE.Vector3(p.playerPos.x, Math.max(0.9, p.eye.y - 0.45), p.playerPos.y);
         if (!p.playerDead) this.onRanged?.(this, this.body.mouth(), target);
         this.rangedCooldown = (s.ranged?.cooldown ?? 2) * (0.8 + Math.random() * 0.4);
-      } else if (dist < s.attackRange + 0.35 && los && !p.playerDead) {
+      } else if (dist < s.attackRange + 0.35 && los && !p.playerDead && (!p.hidden || this.knowsHide)) {
         // Strike lands only if you're still in reach (plus a little lunge).
         this.onAttackHit?.(s.attackDamage * this.mods.damage, me);
       }

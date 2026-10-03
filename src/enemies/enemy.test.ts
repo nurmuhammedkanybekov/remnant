@@ -60,6 +60,34 @@ function run(e: Enemy, p: Perception, seconds: number, others: Enemy[] = [e]): v
   for (let t = 0; t < seconds; t += 1 / 30) e.update(1 / 30, level, p, others);
 }
 
+describe("hiding", () => {
+  it("someone in a locker isn't seen, even right in front of it with the light on", () => {
+    const e = spawn("husk", 3);
+    run(e, perceive(5, { hidden: true, torchOn: true, look: new THREE.Vector3(-1, 0, 0) }), 3);
+    expect(e.isHunting).toBe(false);
+  });
+
+  it("one that watched you get in comes for you", () => {
+    const e = spawn("husk", 3);
+    let hits = 0;
+    e.onAttackHit = () => hits++;
+    // It sees you (light on, close, in front of it), then you climb in.
+    run(e, perceive(5, { torchOn: true }), 1);
+    expect(e.isHunting).toBe(true);
+    run(e, perceive(5, { hidden: true }), 6);
+    expect(hits).toBeGreaterThan(0);
+  });
+
+  it("one that didn't see you go in walks past", () => {
+    const e = spawn("husk", 3);
+    let hits = 0;
+    e.onAttackHit = () => hits++;
+    e.alertTo(cellCenter(5, 2));
+    run(e, perceive(5, { hidden: true }), 8);
+    expect(hits).toBe(0);
+  });
+});
+
 describe("creature senses", () => {
   it("a creature the hunt draws towards you isn't 'suspicious' until it notices something", () => {
     const e = spawn("husk", 3);
