@@ -180,7 +180,7 @@ export class Screens {
   /** The first screen: loading is done, waiting for a key (browsers only allow audio after one). */
   title(prompt: string, onStart: () => void): void {
     this.render(
-      `<h1>REMNANT</h1><div class="tag">OBJECT 9 · TIAN SHAN</div><div class="press">${esc(prompt)}</div>`,
+      `<h1>REMNANT</h1><div class="tag">OBJECT 9 · TIAN SHAN</div><div class="quote">“It learns you by listening. Don’t answer the radio.”</div><div class="press">${esc(prompt)}</div>`,
       [],
       true,
       false,

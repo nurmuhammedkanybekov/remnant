@@ -735,21 +735,73 @@ export function flashTexture(): THREE.CanvasTexture {
 
 /** Bullet hole decal. */
 export function bulletHoleTexture(): THREE.CanvasTexture {
-  return canvasTexture(64, 64, 3, (ctx, w, h, rand) => {
-    const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+  return canvasTexture(128, 128, 3, (ctx, w, h, rand) => {
+    const cx = w / 2;
+    const cy = h / 2;
+    // Concrete chipped away round the hole: a pale, ragged crater.
+    ctx.fillStyle = "rgba(150,145,135,0.55)";
+    ctx.beginPath();
+    for (let i = 0; i <= 18; i++) {
+      const a = (i / 18) * Math.PI * 2;
+      const r = 22 + rand() * 18;
+      if (i === 0) ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      else ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    }
+    ctx.fill();
+    // Scorch and powder burn.
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 34);
     g.addColorStop(0, "rgba(0,0,0,1)");
-    g.addColorStop(0.2, "rgba(10,8,6,0.95)");
-    g.addColorStop(0.45, "rgba(30,28,24,0.5)");
+    g.addColorStop(0.28, "rgba(8,6,5,0.98)");
+    g.addColorStop(0.55, "rgba(30,26,22,0.6)");
     g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = "rgba(0,0,0,0.6)";
-    for (let i = 0; i < 6; i++) {
-      const a = rand() * Math.PI * 2;
+    // Cracks running out from it.
+    ctx.strokeStyle = "rgba(10,8,6,0.75)";
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 7; i++) {
+      let x = cx;
+      let y = cy;
+      let a = rand() * Math.PI * 2;
       ctx.beginPath();
-      ctx.moveTo(w / 2, h / 2);
-      ctx.lineTo(w / 2 + Math.cos(a) * 20, h / 2 + Math.sin(a) * 20);
+      ctx.moveTo(x, y);
+      for (let k = 0; k < 4; k++) {
+        a += (rand() - 0.5) * 0.9;
+        x += Math.cos(a) * (8 + rand() * 10);
+        y += Math.sin(a) * (8 + rand() * 10);
+        ctx.lineTo(x, y);
+      }
       ctx.stroke();
+    }
+  });
+}
+
+/** Blood thrown against a wall: a ragged splash, spatter round it, and runs. */
+export function bloodSplatTexture(): THREE.CanvasTexture {
+  return canvasTexture(256, 256, 11, (ctx, w, h, rand) => {
+    const blob = (x: number, y: number, r: number, a: number) => {
+      ctx.fillStyle = `rgba(${48 + rand() * 30},4,3,${a})`;
+      ctx.beginPath();
+      for (let i = 0; i <= 14; i++) {
+        const t = (i / 14) * Math.PI * 2;
+        const rr = r * (0.7 + rand() * 0.5);
+        if (i === 0) ctx.moveTo(x + Math.cos(t) * rr, y + Math.sin(t) * rr);
+        else ctx.lineTo(x + Math.cos(t) * rr, y + Math.sin(t) * rr);
+      }
+      ctx.fill();
+    };
+    blob(w / 2, h / 2, 48, 0.92);
+    for (let i = 0; i < 9; i++) blob(w / 2 + (rand() - 0.5) * 120, h / 2 + (rand() - 0.5) * 120, 8 + rand() * 18, 0.85);
+    for (let i = 0; i < 60; i++) {
+      const a = rand() * Math.PI * 2;
+      const d = 40 + rand() * 80;
+      blob(w / 2 + Math.cos(a) * d, h / 2 + Math.sin(a) * d, 1.5 + rand() * 4, 0.8);
+    }
+    // Runs, down the wall.
+    for (let i = 0; i < 5; i++) {
+      const x = w / 2 + (rand() - 0.5) * 70;
+      ctx.fillStyle = "rgba(55,5,4,0.85)";
+      ctx.fillRect(x, h / 2, 3 + rand() * 3, 30 + rand() * 80);
     }
   });
 }
@@ -863,6 +915,7 @@ function buildAll() {
     glow: glowTexture(),
     flash: flashTexture(),
     bulletHole: bulletHoleTexture(),
+    bloodSplat: bloodSplatTexture(),
     medkit: medkitTexture(),
     paper: paperTexture(),
     veins: veinTexture(),
