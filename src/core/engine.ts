@@ -3,6 +3,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import type { QualityPreset } from "./quality";
 
 /**
@@ -16,8 +17,9 @@ const PostShader = {
     uTime: { value: 0 },
     uDamage: { value: 0 }, // 0..1, spikes on hit and decays
     uLowHealth: { value: 0 }, // 0..1, persistent
-    uGrain: { value: 0.045 },
+    uGrain: { value: 0.06 },
     uFilm: { value: 1 }, // 0 turns off grain and the resting chromatic aberration (quality)
+    uBars: { value: 0 }, // 0..1: cinema bars top and bottom (the menu)
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -33,6 +35,7 @@ const PostShader = {
     uniform float uLowHealth;
     uniform float uGrain;
     uniform float uFilm;
+    uniform float uBars;
     varying vec2 vUv;
 
     float hash(vec2 p) {
@@ -60,13 +63,28 @@ const PostShader = {
       col += vec3(0.25, 0.0, 0.0) * uDamage * smoothstep(0.2, 0.75, d);
       col += vec3(0.12, 0.0, 0.0) * uLowHealth * smoothstep(0.3, 0.8, d) * (0.6 + 0.4 * sin(uTime * 5.0));
 
+      // The grade: colour drained, blacks crushed, shadows pushed cold and
+      // green, highlights a dirty warm. Old film stock, not a cartoon.
+      float l2 = dot(col, vec3(0.299, 0.587, 0.114));
+      col = mix(vec3(l2), col, 0.72);
+      col = max(col - 0.015, 0.0) * 1.03;
+      vec3 sc = clamp(col, 0.0, 1.0);
+      col = mix(col, sc * sc * (3.0 - 2.0 * sc), 0.35);
+      float shadowAmt = 1.0 - smoothstep(0.0, 0.32, l2);
+      col += vec3(-0.006, 0.006, 0.01) * shadowAmt;
+      col *= mix(vec3(1.0), vec3(1.04, 1.0, 0.92), smoothstep(0.3, 0.9, l2));
+
       // Vignette
       float vig = smoothstep(0.85, 0.25, d);
-      col *= mix(0.35, 1.0, vig);
+      col *= mix(0.3, 1.0, vig);
 
       // Grain (animated)
       float g = hash(uv * vec2(1920.0, 1080.0) + fract(uTime * 13.7) * 100.0) - 0.5;
       col += g * uGrain * uFilm;
+
+      // Cinema bars.
+      float bar = 0.105 * uBars;
+      if (uv.y < bar || uv.y > 1.0 - bar) col = vec3(0.0);
 
       gl_FragColor = vec4(col, 1.0);
     }
@@ -99,11 +117,13 @@ export class Engine {
     this.renderer.toneMappingExposure = 1.15;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = false;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.composer.addPass(new RenderPass(this.scene, this.camera));
+    // Ambient occlusion goes in here (index 1) when the quality asks for it.
     const vm = new RenderPass(this.viewScene, this.camera);
     vm.clear = false;
     vm.clearDepth = true;
@@ -133,7 +153,29 @@ export class Engine {
     this.composer.setPixelRatio(ratio);
     this.composer.setSize(window.innerWidth, window.innerHeight);
     this.post.uniforms.uFilm.value = q.filmEffects ? 1 : 0;
+    this.shadowSize = q.shadows;
+    this.renderer.shadowMap.enabled = q.shadows > 0;
+    if (q.ao && !this.ao) {
+      this.ao = new GTAOPass(this.scene, this.camera, window.innerWidth, window.innerHeight);
+      this.ao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.5, thickness: 1.2, scale: 1.1, samples: 12 });
+      this.ao.blendIntensity = 0.9;
+      this.composer.insertPass(this.ao, 1);
+    } else if (!q.ao && this.ao) {
+      this.composer.removePass(this.ao);
+      this.ao.dispose();
+      this.ao = null;
+    }
   }
+
+  /** Flashlight shadow map size for the current quality (0: none). */
+  shadowSize = 0;
+  private ao: GTAOPass | null = null;
+
+  /** Cinema bars top and bottom (the menu), eased in and out. */
+  setBars(on: boolean): void {
+    this.barsTarget = on ? 1 : 0;
+  }
+  private barsTarget = 0;
 
   setFov(fov: number): void {
     this.camera.fov = fov;
@@ -154,6 +196,8 @@ export class Engine {
   }
 
   render(): void {
+    const u = this.post.uniforms.uBars;
+    u.value += (this.barsTarget - u.value) * 0.08;
     this.composer.render();
   }
 

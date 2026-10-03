@@ -11,6 +11,7 @@ import { enemyDef } from "../content/enemies";
 import { planDressing } from "../world/dressing";
 import type { SceneKind } from "../world/storyScenes";
 import { hasLineOfSight, isSolid, worldToCell } from "../world/grid";
+import { castShadows, spotShadows } from "../core/shadows";
 
 /**
  * The places the menu drifts through, one slow shot each: the story told
@@ -147,6 +148,8 @@ export class MenuBackdrop {
     this.figure = buildBody(enemyDef("husk"));
     this.figure.group.visible = false;
     this.engine.scene.add(this.figure.group);
+    spotShadows(this.light, this.engine.shadowSize);
+    castShadows(this.engine.scene);
   }
 
   /** Puts the figure at the edge of the light, a few steps away, facing the camera. False if there's nowhere to stand. */
@@ -190,6 +193,7 @@ export class MenuBackdrop {
     this.updateGlimpse(dt);
     this.effects.update(dt, cam, 0.8, this.time);
     this.engine.setPostFx(0, 0, this.time);
+    this.engine.setBars(true);
   }
 
   /** The light stutters; in the dark the figure arrives, or goes. */

@@ -1,3 +1,4 @@
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import * as THREE from "three";
 import type { WeaponId } from "../content/weapons";
 import { textures } from "../fx/textures";
@@ -251,8 +252,10 @@ type Mats = Record<
   THREE.MeshStandardMaterial
 >;
 
+/** A part with its edges rounded off, like something machined or moulded, not a block. */
 function box(w: number, h: number, d: number, mat: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  const r = Math.min(w, h, d) * 0.22;
+  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, r), mat);
   m.position.set(x, y, z);
   return m;
 }
@@ -264,11 +267,30 @@ function cyl(r: number, len: number, mat: THREE.Material, x = 0, y = 0, z = 0, s
   return m;
 }
 
-/** Gloved hand on a grip + sleeve, shared by every weapon. */
+/** Gloved hand on a grip + sleeve, shared by every weapon: a palm, four fingers curled round the front of the grip, a thumb along the side. */
 function hand(g: THREE.Group, mats: Mats, gripY: number, gripZ: number, gripTilt: number): void {
-  const h = box(0.06, 0.07, 0.07, mats.glove, 0.004, gripY - 0.01, gripZ + 0.01);
+  const h = new THREE.Group();
+  h.position.set(0.004, gripY - 0.01, gripZ + 0.01);
   h.rotation.x = gripTilt;
   g.add(h);
+  h.add(box(0.05, 0.075, 0.05, mats.glove, 0.008, 0, 0.012)); // palm, wrapping the back of the grip
+  for (let i = 0; i < 4; i++) {
+    // Each finger in two bends, round the front of the grip.
+    const y = 0.026 - i * 0.019;
+    const len = i === 3 ? 0.02 : 0.026;
+    const a = new THREE.Mesh(new THREE.CapsuleGeometry(0.0085, len, 3, 8), mats.glove);
+    a.rotation.set(Math.PI / 2, 0, 0);
+    a.position.set(-0.018, y, -0.012);
+    h.add(a);
+    const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.008, len * 0.8, 3, 8), mats.glove);
+    b.rotation.set(0, 0, Math.PI / 2);
+    b.position.set(-0.004, y, -0.03);
+    h.add(b);
+  }
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.035, 3, 8), mats.glove);
+  thumb.rotation.set(-0.9, 0, 0.2);
+  thumb.position.set(-0.02, 0.04, 0.0);
+  h.add(thumb);
   // Bare wrist between glove and cuff.
   const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.032, 0.05, 12), mats.skin);
   wrist.position.set(0.018, gripY - 0.045, gripZ + 0.05);
@@ -286,6 +308,10 @@ function buildPistol(mats: Mats): GunModel {
   const slide = box(0.036, 0.034, 0.2, mats.metal, 0, 0.022, -0.02);
   g.add(slide);
   slide.add(box(0.006, 0.014, 0.04, mats.darkMetal, 0.018, 0.006, 0)); // ejection port
+  for (let i = 0; i < 7; i++) {
+    // Cocking serrations at the back of the slide.
+    slide.add(new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.022, 0.0025), mats.darkMetal).translateZ(0.06 + i * 0.006).translateY(-0.002));
+  }
   slide.add(box(0.03, 0.01, 0.01, mats.darkMetal, 0, 0.021, 0.09)); // rear sight
   slide.add(box(0.006, 0.012, 0.01, mats.darkMetal, 0, 0.022, -0.09)); // front sight
   slide.add(box(0.004, 0.004, 0.002, new THREE.MeshBasicMaterial({ color: 0x9dff9d }), 0, 0.026, -0.085));

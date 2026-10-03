@@ -1,5 +1,11 @@
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import * as THREE from "three";
 import type { LookDef } from "../content/characters";
+
+/** A box with softened edges: cloth, leather and moulded plastic, not blocks. */
+function rbox(w: number, h: number, d: number): THREE.BufferGeometry {
+  return new RoundedBoxGeometry(w, h, d, 2, Math.min(w, h, d) * 0.3);
+}
 
 /**
  * The co-op partner's body: a miner in a coverall and hi-vis vest with a
@@ -82,19 +88,19 @@ export function buildCharacter(look: LookDef): CharacterParts {
     const knee = new THREE.Group();
     knee.position.y = -0.45;
     knee.add(limb(0.075, 0.42, coverall));
-    const boot = mesh(new THREE.BoxGeometry(0.15, 0.12, 0.28), leather, 0, -0.41, -0.05);
+    const boot = mesh(rbox(0.15, 0.12, 0.28), leather, 0, -0.41, -0.05);
     knee.add(boot);
-    knee.add(mesh(new THREE.BoxGeometry(0.13, 0.13, 0.05), dark, 0, -0.02, -0.075)); // knee pad
+    knee.add(mesh(rbox(0.13, 0.13, 0.05), dark, 0, -0.02, -0.075)); // knee pad
     const tape = new THREE.CylinderGeometry(0.078, 0.074, 0.035, 12, 1, true);
     knee.add(mesh(tape, reflective, 0, -0.26, 0)); // tape round the shin
-    knee.add(mesh(new THREE.BoxGeometry(0.16, 0.03, 0.3), dark, 0, -0.465, -0.05)); // sole
+    knee.add(mesh(rbox(0.16, 0.03, 0.3), dark, 0, -0.465, -0.05)); // sole
     g.add(knee);
     hips.add(g);
     return g;
   };
   const legL = leg(-0.1 * s);
   const legR = leg(0.1 * s);
-  hips.add(mesh(new THREE.BoxGeometry(0.34 * s, 0.16, 0.22), coverall, 0, 0.96, 0)); // pelvis
+  hips.add(mesh(rbox(0.34 * s, 0.16, 0.22), coverall, 0, 0.96, 0)); // pelvis
 
   // --- torso: tapered chest, vest with reflective bands, belt, pack.
   const torso = new THREE.Group();
@@ -113,23 +119,23 @@ export function buildCharacter(look: LookDef): CharacterParts {
   const belt = new THREE.CylinderGeometry(0.17, 0.17, 0.05, 12);
   belt.scale(1, 1, 0.65);
   torso.add(mesh(belt, leather, 0, 0.04, 0));
-  torso.add(mesh(new THREE.BoxGeometry(0.06, 0.05, 0.02), mat(0x8a8a80, 0.4, { metalness: 0.7 }), 0, 0.04, -0.115)); // buckle
-  torso.add(mesh(new THREE.BoxGeometry(0.3 * s, 0.36, 0.13), dark, 0, 0.36, 0.17)); // pack
+  torso.add(mesh(rbox(0.06, 0.05, 0.02), mat(0x8a8a80, 0.4, { metalness: 0.7 }), 0, 0.04, -0.115)); // buckle
+  torso.add(mesh(rbox(0.3 * s, 0.36, 0.13), dark, 0, 0.36, 0.17)); // pack
   for (const x of [-1, 1]) {
     // Pack straps over the shoulders, and a chest pocket each side.
-    const strap = mesh(new THREE.BoxGeometry(0.035, 0.42, 0.012), leather, x * 0.1 * s, 0.37, -0.128);
+    const strap = mesh(rbox(0.035, 0.42, 0.012), leather, x * 0.1 * s, 0.37, -0.128);
     strap.rotation.z = x * 0.08;
     torso.add(strap);
-    torso.add(mesh(new THREE.BoxGeometry(0.075, 0.07, 0.015), vest, x * 0.1 * s, 0.33, -0.137));
+    torso.add(mesh(rbox(0.075, 0.07, 0.015), vest, x * 0.1 * s, 0.33, -0.137));
     // Tape crossed on the back of the pack, so you know them from behind too.
-    const cross = mesh(new THREE.BoxGeometry(0.34 * s, 0.03, 0.01), reflective, 0, 0.36, 0.237);
+    const cross = mesh(rbox(0.34 * s, 0.03, 0.01), reflective, 0, 0.36, 0.237);
     cross.rotation.z = x * 0.8;
     torso.add(cross);
   }
   const collar = new THREE.TorusGeometry(0.075, 0.022, 6, 14);
   collar.rotateX(Math.PI / 2);
   torso.add(mesh(collar, coverall, 0, 0.64, 0));
-  torso.add(mesh(new THREE.BoxGeometry(0.05, 0.05, 0.03), mat(0x2a5a2a, 0.5, { emissive: 0x0a3a0a }), 0.1, 0.5, -0.12)); // radio
+  torso.add(mesh(rbox(0.05, 0.05, 0.03), mat(0x2a5a2a, 0.5, { emissive: 0x0a3a0a }), 0.1, 0.5, -0.12)); // radio
   for (const x of [-1, 1]) torso.add(mesh(new THREE.SphereGeometry(0.075, 10, 8), coverall, x * 0.2 * s, 0.56, 0)); // shoulders
 
   // --- head: neck, face, eyes, nose, ears, hair, hard hat.
@@ -145,7 +151,7 @@ export function buildCharacter(look: LookDef): CharacterParts {
   for (const x of [-1, 1]) {
     head.add(mesh(new THREE.SphereGeometry(0.016, 8, 6), eyeWhite, x * 0.036, 0.145, -0.088));
     head.add(mesh(new THREE.SphereGeometry(0.009, 8, 6), iris, x * 0.036, 0.145, -0.1));
-    head.add(mesh(new THREE.BoxGeometry(0.04, 0.008, 0.01), hair, x * 0.037, 0.172, -0.095)); // brow
+    head.add(mesh(rbox(0.04, 0.008, 0.01), hair, x * 0.037, 0.172, -0.095)); // brow
     const ear = mesh(new THREE.SphereGeometry(0.022, 8, 6), skin, x * 0.095, 0.13, 0.005);
     ear.scale.set(0.5, 1, 0.8);
     head.add(ear);
@@ -153,7 +159,7 @@ export function buildCharacter(look: LookDef): CharacterParts {
   const nose = mesh(new THREE.ConeGeometry(0.018, 0.045, 6), skin, 0, 0.12, -0.105);
   nose.rotation.x = -Math.PI / 2 + 0.3;
   head.add(nose);
-  head.add(mesh(new THREE.BoxGeometry(0.04, 0.006, 0.01), mat(0x5a2a24, 0.6), 0, 0.078, -0.085)); // mouth
+  head.add(mesh(rbox(0.04, 0.006, 0.01), mat(0x5a2a24, 0.6), 0, 0.078, -0.085)); // mouth
 
   // Hair: a cap over the crown, tilted so it sits high on the forehead and low at the back.
   const crown = (theta: number) => {
@@ -172,7 +178,7 @@ export function buildCharacter(look: LookDef): CharacterParts {
     head.add(tailRoot);
     head.add(mesh(new THREE.SphereGeometry(0.03, 8, 6), hair, 0, 0.155, 0.105)); // tie
     for (const x of [-1, 1]) {
-      const side = mesh(new THREE.BoxGeometry(0.02, 0.09, 0.07), hair, x * 0.088, 0.12, 0.02); // hair over the ears
+      const side = mesh(rbox(0.02, 0.09, 0.07), hair, x * 0.088, 0.12, 0.02); // hair over the ears
       head.add(side);
     }
   }
@@ -189,8 +195,8 @@ export function buildCharacter(look: LookDef): CharacterParts {
   const brim = new THREE.CylinderGeometry(0.16, 0.16, 0.015, 18);
   brim.scale(1, 1, 1.15);
   head.add(mesh(brim, helmet, 0, 0.2, -0.015));
-  head.add(mesh(new THREE.BoxGeometry(0.02, 0.03, 0.26), helmet, 0, 0.31, 0)); // ridge
-  head.add(mesh(new THREE.BoxGeometry(0.07, 0.05, 0.04), dark, 0, 0.25, -0.15)); // lamp housing
+  head.add(mesh(rbox(0.02, 0.03, 0.26), helmet, 0, 0.31, 0)); // ridge
+  head.add(mesh(rbox(0.07, 0.05, 0.04), dark, 0, 0.25, -0.15)); // lamp housing
   torso.add(head);
 
   // --- arms: shoulder to elbow to hands on the gun, pointing where they look.
@@ -205,14 +211,14 @@ export function buildCharacter(look: LookDef): CharacterParts {
     arms.add(mesh(new THREE.SphereGeometry(0.055, 10, 8), coverall, elbow.x, elbow.y, elbow.z));
     // A band of tape round each upper arm.
     arms.add(segment(shoulder.clone().lerp(elbow, 0.45), shoulder.clone().lerp(elbow, 0.62), 0.066, reflective));
-    const hand = mesh(new THREE.BoxGeometry(0.065, 0.085, 0.08), glove, x * 0.035, -0.07, -0.47);
+    const hand = mesh(rbox(0.065, 0.085, 0.08), glove, x * 0.035, -0.07, -0.47);
     hand.rotation.x = 0.3;
     arms.add(hand);
   }
   const gun = new THREE.Group();
   gun.position.set(0, 0.0, -0.5);
-  gun.add(mesh(new THREE.BoxGeometry(0.05, 0.07, 0.32), dark));
-  gun.add(mesh(new THREE.BoxGeometry(0.045, 0.1, 0.05), dark, 0, -0.07, 0.08));
+  gun.add(mesh(rbox(0.05, 0.07, 0.32), dark));
+  gun.add(mesh(rbox(0.045, 0.1, 0.05), dark, 0, -0.07, 0.08));
   arms.add(gun);
   torso.add(arms);
 

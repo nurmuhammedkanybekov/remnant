@@ -703,6 +703,7 @@ export class Game {
     this.persistRun();
 
     this.backdrop = null;
+    this.engine.setBars(false);
     this.screens.hide();
     this.hud.hideTransient();
     const session = new LevelSession(

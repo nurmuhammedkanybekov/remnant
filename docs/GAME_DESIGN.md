@@ -211,10 +211,18 @@ or the exit.
   flashlight, which is near-invisible in these units — the main reason it
   rendered almost black.)
 - ACES filmic tone mapping, exposure 1.15, sRGB output.
-- **Post-processing** (`engine.ts`): world pass → viewmodel pass (depth
-  cleared, so the gun never clips into walls) → output pass → a custom
-  shader with film grain, vignette, chromatic aberration that spikes when
-  you're hit, and red-tinted desaturation as health drops below 40%.
+- **Shadows**: the flashlight casts them (soft PCF; 1024 on Medium, 2048 on
+  High, none on Low), and everything solid casts and catches them
+  (`core/shadows.ts`; glass, water, decals and glows are left out). Shadows
+  are drawn from the faces turned towards the light, so walking into a prop
+  (they don't block you) doesn't snuff your light out.
+- **Post-processing** (`engine.ts`): world pass → ambient occlusion (GTAO,
+  High only: corners and contact darken) → viewmodel pass (depth cleared, so
+  the gun never clips into walls) → output pass → a custom shader: a grade
+  (colour drained, blacks crushed, shadows cold and green, highlights a dirty
+  warm), film grain, vignette, chromatic aberration that spikes when you're
+  hit, red-tinted desaturation as health drops below 40%, and cinema bars
+  behind the menu.
 - **Light budget is fixed** so shaders never recompile mid-level: 1 hemisphere
   fill, 6 pooled lamp lights, 1 exit light, the flashlight, and a muzzle-flash
   light that is always present (intensity 0 when idle).
@@ -529,7 +537,8 @@ Hit-testing: ray vs. per-enemy spheres (head, chest, hips, legs) that follow
 the animated rig, clipped to the wall-hit distance. Feedback: hit marker
 (red for headshots, larger on kills), blood burst, hit sound, enemy flinch.
 
-The **viewmodels** are built from primitives: pistol and gloved hand, a
+The **viewmodels** are built from rounded parts (no razor edges) with a
+real gloved hand (palm, four curled fingers, thumb): pistol, a
 yellow rivet gun with a side strip and gas canister, and a pump shotgun
 whose forend racks after every shot. All share idle and mouse-lag sway, walk
 bob, recoil, a lowered pose while sprinting, a melee swing, and an
@@ -649,7 +658,18 @@ comes back after 25 s, so the fight can be slow but never unwinnable.
 
 ### Bodies & animation (`enemies/bodies.ts`)
 
-Each creature type has its own rig, all from primitives:
+Each creature type has its own rig. Humanoids are built from flesh, not
+primitives: every part is a lathe of a profile (`fleshTube`) or a welded
+icosphere (`fleshBlob`), its surface pushed in and out by 3D value noise so
+nothing is a clean sphere or tube and no two limbs match. Limbs are knotted
+at the joints and wasted between them, long enough to run into the next
+joint so no gap opens as they bend. The torso is starved: ribs and a
+knuckled spine pushed out through the skin, the belly sunken under the ribs,
+shoulder blades. The skull is long and narrow, higher at the back, with
+sockets sunk into it, a brow ridge and cheekbones; eyes are pinpricks deep
+in the sockets. The skin (`fleshMaterial`) is a dead grey-green that each
+kind's tint only leans, painted with bruising, veins, pores and grime, its
+creases pushed hard, with a soft sheen and a thin wet film.
 
 - **Humanoid**, pushed per type: the Husk's gaunt hunch; the Brute's width,
   fused shoulder masses and half-absorbed second face; the Listener's skull
@@ -1089,11 +1109,11 @@ See [`ROADMAP.md`](ROADMAP.md) for the full plan.
 1. **Pathfinding** is per-enemy BFS (fine at this scale — the Armory's 18
    rats included; switch to a shared flow field if enemy counts grow a lot).
 2. **Dead enemies never despawn** (fine without respawning).
-3. **No shadows**, deliberately, for integrated-GPU performance. Lamp light
-   passes through closed doors for the same reason.
-4. **Creatures are primitives.** Per-type rigs and glowing veins make them
-   readable in the dark, but a proper model pipeline (see the roadmap's
-   asset rule) would be the next step up.
+3. **Only the flashlight casts shadows.** Lamps don't (each would need a
+   cube shadow map), so lamp light passes through closed doors.
+4. **Creatures are generated, not sculpted.** Noise-deformed flesh reads as
+   flesh in the dark, but sculpted, rigged models would be the next step up
+   (the boss and the rats still use the older primitive bodies).
 5. **No touch input.** Touch-only devices are told so on the title screen.
 6. **Co-op** depends on free third-party services: Metered Realtime for
    matchmaking (with the relay it hands out) and, optionally, Metered's
