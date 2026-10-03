@@ -1,3 +1,4 @@
+import { beamMaterial, beamMesh } from "../fx/beams";
 import * as THREE from "three";
 import { textures } from "../fx/textures";
 import { isCharacterLook, LOOKS, type CharacterLook } from "../content/characters";
@@ -41,6 +42,7 @@ export class RemotePlayer {
   private head = new THREE.Group();
   private arms = new THREE.Group();
   private readonly lamp: THREE.SpotLight;
+  private readonly beam = beamMaterial(0xe8eeff, 0);
   private readonly lampTarget = new THREE.Object3D();
   private readonly lens: THREE.MeshBasicMaterial;
   private readonly flash: THREE.Sprite;
@@ -130,6 +132,11 @@ export class RemotePlayer {
     this.body.add(parts.hips, parts.torso);
     this.body.scale.setScalar(LOOKS[look].height);
     this.head.add(this.lamp, this.lampTarget, lensMesh(this.lens));
+    // Their beam, visible in the dust: you see where your partner is looking.
+    const beam = beamMesh(0.05, 1.5, 7, this.beam);
+    beam.rotation.x = Math.PI / 2;
+    beam.position.set(0, 0.25, -0.16 - 3.5);
+    this.head.add(beam);
     this.arms.add(this.flash, this.flashLight);
     this.tag.material.map?.dispose();
     this.tag.material.map = nameTexture(LOOKS[look].firstName, LOOKS[look].accent);
@@ -229,6 +236,7 @@ export class RemotePlayer {
 
     // --- lights
     this.lamp.intensity = s.torch * TORCH_INTENSITY;
+    this.beam.uniforms.uStrength.value = s.torch * 0.1;
     this.lens.color.setScalar(0.25 + s.torch * 0.75);
     this.muzzleTime -= dt;
     const firing = this.muzzleTime > 0;

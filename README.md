@@ -108,7 +108,8 @@ installs.
 **And the rest.** Three characters to play as (the radio and the notes call
 you by your own name), five difficulty modes, an inventory with a journal of
 every note you've found, cloud saves with Google sign-in, an online
-leaderboard of best times, full gamepad support, rebindable controls and
+leaderboard of best times, a brightness screen on first launch, graphics that
+step down by themselves if a laptop struggles, full gamepad support, rebindable controls and
 accessibility options.
 
 ## How to play
@@ -454,7 +455,7 @@ The game is then at http://localhost:5173. Other useful commands:
   session: joining with a code, shared doors and pickups, reviving, retrying,
   finishing a level together and leaving.
 
-There are 275 unit tests covering level validation, collision, pathfinding,
+There are 279 unit tests covering level validation, collision, pathfinding,
 movement, breathing, weapons, thrown bottles, creature AI, loot placement,
 room furnishing, co-op, save merging, cloud sync, the leaderboard, settings
 and more. Adding `?debug` to the URL exposes test hooks on `window.game`.

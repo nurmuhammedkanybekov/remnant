@@ -20,6 +20,10 @@ const CSS = /* css */ `
 
 /* ---- crosshair ---- */
 /* Inside a locker: dark steel, light only through the horizontal slats, edges in shadow. */
+/* Brightness calibration: three marks on true black. */
+.calib { display: flex; gap: 46px; justify-content: center; margin: 30px 0 26px; padding: 40px 60px; background: #000; }
+.calib i { width: 74px; height: 74px; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.calib-slider input { width: min(420px, 70vw); accent-color: #b8962a; }
 .slats { position: absolute; inset: 0; opacity: 0; transition: opacity .35s; pointer-events: none;
   background:
     radial-gradient(ellipse 46% 30% at 50% 47%, rgba(0,0,0,0) 0%, rgba(0,0,0,.55) 70%, rgba(0,0,0,.97) 100%),

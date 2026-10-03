@@ -20,6 +20,7 @@ const PostShader = {
     uGrain: { value: 0.06 },
     uFilm: { value: 1 }, // 0 turns off grain and the resting chromatic aberration (quality)
     uBars: { value: 0 }, // 0..1: cinema bars top and bottom (the menu)
+    uGamma: { value: 1 }, // the player's brightness: a gamma lift (raises the shadows, keeps black black)
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -36,6 +37,7 @@ const PostShader = {
     uniform float uGrain;
     uniform float uFilm;
     uniform float uBars;
+    uniform float uGamma;
     varying vec2 vUv;
 
     float hash(vec2 p) {
@@ -81,6 +83,9 @@ const PostShader = {
       // Grain (animated)
       float g = hash(uv * vec2(1920.0, 1080.0) + fract(uTime * 13.7) * 100.0) - 0.5;
       col += g * uGrain * uFilm;
+
+      // The player's brightness.
+      col = pow(max(col, 0.0), vec3(1.0 / uGamma));
 
       // Cinema bars.
       float bar = 0.105 * uBars;
@@ -159,6 +164,23 @@ export class Engine {
       this.ao = new GTAOPass(this.scene, this.camera, window.innerWidth, window.innerHeight);
       this.ao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.5, thickness: 1.2, scale: 1.1, samples: 12 });
       this.ao.blendIntensity = 0.9;
+      // Glows, sprites, particles and anything see-through would be drawn
+      // into the occlusion's depth and normals as solid quads, leaving dark
+      // squares round every eye and lamp halo: hide them for that pass.
+      const ao = this.ao;
+      const render = ao.render.bind(ao);
+      ao.render = (...args: Parameters<GTAOPass["render"]>) => {
+        const hidden: THREE.Object3D[] = [];
+        this.scene.traverseVisible((o) => {
+          const m = o as THREE.Mesh;
+          const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+          const seeThrough = mat && (Array.isArray(mat) ? mat.some((x) => x.transparent) : mat.transparent);
+          if ((o as THREE.Sprite).isSprite || (o as THREE.Points).isPoints || seeThrough) hidden.push(o);
+        });
+        for (const o of hidden) o.visible = false;
+        render(...args);
+        for (const o of hidden) o.visible = true;
+      };
       this.composer.insertPass(this.ao, 1);
     } else if (!q.ao && this.ao) {
       this.composer.removePass(this.ao);
@@ -170,6 +192,11 @@ export class Engine {
   /** Flashlight shadow map size for the current quality (0: none). */
   shadowSize = 0;
   private ao: GTAOPass | null = null;
+
+  /** The player's brightness setting: a gamma lift in the final pass. */
+  setBrightness(b: number): void {
+    this.post.uniforms.uGamma.value = b;
+  }
 
   /** Cinema bars top and bottom (the menu), eased in and out. */
   setBars(on: boolean): void {

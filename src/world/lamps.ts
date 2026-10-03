@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { WALL_HEIGHT } from "./grid";
 import type { LampFixture } from "./levelBuilder";
 import type { LampSpawn } from "./levelParser";
+import { beamMaterial, beamMesh } from "../fx/beams";
 
 const DEFAULT_POOL_SIZE = 6;
 const MAX_LIGHT_DIST = 26;
@@ -20,6 +21,8 @@ interface Lamp {
   disturbed: boolean;
   /** Shot out: dark for the rest of the level. */
   broken: boolean;
+  /** The cone of light it throws down through the dust. */
+  beam: THREE.ShaderMaterial | null;
 }
 
 /** Lamps within this distance (world units) of a creature stutter. */
@@ -47,7 +50,15 @@ export class LampSystem {
       baseColor: new THREE.Color(spawn.color),
       disturbed: false,
       broken: false,
+      beam: fixtures[i] ? beamMaterial(spawn.color, 0) : null,
     }));
+    for (const l of this.lamps) {
+      if (!l.beam) continue;
+      const h = WALL_HEIGHT - 0.12;
+      const cone = beamMesh(0.5, 1.9, h, l.beam);
+      cone.position.set(l.spawn.pos.x, h / 2, l.spawn.pos.y);
+      scene.add(cone);
+    }
     for (let i = 0; i < poolSize; i++) {
       const l = new THREE.PointLight(0xffffff, 0, 11, 1.6);
       l.position.set(0, -100, 0);
@@ -159,6 +170,7 @@ export class LampSystem {
       (lamp.fixture.mesh.material as THREE.MeshBasicMaterial).color.setRGB(0.05, 0.05, 0.05);
       lamp.fixture.halo.material.opacity = 0;
     }
+    if (lamp.beam) lamp.beam.uniforms.uStrength.value = 0;
     return new THREE.Vector3(lamp.spawn.pos.x, WALL_HEIGHT - 0.08, lamp.spawn.pos.y);
   }
 
@@ -166,5 +178,6 @@ export class LampSystem {
     if (!lamp.fixture) return;
     (lamp.fixture.mesh.material as THREE.MeshBasicMaterial).color.copy(lamp.baseColor).multiplyScalar(0.15 + lamp.brightness);
     lamp.fixture.halo.material.opacity = (lamp.spawn.emergency ? 0.5 : 0.35) * lamp.brightness;
+    if (lamp.beam) lamp.beam.uniforms.uStrength.value = (lamp.spawn.emergency ? 0.07 : 0.09) * lamp.brightness;
   }
 }

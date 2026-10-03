@@ -65,8 +65,8 @@ function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 }
 
-type NumericKey = "sensitivity" | "padSensitivity" | "fov" | "volume" | "musicVolume" | "hudScale";
-type ToggleKey = "invertY" | "reducedShake" | "colorBlind";
+type NumericKey = "sensitivity" | "padSensitivity" | "fov" | "volume" | "musicVolume" | "hudScale" | "brightness";
+type ToggleKey = "invertY" | "reducedShake" | "colorBlind" | "autoQuality";
 type CycleKey = "quality" | "subtitleSize" | "look" | "voice";
 
 /** Full-screen menus. Each method replaces whatever screen is showing. */
@@ -515,6 +515,45 @@ export class Screens {
 
   // ------------------------------------------------------------------ options
 
+  /**
+   * First launch: set the brightness so the darkness looks as it should.
+   * Three marks on black, each a little lighter; the left one should be only
+   * just visible. The preview goes through the same gamma curve as the game.
+   */
+  calibrate(value: number, onChange: (v: number) => void, onDone: () => void): void {
+    this.render(
+      `<h2>BRIGHTNESS</h2>
+       <div class="sub">Turn it up or down until the mark on the left is only just visible.<br>Most of this game happens in the dark.</div>
+       <svg width="0" height="0" style="position:absolute"><filter id="calib-gamma"><feComponentTransfer>
+         <feFuncR type="gamma" exponent="1"/><feFuncG type="gamma" exponent="1"/><feFuncB type="gamma" exponent="1"/>
+       </feComponentTransfer></filter></svg>
+       <div class="calib" style="filter:url(#calib-gamma)">${[0.018, 0.045, 0.1]
+         .map((l) => `<i style="background:rgb(${Math.round(l * 255)},${Math.round(l * 255)},${Math.round(l * 255)})"></i>`)
+         .join("")}</div>
+       <label class="calib-slider"><input type="range" min="0.6" max="1.8" step="0.02" value="${value}"></label>
+       <div class="note-line">← → or the slider · you can change it later in Settings</div>`,
+      [{ label: "Done", action: onDone, primary: true }],
+      false,
+      false,
+      "calibrate"
+    );
+    const input = this.root.querySelector<HTMLInputElement>(".calib-slider input")!;
+    const funcs = this.root.querySelectorAll("#calib-gamma feFuncR, #calib-gamma feFuncG, #calib-gamma feFuncB");
+    const apply = (v: number) => {
+      for (const f of funcs) f.setAttribute("exponent", String(1 / v));
+      onChange(v);
+    };
+    input.addEventListener("input", () => apply(Number(input.value)));
+    const keys = (e: KeyboardEvent) => {
+      if (e.code !== "ArrowLeft" && e.code !== "ArrowRight") return;
+      input.value = String(Number(input.value) + (e.code === "ArrowRight" ? 0.04 : -0.04));
+      apply(Number(input.value));
+    };
+    window.addEventListener("keydown", keys);
+    this.teardown = () => window.removeEventListener("keydown", keys);
+    apply(value);
+  }
+
   settings(settings: Settings, onChange: (s: Settings) => void, back: () => void): void {
     const slider = (label: string, key: NumericKey, min: number, max: number, step: number) =>
       `<label>${label} <input type="range" min="${min}" max="${max}" step="${step}" data-s="${key}"><output></output></label>`;
@@ -538,6 +577,8 @@ export class Screens {
          <section>
            <div class="group">DISPLAY</div>
            ${cycle("GRAPHICS QUALITY", "quality")}
+           ${toggle("ADJUST QUALITY AUTOMATICALLY", "autoQuality")}
+           ${slider("BRIGHTNESS", "brightness", 0.6, 1.8, 0.05)}
            ${slider("FIELD OF VIEW", "fov", 60, 100, 1)}
            ${slider("HUD SIZE", "hudScale", 0.8, 1.4, 0.05)}
            <div class="group">ACCESSIBILITY</div>
@@ -553,7 +594,11 @@ export class Screens {
       "settings"
     );
     const fmt = (k: NumericKey, v: number) =>
-      k === "volume" || k === "musicVolume" || k === "hudScale" ? `${Math.round(v * 100)}%` : k === "fov" ? `${v}°` : `${v.toFixed(2)}×`;
+      k === "volume" || k === "musicVolume" || k === "hudScale" || k === "brightness"
+        ? `${Math.round(v * 100)}%`
+        : k === "fov"
+          ? `${v}°`
+          : `${v.toFixed(2)}×`;
     this.root.querySelectorAll<HTMLInputElement>("input[data-s]").forEach((input) => {
       const key = input.dataset.s as NumericKey | ToggleKey;
       const out = input.nextElementSibling as HTMLOutputElement | null;
