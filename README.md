@@ -32,7 +32,8 @@ I built REMNANT from scratch in TypeScript and Three.js as a way to learn the
 parts of software I don't touch in backend work: real-time rendering, game AI,
 3D audio, networking and performance. There is no game engine underneath, and
 almost everything you see and hear (the creatures, the characters, the music,
-most of the sound) is generated in code.
+the acoustics of every room) is generated in code; the recorded sounds are
+public-domain field recordings.
 
 <table>
   <tr>
@@ -92,7 +93,8 @@ one that waits on the ceiling, one that imitates the voice on the radio. Some
 of them wander the whole level, and every so often one is drawn towards
 wherever you are, so nowhere stays safe for long. They are dark and hard
 to pick out until they are close, and their eyes only catch your light at
-short range. Lamps stutter when one is near, and your heart beats faster
+short range. You hear them before you see them: bare feet on concrete, in 3D
+on headphones, through the wall. Lamps stutter when one is near, and your heart beats faster
 when something is close that you can't see.
 
 **Scarce supplies.** Three weapons, silent takedowns from behind, and
@@ -455,7 +457,7 @@ The game is then at http://localhost:5173. Other useful commands:
   session: joining with a code, shared doors and pickups, reviving, retrying,
   finishing a level together and leaving.
 
-There are 279 unit tests covering level validation, collision, pathfinding,
+There are 280 unit tests covering level validation, collision, pathfinding,
 movement, breathing, weapons, thrown bottles, creature AI, loot placement,
 room furnishing, co-op, save merging, cloud sync, the leaderboard, settings
 and more. Adding `?debug` to the URL exposes test hooks on `window.game`.

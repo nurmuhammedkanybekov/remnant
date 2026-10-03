@@ -264,6 +264,8 @@ export class Game {
     this.endCoop();
     this.state = "menu";
     this.music.setMode("silent");
+    // Behind the menu: only the building, very quietly.
+    this.sound.setRoomTone(0.07, 0);
     this.hud.setVisible(false);
     this.hud.hideTransient();
     this.viewmodel.setVisible(false);
