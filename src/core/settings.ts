@@ -22,6 +22,12 @@ export interface Settings {
   fov: number;
   invertY: boolean;
   quality: QualityId;
+  /** Steps the graphics down by itself if the game runs slowly. */
+  autoQuality: boolean;
+  /** Gamma lift for dark screens, 0.6..1.8 (1 = as designed). */
+  brightness: number;
+  /** Set once the player has been through the brightness screen on first launch. */
+  calibrated: boolean;
   subtitleSize: SubtitleSize;
   /** Scales the HUD, 0.8..1.4. */
   hudScale: number;
@@ -46,6 +52,9 @@ export function defaultSettings(): Settings {
     fov: 75,
     invertY: false,
     quality: "high",
+    autoQuality: true,
+    brightness: 1,
+    calibrated: false,
     subtitleSize: "medium",
     hudScale: 1,
     reducedShake: false,
@@ -73,6 +82,9 @@ export function normalizeSettings(raw: unknown): Settings {
     fov: clamp(s.fov, 60, 100, d.fov),
     invertY: bool(s.invertY, d.invertY),
     quality: isQualityId(s.quality) ? s.quality : d.quality,
+    autoQuality: bool(s.autoQuality, d.autoQuality),
+    brightness: clamp(s.brightness, 0.6, 1.8, d.brightness),
+    calibrated: bool(s.calibrated, d.calibrated),
     subtitleSize: SUBTITLE_SIZES.includes(s.subtitleSize as SubtitleSize) ? (s.subtitleSize as SubtitleSize) : d.subtitleSize,
     hudScale: clamp(s.hudScale, 0.8, 1.4, d.hudScale),
     reducedShake: bool(s.reducedShake, d.reducedShake),

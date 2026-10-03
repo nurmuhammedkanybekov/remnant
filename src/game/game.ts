@@ -5,7 +5,8 @@ import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyDef, type DifficultyId }
 import { cloneBindings, DEFAULT_BINDINGS, keyLabel, type Action } from "../core/actions";
 import { ENDINGS, PROLOGUE, TRANSMISSIONS, type EndingId } from "../content/story";
 import { PAD, padLabel } from "../core/gamepad";
-import { QUALITY } from "../core/quality";
+import { QUALITY, QUALITY_ORDER } from "../core/quality";
+import { QualityGuard } from "../core/qualityGuard";
 import { Clock } from "../core/clock";
 import { Engine } from "../core/engine";
 import { Input } from "../core/input";
@@ -217,6 +218,7 @@ export class Game {
 
   /** Settings that change how the HUD and camera behave. */
   private applyDisplaySettings(): void {
+    this.engine.setBrightness(this.settings.brightness);
     setCharacter(this.settings.look);
     this.viewmodel.setSkin(LOOKS[this.settings.look].skin);
     this.hud.applyDisplay(this.settings.hudScale, this.settings.subtitleSize);
@@ -236,8 +238,25 @@ export class Game {
       this.sound.init();
       this.sound.setPaused(false);
       this.music.setMode("silent");
-      this.showMainMenu();
+      if (this.settings.calibrated) this.showMainMenu();
+      else this.showCalibration(() => this.showMainMenu());
     });
+  }
+
+  /** First launch: the brightness screen, before anything else. */
+  private showCalibration(done: () => void): void {
+    this.screens.calibrate(
+      this.settings.brightness,
+      (v) => {
+        this.settings.brightness = v;
+        this.engine.setBrightness(v);
+      },
+      () => {
+        this.settings.calibrated = true;
+        saveSettings(this.settings);
+        done();
+      }
+    );
   }
 
   private showMainMenu(): void {
@@ -704,6 +723,7 @@ export class Game {
 
     this.backdrop = null;
     this.engine.setBars(false);
+    this.qualityGuard.reset();
     this.screens.hide();
     this.hud.hideTransient();
     const session = new LevelSession(
@@ -1328,6 +1348,22 @@ export class Game {
     requestAnimationFrame(this.loop);
   };
 
+  /**
+   * The game is running slowly on this machine: take the graphics down a
+   * step (and say so), rather than let it stutter. Shadows and occlusion go
+   * first; Low keeps the game smooth on almost anything.
+   */
+  private lowerQuality(): void {
+    const i = QUALITY_ORDER.indexOf(this.settings.quality);
+    if (i <= 0) return;
+    this.settings.quality = QUALITY_ORDER[i - 1];
+    saveSettings(this.settings);
+    this.engine.setQuality(QUALITY[this.settings.quality]);
+    this.hud.prompt(`GRAPHICS SET TO ${QUALITY[this.settings.quality].name.toUpperCase()} TO KEEP IT SMOOTH — CHANGE IT IN SETTINGS`, 4);
+  }
+
+  private readonly qualityGuard = new QualityGuard();
+
   /** One tick of the game; `render` is false for background ticks (nobody's looking). */
   private frame(render: boolean): void {
     const dt = this.clock.tick();
@@ -1337,6 +1373,7 @@ export class Game {
     this.music.update(dt, this.state === "playing" ? (this.session?.threat ?? 0) : 0);
     this.input.endFrame();
     if (render) this.engine.render();
+    if (render && this.state === "playing" && this.settings.autoQuality && !this.debug && this.qualityGuard.frame(dt)) this.lowerQuality();
   }
 
   /**
