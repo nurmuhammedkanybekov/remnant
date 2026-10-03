@@ -21,32 +21,36 @@ In 1991 the Soviet deep-drilling station Object 9 "Zenit" was sealed and
 forgotten under the Tian Shan mountains. Eleven days ago a mining crew opened
 it again, and the shafts collapsed behind them.
 
-You are one of three survivors of the crew: Nur Kanybekov, a structural
-engineer; Raiymbek Asanov, a drilling foreman; or Nuraiza Akylbek, a field
-geologist. You wake up on the deepest sublevel with a pistol that isn't yours
-and a flashlight that is almost dead. The radio still works, and a calm voice on it offers to guide you to the
-surface, 2.4 km above. The things down there are blind, but they hear
-everything.
+You are one of three survivors: Nur Kanybekov, a structural engineer;
+Raiymbek Asanov, a drilling foreman; or Nuraiza Akylbek, a field geologist.
+You wake on the deepest sublevel with a pistol that isn't yours and a
+flashlight that is almost dead. The radio still works, and a calm voice on it
+offers to guide you to the surface, 2.4 km above. The things down there hear
+everything. Some of them see your light.
 
-I built REMNANT from scratch in TypeScript and Three.js as a way to learn the
-parts of software I don't touch in backend work: real-time rendering, game AI,
-3D audio, networking and performance. There is no game engine underneath, and
-almost everything you see and hear (the creatures, the characters, the music,
-the acoustics of every room) is generated in code; the recorded sounds are
-public-domain field recordings.
+I built REMNANT from scratch in TypeScript and Three.js to learn the parts of
+software I don't touch in backend work: real-time rendering, game AI, 3D
+audio, networking and performance. There is no game engine underneath.
+The creatures, the characters, the levels, the music and the acoustics of
+every room are generated in code; the recorded sounds and surface textures
+are public-domain.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/corridor.jpg" alt="A lamp-lit corridor in the maintenance wing"></td>
-    <td width="50%"><img src="docs/screenshots/creature.jpg" alt="A Brute in the armory, caught in the flashlight"></td>
+    <td width="50%"><img src="docs/screenshots/corridor.jpg" alt="Lamp light falling through the haze in a maintenance corridor"></td>
+    <td width="50%"><img src="docs/screenshots/husk.jpg" alt="A Husk caught in the flashlight, its shadow on the wall behind it"></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/characters.jpg" alt="Nur, Raiymbek and Nuraiza, the three playable characters"></td>
-    <td><img src="docs/screenshots/boss.jpg" alt="The Remnant, the boss of Sublevel 2"></td>
+    <td><img src="docs/screenshots/story-radio.jpg" alt="Ward 1: the crew's chairs in a circle round a radio that is still on"></td>
+    <td><img src="docs/screenshots/story-r7.jpg" alt="Sample R-7's cell in the containment labs, broken from the inside"></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/water.jpg" alt="The flooded pumping station"></td>
-    <td><img src="docs/screenshots/infirmary.jpg" alt="A ward in the infirmary"></td>
+    <td><img src="docs/screenshots/watcher.jpg" alt="A Watcher, the tall one that freezes in your light"></td>
+    <td><img src="docs/screenshots/creature.jpg" alt="A Brute in the dark"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/characters.jpg" alt="Nur, Raiymbek and Nuraiza with their name tags, as co-op partners see them"></td>
+    <td><img src="docs/screenshots/impacts.jpg" alt="Bullet holes and dust left on a wall"></td>
   </tr>
 </table>
 
@@ -62,40 +66,44 @@ public-domain field recordings.
 
 ## What's in the game
 
-**The campaign.** Ten hand-built levels, from the deepest sublevel up to the
-surface, with a story told over the radio, notes left by the people who were
-there before you, a three-phase boss and two endings. Every note answers a
-question the last one raised: why the station was sealed, who the voice on
-the radio really is, and what is waiting at the top, so the story comes
-together as you climb, and where each note was left, the place shows what it
-says: the bed you slept through it in, the radio with its plug pulled; R-7's
-cell, broken from the inside. The rooms have a purpose (wards, labs, freezers,
-pump halls, an armory with its racks nearly empty) and are furnished to
-match, with signs by their doors. Pipes painted to the Soviet colour code
-run the length of the corridors, frosted and hung with icicles in cold
-storage, and what the crew scrawled on the walls is still there. Every level
-hides a room behind a loose wall panel.
+**A story you piece together.** Ten hand-built levels climb from the deepest
+sublevel to the surface, ending in a three-phase boss and a choice between
+two endings. The story comes over the radio and through notes left by the
+people who were there before you, and each note answers a question the last
+one raised: why the station was sealed, who the voice on the radio really is,
+and what is waiting at the top. Where a note was left, the place shows what
+it says: the bed you slept through it all in, the radio with its plug pulled
+out, R-7's cell broken from the inside.
 
-**Stealth that matters.** The creatures are blind, but they hear everything.
-Every step makes noise, sprinting and wading make more, and a creature right
-beside you can hear you breathe, so you hold your breath while it walks past.
-Every level has lockers to hide in: inside, you watch through the slats
-while it searches. Anything that saw you climb in knows where you are.
-Your flashlight is the other half of it: turn it on in the dark and anything
-that sees the light comes for you straight away. A thrown bottle sends them
-somewhere else. Every shot leaves its mark: holes and chips of concrete that
-stay, dust hanging in the beam, blood on the wall behind what you hit, and
-a lamp shot out stays dark, and loud.
+**Places that were used.** Every room has a purpose (wards, labs, freezers,
+pump halls, an armory with its racks nearly empty) and is furnished to
+match, with a sign by its door. Pipes painted to the Soviet colour code run
+the length of the corridors, frosted and hung with icicles in cold storage.
+What the crew scrawled on the walls is still there, and every level hides a
+room behind a loose wall panel.
+
+**Stealth that matters.** Every step makes noise, sprinting and wading make
+more, and a creature right beside you can hear you breathe, so you hold your
+breath while it walks past. Turn your flashlight on in the dark and anything
+that sees it comes for you. Lockers let you hide and watch through the slats
+while something searches the room, but one that saw you climb in knows where
+you are. A thrown bottle sends them somewhere else.
 
 **Creatures that hunt.** Nine kinds, each designed to break a habit the
 previous one taught you: one that only hears, one that freezes in your light,
-one that waits on the ceiling, one that imitates the voice on the radio. Some
-of them wander the whole level, and every so often one is drawn towards
-wherever you are, so nowhere stays safe for long. They are dark and hard
-to pick out until they are close, and their eyes only catch your light at
-short range. You hear them before you see them: bare feet on concrete, in 3D
-on headphones, through the wall. Lamps stutter when one is near, and your heart beats faster
-when something is close that you can't see.
+one that waits on the ceiling, one that imitates the voice on the radio.
+Some wander the whole level, and every so often one is drawn towards
+wherever you are, so nowhere stays safe for long. You usually hear them
+first: bare feet on concrete, placed in 3D on headphones, muffled through the
+wall. Lamps stutter when one is near, and your heart beats faster when
+something is close that you can't see.
+
+**A world that reacts.** The flashlight throws real shadows, and a creature
+in your beam throws its own up the wall behind it. Every shot leaves a hole,
+chips of concrete and dust hanging in the light; blood stays on the wall
+behind what you hit; a lamp shot out stays dark, and the crash brings
+company. A gunshot is swallowed by a vent and rolls on and on in the pump
+hall, because each room's echo follows its size.
 
 **Scarce supplies.** Three weapons, silent takedowns from behind, and
 medkits you carry and use when you choose. Ammunition comes in small caches
@@ -103,16 +111,16 @@ spread across each level, so you find it by exploring.
 
 **Together.** Online co-op for two or three players with a room code, and
 voice chat that comes from where each player stands. Each character has
-their own helmet colour and reflective tape, and a name tag floats above
-every partner, so you can find each other in the dark. No accounts, no
+their own helmet colour, reflective tape and a name tag, and their torch
+shows as a beam, so you can find each other in the dark. No accounts, no
 installs.
 
 **And the rest.** Three characters to play as (the radio and the notes call
 you by your own name), five difficulty modes, an inventory with a journal of
 every note you've found, cloud saves with Google sign-in, an online
-leaderboard of best times, a brightness screen on first launch, graphics that
-step down by themselves if a laptop struggles, full gamepad support, rebindable controls and
-accessibility options.
+leaderboard of best times, a brightness screen on first launch, graphics
+that step down by themselves if a laptop struggles, full gamepad support,
+rebindable controls and accessibility options.
 
 ## How to play
 
@@ -380,23 +388,33 @@ two different builds refuse to connect instead of drifting apart.
 
 ### A few details I'm happy with
 
-- Changing the number of lights in Three.js recompiles shaders and causes a
-  stutter, so the level uses a fixed pool of lights that is reassigned to the
-  lamps nearest the player every frame. Co-op partners' headlamps exist from
-  the start of a level for the same reason.
-- On a guest's screen, creatures keep moving between the host's snapshots
-  at their last known speed, and a snapshot that arrives late is thrown away,
-  so a slow network doesn't make them stall or jump back.
-- With three players the host forwards one guest's voice to the other over
-  the same peer-to-peer connection, so voice chat needs no server.
-- One text grid drives the level geometry, collision, line of sight, bullet
-  raycasts and pathfinding.
-- Every level is checked by a validator that fails the build if an exit,
-  keycard or generator can't be reached.
-- Extra creatures, ammunition caches and bottles are placed by seeded
-  algorithms, so every co-op player gets exactly the same level.
-- Saves are versioned and validated field by field. Old saves are migrated,
-  broken values are repaired, and the game still runs if storage is blocked.
+- **Creatures are grown, not modelled.** Each body part is a lathe of a
+  profile or a welded sphere pushed out of shape by 3D noise, so limbs are
+  knotted at the joints and wasted between them, ribs and spine push through
+  a starved torso, and no two creatures of a kind are quite the same.
+- **Light without a light budget.** Changing the number of lights in Three.js
+  recompiles shaders and stutters, so the level uses a fixed pool of lights
+  handed to the lamps nearest you every frame. Only the flashlight casts
+  shadows; the lamps' light cones in the dust are faked with one additive
+  cone each.
+- **Sound you can place.** Everything is panned in 3D (HRTF), and two
+  generated reverbs, a tight duct and a big concrete hall, are crossfaded by
+  how open the space around you is, measured with eight rays twice a second.
+- **It looks after itself.** The game watches its own frame rate and steps
+  the graphics down if a laptop can't keep up, rather than stutter.
+- **One text grid** drives the level geometry, collision, line of sight,
+  bullet raycasts, pathfinding, set dressing and the story scenes. Every
+  level is checked by a validator that fails the build if an exit, keycard
+  or generator can't be reached.
+- **Co-op that survives real networks.** On a guest's screen creatures keep
+  moving between the host's snapshots at their last known speed and late
+  snapshots are thrown away; with three players the host forwards one
+  guest's voice to the other over the same peer-to-peer connection, so voice
+  chat needs no server. Everything random is seeded, so every player gets
+  exactly the same level.
+- **Saves are versioned and validated field by field.** Old saves are
+  migrated, broken values are repaired, and the game still runs if storage
+  is blocked.
 
 ### Project layout
 
@@ -405,13 +423,14 @@ src/
   game/      app shell, level session, co-op partner, saves
   net/       matchmaking, WebRTC link, relay, voice, cloud saves, leaderboard
   content/   creatures, weapons, items, difficulty, characters
-  world/     level format, parser, validator, builder, grid, pathfinding
+  world/     level format, parser, validator, builder, grid, pathfinding,
+             set dressing, story scenes
   enemies/   AI, creature bodies, boss, projectiles
   items/     pickups, thrown bottles
   player/    input commands, movement, breathing, flashlight, health
   weapons/   weapon logic, first-person models
-  core/      renderer, input, gamepad, settings
-  fx/        textures, particles
+  core/      renderer, shadows, quality presets and guard, input, settings
+  fx/        textures, particles, light beams
   audio/     sound engine, samples, adaptive music
   ui/        HUD, menus, inventory
 ```
