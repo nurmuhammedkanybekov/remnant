@@ -326,6 +326,15 @@ the consortium's) and, from ventilation on, what the crew scrawled
 ("НЕ ОТВЕЧАЙ ГОЛОСУ", "IT KNOWS YOUR NAME"); floors have papers, stains
 and frost.
 
+**Story scenes** (`world/storyScenes.ts`, listed in docs/STORY.md). Every
+note has a hand-built scene around it showing what it says, and some rooms
+have one the notes don't mention. A note's scene stands against a wall of
+its cell (or the nearest cell that has one), in its own frame with the
+wall at +Z, and stays out of the middle of the cell where the note lies;
+the random dressing leaves scene cells alone. Documents and wall writing
+are canvas textures; writing on the wall is transparent and offset so it
+sits on the plates.
+
 Planned purely and seeded (the same for every co-op player), built as one
 merged mesh per material (posters and scrawls per texture): about 15–25
 draw calls and 15–200k triangles a level. Props stand against walls and
