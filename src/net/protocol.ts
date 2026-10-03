@@ -115,7 +115,7 @@ export type SessionMsg =
   | { t: "bossPhase"; phase: number }
   | { t: "bossDead" }
   // --- combat (both ways)
-  | { t: "shot"; w: WeaponId; walls: number[][]; blood: number[][] }
+  | { t: "shot"; w: WeaponId; walls: number[][]; blood: number[][]; lamps?: number[] }
   /** Guest → host. */
   | { t: "noise"; x: number; z: number; r: number }
   | { t: "hit"; i: number; dmg: number; part: "head" | "body"; x: number; z: number }

@@ -18,6 +18,8 @@ interface Lamp {
   baseColor: THREE.Color;
   /** A creature is close: it's stuttering. */
   disturbed: boolean;
+  /** Shot out: dark for the rest of the level. */
+  broken: boolean;
 }
 
 /** Lamps within this distance (world units) of a creature stutter. */
@@ -44,6 +46,7 @@ export class LampSystem {
       phase: Math.random() * Math.PI * 2,
       baseColor: new THREE.Color(spawn.color),
       disturbed: false,
+      broken: false,
     }));
     for (let i = 0; i < poolSize; i++) {
       const l = new THREE.PointLight(0xffffff, 0, 11, 1.6);
@@ -60,6 +63,7 @@ export class LampSystem {
    */
   update(dt: number, player: THREE.Vector3, time: number, creatures: readonly THREE.Vector2[] = []): void {
     for (const lamp of this.lamps) {
+      if (lamp.broken) continue;
       lamp.timer -= dt;
       const near = creatures.some((c) => Math.hypot(c.x - lamp.spawn.pos.x, c.y - lamp.spawn.pos.y) < DISTURB_RADIUS);
       if (near) {
@@ -104,6 +108,7 @@ export class LampSystem {
 
     // Assign pooled lights to the nearest lamps.
     const sorted = this.lamps
+      .filter((l) => !l.broken)
       .map((l) => ({ l, d: Math.hypot(l.spawn.pos.x - player.x, l.spawn.pos.y - player.z) }))
       .filter((x) => x.d < MAX_LIGHT_DIST)
       .sort((a, b) => a.d - b.d);
@@ -121,6 +126,40 @@ export class LampSystem {
       const fade = THREE.MathUtils.clamp((MAX_LIGHT_DIST - d) / 6, 0, 1);
       light.intensity = (l.spawn.emergency ? 14 : 18) * l.brightness * fade;
     }
+  }
+
+  /**
+   * The lamp a ray hits first (its fixture under the ceiling), within
+   * `maxDist`: its index, the point and the distance. Lamps already shot out
+   * don't count.
+   */
+  raycast(ray: THREE.Ray, maxDist: number): { index: number; point: THREE.Vector3; distance: number } | null {
+    let best: { index: number; point: THREE.Vector3; distance: number } | null = null;
+    const box = new THREE.Box3();
+    const hit = new THREE.Vector3();
+    this.lamps.forEach((l, index) => {
+      if (l.broken) return;
+      const { x, y } = l.spawn.pos;
+      box.min.set(x - 0.75, WALL_HEIGHT - 0.14, y - 0.22);
+      box.max.set(x + 0.75, WALL_HEIGHT, y + 0.22);
+      if (!ray.intersectBox(box, hit)) return;
+      const distance = hit.distanceTo(ray.origin);
+      if (distance <= maxDist && (!best || distance < best.distance)) best = { index, point: hit.clone(), distance };
+    });
+    return best;
+  }
+
+  /** Shoots a lamp out: the tube goes dark for the rest of the level. Returns where it was, or null if it already was. */
+  breakLamp(index: number): THREE.Vector3 | null {
+    const lamp = this.lamps[index];
+    if (!lamp || lamp.broken) return null;
+    lamp.broken = true;
+    lamp.brightness = 0;
+    if (lamp.fixture) {
+      (lamp.fixture.mesh.material as THREE.MeshBasicMaterial).color.setRGB(0.05, 0.05, 0.05);
+      lamp.fixture.halo.material.opacity = 0;
+    }
+    return new THREE.Vector3(lamp.spawn.pos.x, WALL_HEIGHT - 0.08, lamp.spawn.pos.y);
   }
 
   private paint(lamp: Lamp): void {

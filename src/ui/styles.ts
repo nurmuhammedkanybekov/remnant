@@ -8,13 +8,15 @@ const CSS = /* css */ `
   --ui-amber: #e2b04a;
   --ui-green: #6fdc8c;
   --ui-blue: #7fd0f0;
-  --font-display: "Oswald", "Arial Narrow", Impact, sans-serif;
-  --font-mono: "Share Tech Mono", "Courier New", monospace;
-  --font-type: "Special Elite", "Courier New", monospace;
+  --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-mono: "PT Mono", "Courier New", monospace;
+  --font-type: "PT Mono", "Courier New", monospace;
 }
 
 .hud { position: absolute; inset: 0; pointer-events: none; user-select: none;
-  color: var(--ui-fg); font-family: var(--font-mono); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+  color: var(--ui-fg); font-family: var(--font-mono); text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+  /* Cormorant's default figures are old-style (10 reads as "IO"): use lining ones everywhere. */
+  font-variant-numeric: lining-nums; }
 
 /* ---- crosshair ---- */
 .xhair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transition: opacity .15s; }
@@ -83,7 +85,7 @@ const CSS = /* css */ `
 
 /* ---- ammo ---- */
 .ammo { position: absolute; right: 30px; bottom: 24px; text-align: right; }
-.ammo .mag { font-family: var(--font-display); font-size: 54px; line-height: 1; font-weight: 500; }
+.ammo .mag { font-family: var(--font-mono); font-size: 48px; line-height: 1; font-weight: 700; }
 .ammo .mag.empty { color: var(--ui-red); }
 .ammo .res { font-size: 18px; color: var(--ui-dim); margin-left: 6px; }
 .ammo .pips { display: flex; gap: 3px; justify-content: flex-end; margin-top: 6px; }
@@ -175,14 +177,14 @@ const CSS = /* css */ `
   background: radial-gradient(ellipse at center, rgba(8,8,10,.55) 0%, rgba(0,0,0,.92) 85%); }
 .screen.show { display: flex; animation: fadein .35s ease; }
 .screen.opaque { background: radial-gradient(ellipse at center, rgba(12,10,10,.85), #000 80%); }
-.screen h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(56px, 11vw, 124px); letter-spacing: .28em;
+.screen h1 { font-family: var(--font-display); font-weight: 400; animation: dying 11s linear infinite; font-size: clamp(56px, 11vw, 124px); letter-spacing: .28em;
   margin: 0 0 4px .28em; line-height: 1; color: #efe9dc; text-shadow: 0 0 30px rgba(216,67,47,.25); animation: flicker 6s infinite; }
 .screen h2 { font-family: var(--font-display); font-weight: 400; font-size: clamp(34px, 6vw, 60px); letter-spacing: .2em; margin: 0 0 8px .2em; }
 .screen h2.red { color: var(--ui-red); text-shadow: 0 0 24px rgba(216,67,47,.5); }
 .screen .tag { font-size: 13px; letter-spacing: 6px; color: var(--ui-dim); margin-bottom: 42px; }
 .screen .sub { font-size: 14px; color: var(--ui-dim); max-width: 520px; line-height: 1.7; margin-bottom: 30px; white-space: pre-line; }
 .menu { display: flex; flex-direction: column; gap: 6px; min-width: 260px; }
-.menu button { font-family: var(--font-display); font-size: 20px; letter-spacing: 6px; text-transform: uppercase; color: var(--ui-dim);
+.menu button { font-family: var(--font-display); font-weight: 600; font-size: 23px; letter-spacing: 6px; text-transform: uppercase; color: var(--ui-dim);
   background: none; border: none; padding: 8px 20px; cursor: pointer; position: relative; transition: color .15s, letter-spacing .2s; }
 .menu button:hover, .menu button:focus-visible { color: #fff; letter-spacing: 8px; outline: none; }
 .menu button:hover::before, .menu button:focus-visible::before { content: "›"; position: absolute; left: 12px; color: var(--ui-red); }
@@ -196,7 +198,7 @@ const CSS = /* css */ `
 .code-input:focus { border-color: var(--ui-green); }
 .screen .sub.err { color: var(--ui-red); min-height: 1.7em; margin-bottom: 18px; }
 .story { width: min(620px, 88vw); text-align: left; margin: 6px 0 30px; }
-.story p { font-family: "Special Elite", var(--font-mono); font-size: 15px; line-height: 1.75; color: rgba(232,226,214,.88); margin: 0 0 16px;
+.story p { font-family: var(--font-type); font-size: 15px; line-height: 1.75; color: rgba(232,226,214,.88); margin: 0 0 16px;
   opacity: 0; animation: storyin 1.4s ease forwards; }
 @keyframes storyin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .menu.row { flex-direction: row; gap: 18px; }
@@ -239,6 +241,10 @@ const CSS = /* css */ `
 
 /* ---- title ---- */
 .screen.title h1 { font-size: clamp(64px, 13vw, 150px); }
+/* The title's lamp is dying: now and then it drops out for a moment. */
+@keyframes dying { 0%, 61%, 63.5%, 65%, 88%, 88.6%, 100% { opacity: 1; } 62% { opacity: .25; } 64% { opacity: .55; } 88.3% { opacity: .1; } }
+.screen .quote { font-family: var(--font-display); font-style: italic; font-size: clamp(17px, 1.8vw, 22px); color: rgba(232,226,214,.62);
+  letter-spacing: .04em; margin: -18px 0 8px; animation: storyin 2.4s ease 1.2s both; }
 .screen .press { margin-top: 34px; font-size: 13px; letter-spacing: 6px; color: var(--ui-dim); animation: pulse 1.8s ease-in-out infinite; }
 
 /* ---- main menu ---- */

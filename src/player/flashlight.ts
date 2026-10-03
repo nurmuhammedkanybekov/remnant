@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 export const MAX_BATTERY = 100;
-const DRAIN_PER_SEC = 1.7; // ~60s of light from full
+const DRAIN_PER_SEC = 0.55; // ~3 minutes of light from full: enough that the battery is a worry, not a chore
 const RECHARGE_PER_SEC = 0.8; // passive trickle while off...
 const RECHARGE_CAP = 30; // ...but only up to this — real charge comes from batteries
 const LOW_BATTERY_THRESHOLD = 20;

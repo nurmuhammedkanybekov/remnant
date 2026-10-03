@@ -12,6 +12,16 @@ export interface EnemyHit {
   headshot: boolean;
 }
 
+/** A creature this close is heard through anything; this far, seen if nothing's in the way. */
+const HEAR_RANGE = 5;
+const SEE_RANGE = 24;
+
+/** Could a player at `from` know about something at `at`: close enough to hear, or in plain sight? */
+export function canPerceive(level: LevelGrid, from: THREE.Vector2, at: THREE.Vector2): boolean {
+  const d = at.distanceTo(from);
+  return d <= HEAR_RANGE || (d <= SEE_RANGE && hasLineOfSight(level, from, at));
+}
+
 export class EnemyManager {
   readonly enemies: Enemy[] = [];
   /** Called for every enemy, including ones spawned mid-level, so the session can wire up its callbacks. */
@@ -106,6 +116,25 @@ export class EnemyManager {
     let t = 0;
     for (const e of this.enemies) {
       if (e.isDead) continue;
+      if (e.isHunting || e.state === "drop") return 1;
+      const checking = (e.state === "investigate" || e.state === "search") && !e.drawn;
+      t = Math.max(t, checking ? 0.6 : e.suspicion * 0.6);
+    }
+    return t;
+  }
+
+  /**
+   * The threat the HUD shows: only from creatures this player could know
+   * about (in line of sight, or close enough to hear). Without this the
+   * warning gave away a creature two rooms off that heard a gunshot and
+   * came to look; that one stays a surprise. Music and the heartbeat still
+   * follow `threat`.
+   */
+  perceivedThreat(from: THREE.Vector2): number {
+    let t = 0;
+    for (const e of this.enemies) {
+      if (e.isDead) continue;
+      if (!canPerceive(this.level, from, e.position2D)) continue;
       if (e.isHunting || e.state === "drop") return 1;
       const checking = (e.state === "investigate" || e.state === "search") && !e.drawn;
       t = Math.max(t, checking ? 0.6 : e.suspicion * 0.6);

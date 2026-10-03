@@ -39,6 +39,8 @@ import { isCharacterLook, LOOKS, personalise, type CharacterLook } from "../cont
 import { RemotePlayer } from "./remotePlayer";
 import { freshStats, type RunStats } from "./stats";
 
+/** How far the crash of a lamp being shot out carries (world units). */
+const LAMP_BREAK_NOISE = 12;
 const EXIT_RADIUS = 1.6;
 const PICKUP_RADIUS = 1.1;
 const MUZZLE_FLASH_TIME = 0.05;
@@ -241,6 +243,17 @@ export class LevelSession {
     const cellIndex = (c: { col: number; row: number }) => c.row * this.level.cols + c.col;
     this.lamps = new LampSystem(scene, sp.lamps, this.level.lampFixtures, quality.lampLights);
     this.effects = new Effects(scene, quality.dustMotes);
+    const water = new Set(sp.water.map((w) => `${w.cell.col},${w.cell.row}`));
+    this.effects.setWorld({
+      solidAt: (x, z) => {
+        const c = worldToCell(x, z);
+        return isSolid(this.level, c.col, c.row);
+      },
+      waterAt: (x, z) => {
+        const c = worldToCell(x, z);
+        return water.has(`${c.col},${c.row}`);
+      },
+    });
     this.radio = new RadioChannel(hud, sound);
     this.objective = def.objective;
 
@@ -1031,28 +1044,42 @@ export class LevelSession {
     let impactSound = false;
     const walls: number[][] = [];
     const blood: number[][] = [];
+    const lamps: number[] = [];
+    const small = cfg.pellets > 1;
     const v3 = (a: THREE.Vector3, b: THREE.Vector3) => [a.x, a.y, a.z, b.x, b.y, b.z].map(r2);
     for (const dir of shot.dirs) {
       const wall = raycastWorld(this.level, shot.origin, dir, cfg.range);
-      const hit = this.enemies.raycast(new THREE.Ray(shot.origin, dir), wall ? wall.distance : cfg.range);
-      if (hit) {
+      const ray = new THREE.Ray(shot.origin, dir);
+      const hit = this.enemies.raycast(ray, wall ? wall.distance : cfg.range);
+      // A lamp in the way stops the shot: the tube bursts and that part of the level goes dark.
+      const lamp = this.lamps.raycast(ray, Math.min(hit?.distance ?? Infinity, wall?.distance ?? cfg.range));
+      if (lamp) {
+        if (this.shootLamp(lamp.index)) lamps.push(lamp.index);
+      } else if (hit) {
         const dmg = cfg.damage * (hit.headshot ? cfg.headshotMultiplier : 1);
         const part = hit.headshot ? "head" : "body";
         if (!(hit.enemy instanceof RemnantBoss && hit.enemy.isArmoured(part))) allArmoured = false;
         const killed = this.damageEnemy(hit.enemy, dmg, part);
         this.effects.bloodBurst(hit.point, dir.clone(), (killed ? 28 : 14) / Math.sqrt(cfg.pellets));
+        this.splatter(hit.point, dir, killed);
         blood.push(v3(hit.point, dir));
         anyHit = true;
         anyHead ||= hit.headshot;
         anyKill ||= killed;
       } else if (wall) {
-        this.effects.impact(wall.point, wall.normal);
+        this.effects.impact(wall.point, wall.normal, small);
         walls.push(v3(wall.point, wall.normal));
         if (!impactSound) sound.playImpact(this.spatial(new THREE.Vector2(wall.point.x, wall.point.z)));
         impactSound = true;
       }
     }
-    this.coop?.send({ t: "shot", w: this.currentWeapon, walls: walls.slice(0, 4), blood: blood.slice(0, 4) });
+    this.coop?.send({
+      t: "shot",
+      w: this.currentWeapon,
+      walls: walls.slice(0, 4),
+      blood: blood.slice(0, 4),
+      ...(lamps.length ? { lamps } : {}),
+    });
     if (anyHit) {
       this.stats.hits++;
       if (anyHead && !allArmoured) this.stats.headshots++;
@@ -1542,8 +1569,41 @@ export class LevelSession {
     if (!r) return;
     r.fired();
     this.services.sound.playGunshotAt(m.w, this.spatial(r.position2D));
-    for (const [x, y, z, nx, ny, nz] of m.walls) this.effects.impact(new THREE.Vector3(x, y, z), new THREE.Vector3(nx, ny, nz));
-    for (const [x, y, z, dx, dy, dz] of m.blood) this.effects.bloodBurst(new THREE.Vector3(x, y, z), new THREE.Vector3(dx, dy, dz), 12);
+    for (const [x, y, z, nx, ny, nz] of m.walls)
+      this.effects.impact(new THREE.Vector3(x, y, z), new THREE.Vector3(nx, ny, nz), m.w === "shotgun");
+    for (const [x, y, z, dx, dy, dz] of m.blood) {
+      const p = new THREE.Vector3(x, y, z);
+      const d = new THREE.Vector3(dx, dy, dz);
+      this.effects.bloodBurst(p, d, 12);
+      this.splatter(p, d, false);
+    }
+    // Their shot broke a lamp: it breaks here too (they made the noise).
+    for (const i of m.lamps ?? []) this.shootLamp(i, false);
+  }
+
+  /** Blood thrown on the wall (or floor) behind a creature that was hit, and under it if it died. */
+  private splatter(point: THREE.Vector3, dir: THREE.Vector3, killed: boolean): void {
+    const behind = raycastWorld(this.level, point, dir.clone().normalize(), 3);
+    if (behind) this.effects.bloodSplat(behind.point, behind.normal, 0.45 + Math.random() * 0.4);
+    if (killed) {
+      const below = raycastWorld(this.level, point, new THREE.Vector3(0, -1, 0), 3);
+      if (below) this.effects.bloodSplat(below.point, below.normal, 1.1);
+    }
+  }
+
+  /**
+   * A lamp shot out: the glass bursts and that stretch goes dark for good.
+   * Loud: whatever's near comes to see. False if it was already out.
+   */
+  private shootLamp(index: number, noisy = true): boolean {
+    const at = this.lamps.breakLamp(index);
+    if (!at) return false;
+    this.effects.glassBurst(at);
+    this.effects.impact(at, new THREE.Vector3(0, -1, 0), true);
+    const where = new THREE.Vector2(at.x, at.z);
+    this.services.sound.playShatter(this.spatial(where));
+    if (noisy) this.playerNoise(where, LAMP_BREAK_NOISE);
+    return true;
   }
 
   /** A message from another player, `from` being their slot (see `net/protocol.ts`). */
@@ -1696,7 +1756,7 @@ export class LevelSession {
       reloadKey: this.services.keyFor("reload"),
       canFire: !this.busy && !this.player.isSprinting,
       noise: this.weapon.bloom > 0.6 ? 5 : noiseBars,
-      threat: this.enemies.threat,
+      threat: this.enemies.perceivedThreat(this.player.position2D),
       spreadPx: (Math.tan(spread) / halfFov) * (window.innerHeight / 2),
       hasKeycard: this.hasKeycard,
       breath: this.player.breath.air,

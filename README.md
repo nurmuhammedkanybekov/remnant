@@ -80,7 +80,9 @@ Every step makes noise, sprinting and wading make more, and a creature right
 beside you can hear you breathe, so you hold your breath while it walks past.
 Your flashlight is the other half of it: turn it on in the dark and anything
 that sees the light comes for you straight away. A thrown bottle sends them
-somewhere else.
+somewhere else. Every shot leaves its mark: holes and chips of concrete that
+stay, dust hanging in the beam, blood on the wall behind what you hit, and
+a lamp shot out stays dark, and loud.
 
 **Creatures that hunt.** Nine kinds, each designed to break a habit the
 previous one taught you: one that only hears, one that freezes in your light,
@@ -450,7 +452,7 @@ The game is then at http://localhost:5173. Other useful commands:
   session: joining with a code, shared doors and pickups, reviving, retrying,
   finishing a level together and leaving.
 
-There are 259 unit tests covering level validation, collision, pathfinding,
+There are 262 unit tests covering level validation, collision, pathfinding,
 movement, breathing, weapons, thrown bottles, creature AI, loot placement,
 room furnishing, co-op, save merging, cloud sync, the leaderboard, settings
 and more. Adding `?debug` to the URL exposes test hooks on `window.game`.

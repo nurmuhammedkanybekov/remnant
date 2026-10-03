@@ -394,7 +394,16 @@ line at a time on the simulation clock, so pausing pauses the conversation.
   Used by the player (r 0.35) and enemies (r 0.35 / 0.5).
 - `hasLineOfSight` — samples the segment every 0.8 units against the grid.
 - `raycastWorld` — exact DDA grid walk + floor/ceiling planes. Bullets stop at
-  walls and leave sparks + a decal.
+  walls, floor and ceiling and mark them (`fx/particles.ts`): a chipped hole
+  (160 kept per level, oldest recycled; shotgun pellets leave smaller ones),
+  sparks, a puff of dust that hangs for a second or two (grit falls from the
+  ceiling instead), and chips of concrete that fly off with gravity, bounce
+  off the floor and walls with friction, and lie where they land for 45 s.
+  Shots into flooded floor splash instead. A creature hit throws blood on
+  the wall or floor up to 3 units behind it, and a kill leaves a pool under
+  it. Lamp fixtures are targets too: a lamp shot out bursts, goes dark for
+  the rest of the level, and the crash carries 12 units (`LampSystem.raycast`
+  / `breakLamp`; partners' shots break the same lamp for everyone).
 
 ---
 
@@ -458,7 +467,8 @@ You start a run with one and carry up to three; in co-op each throw is
 flown on every copy (`toss`) but only the thrower's makes the noise.
 
 **Flashlight** (F): spotlight held low-right with beam sway that lags your
-aim. Battery 100, drains 1.7/s (~60 s). While off it trickles back to at
+aim. Battery 100, drains 0.55/s (about three minutes; it was a minute,
+which turned the game into battery-watching). While off it trickles back to at
 most 30; beyond that you need battery pickups (+45). Flickers below 20.
 With it on, enemies can see you from 15 units instead of 6.
 
@@ -742,7 +752,9 @@ the chase over 0.8–0.97. Death cuts the music; a new level starts calm.
 ## 11. UI
 
 - **HUD**: level + objective (top left); awareness eye showing SUSPICIOUS /
-  HUNTED (top centre); dynamic crosshair; hit marker; directional damage
+  HUNTED (top centre), counting only creatures you could know about, in line
+  of sight within 24 units or within 5 (`canPerceive`), so it never gives
+  away one in the next room; dynamic crosshair; hit marker; directional damage
   arcs; health (with lag bar) / stamina / battery (bottom left); keycard
   indicator; carried medkits with the heal key; noise meter (bottom centre);
   weapon strip, weapon name, magazine, reserve, round pips and
