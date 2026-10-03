@@ -25,6 +25,7 @@ import { Weapon } from "../weapons/weapon";
 import type { Viewmodel } from "../weapons/viewmodel";
 import { circleHitsWall, hasLineOfSight, isSolid, randomFloorNear, raycastWorld, worldToCell } from "../world/grid";
 import { planDressing } from "../world/dressing";
+import { castShadows, spotShadows } from "../core/shadows";
 import { CheckpointMarker, DetonatorConsole, Door, Generator, Intercom, type Interactable } from "../world/interactables";
 import { LampSystem } from "../world/lamps";
 import { animateWater, buildLevel, type LevelData } from "../world/levelBuilder";
@@ -322,7 +323,10 @@ export class LevelSession {
       this.effects.acidSplash(at);
       sound.playAcidSplash(this.spatial(new THREE.Vector2(at.x, at.z)));
     };
-    this.enemies.onSpawned = (e) => this.wireEnemy(e);
+    this.enemies.onSpawned = (e) => {
+      this.wireEnemy(e);
+      castShadows(e.root);
+    };
     this.enemies.wireAll();
     this.boss = this.enemies.boss;
 
@@ -402,6 +406,10 @@ export class LevelSession {
     if (restore) this.restore(restore);
     else this.run(def.events?.start ?? []);
     this.refreshObjective();
+
+    // Shadows: the flashlight throws them, and everything solid casts and catches them.
+    spotShadows(this.player.flashlight.light, this.services.engine.shadowSize);
+    castShadows(this.services.engine.scene);
   }
 
   /** The guest starts a step beside the host (to the right, left or behind — whichever is clear). */
@@ -1522,6 +1530,7 @@ export class LevelSession {
     let r = this.remotes.get(slot);
     if (!r) {
       r = new RemotePlayer(this.services.engine.scene);
+      castShadows(r.figure);
       r.onFootstep = (gait, wet, at) => this.services.sound.playFootstepAt(gait, wet, this.spatial(at));
       this.remotes.set(slot, r);
     }

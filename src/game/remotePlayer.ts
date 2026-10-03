@@ -29,6 +29,10 @@ export class RemotePlayer {
   onFootstep: ((gait: Gait, wet: boolean, at: THREE.Vector2) => void) | null = null;
 
   private readonly root = new THREE.Group();
+  /** Their whole figure (for shadows). */
+  get figure(): THREE.Object3D {
+    return this.root;
+  }
   private readonly body = new THREE.Group();
   private hips = new THREE.Group();
   private legL = new THREE.Group();
