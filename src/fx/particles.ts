@@ -109,12 +109,80 @@ class ParticlePool {
   }
 }
 
-/** Sparks, blood, bullet-hole decals and ambient dust. */
+/** What the effects need to know about the level: where the walls and the water are. */
+export interface EffectsWorld {
+  solidAt(x: number, z: number): boolean;
+  waterAt(x: number, z: number): boolean;
+}
+
+/** Bullet holes stay for the whole level (the oldest go first past this many). */
+const HOLES = 160;
+const SPLATS = 60;
+/** Chips of concrete knocked off by bullets: they fly, bounce and lie where they land. */
+const CHIPS = 160;
+const CHIP_LIFE = 45;
+
+interface Chip {
+  pos: THREE.Vector3;
+  vel: THREE.Vector3;
+  rot: THREE.Euler;
+  spin: THREE.Vector3;
+  size: number;
+  age: number;
+  resting: boolean;
+  alive: boolean;
+}
+
+/** A pool of flat decals (holes, blood) laid on surfaces, recycled oldest first. */
+class DecalPool {
+  private readonly meshes: THREE.Mesh[] = [];
+  private cursor = 0;
+
+  constructor(scene: THREE.Scene, count: number, map: THREE.Texture, offset: number) {
+    const geo = new THREE.PlaneGeometry(1, 1);
+    const mat = new THREE.MeshStandardMaterial({
+      map,
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: offset,
+      roughness: 0.9,
+    });
+    for (let i = 0; i < count; i++) {
+      const m = new THREE.Mesh(geo, mat);
+      m.visible = false;
+      m.matrixAutoUpdate = false;
+      scene.add(m);
+      this.meshes.push(m);
+    }
+  }
+
+  place(point: THREE.Vector3, normal: THREE.Vector3, size: number): void {
+    const m = this.meshes[this.cursor];
+    this.cursor = (this.cursor + 1) % this.meshes.length;
+    m.visible = true;
+    m.position.copy(point).addScaledVector(normal, 0.008);
+    m.lookAt(point.clone().add(normal));
+    m.rotateZ(Math.random() * Math.PI * 2);
+    m.scale.setScalar(size);
+    m.updateMatrix();
+  }
+
+  get all(): THREE.Mesh[] {
+    return this.meshes;
+  }
+}
+
+/** Sparks, blood, bullet holes, chips of concrete, splashes and ambient dust. */
 export class Effects {
-  private readonly sparks = new ParticlePool(160, THREE.AdditiveBlending);
-  private readonly blood = new ParticlePool(220, THREE.NormalBlending);
-  private readonly decals: THREE.Mesh[] = [];
-  private decalCursor = 0;
+  private readonly sparks = new ParticlePool(220, THREE.AdditiveBlending);
+  private readonly blood = new ParticlePool(420, THREE.NormalBlending);
+  private readonly holes: DecalPool;
+  private readonly splats: DecalPool;
+  private readonly chips: Chip[] = [];
+  private readonly chipMesh: THREE.InstancedMesh;
+  private chipCursor = 0;
+  private world: EffectsWorld | null = null;
   private readonly dust: THREE.Points;
   private readonly dustBase: Float32Array;
 
@@ -124,21 +192,32 @@ export class Effects {
   ) {
     scene.add(this.sparks.points, this.blood.points);
 
-    const decalGeo = new THREE.PlaneGeometry(0.16, 0.16);
-    const decalMat = new THREE.MeshStandardMaterial({
-      map: textures().bulletHole,
-      transparent: true,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -4,
-      roughness: 1,
-    });
-    for (let i = 0; i < 40; i++) {
-      const m = new THREE.Mesh(decalGeo, decalMat);
-      m.visible = false;
-      scene.add(m);
-      this.decals.push(m);
+    this.holes = new DecalPool(scene, HOLES, textures().bulletHole, -4);
+    this.splats = new DecalPool(scene, SPLATS, textures().bloodSplat, -3);
+    this.chipMesh = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 }),
+      CHIPS
+    );
+    this.chipMesh.frustumCulled = false;
+    const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+    const shade = new THREE.Color();
+    for (let i = 0; i < CHIPS; i++) {
+      this.chipMesh.setMatrixAt(i, hidden);
+      const g = 0.13 + Math.random() * 0.1;
+      this.chipMesh.setColorAt(i, shade.setRGB(g, g * 0.97, g * 0.92));
+      this.chips.push({
+        pos: new THREE.Vector3(),
+        vel: new THREE.Vector3(),
+        rot: new THREE.Euler(),
+        spin: new THREE.Vector3(),
+        size: 0,
+        age: 0,
+        resting: true,
+        alive: false,
+      });
     }
+    scene.add(this.chipMesh);
 
     // Dust motes: a box of points that follows the player; only the ones
     // inside the flashlight cone are visible (computed in the shader).
@@ -182,27 +261,142 @@ export class Effects {
     scene.add(this.dust);
   }
 
-  impact(point: THREE.Vector3, normal: THREE.Vector3): void {
+  /** Lets the effects know the level: chips bounce off its walls, shots into flooded floor splash. */
+  setWorld(world: EffectsWorld): void {
+    this.world = world;
+  }
+
+  /**
+   * A bullet hitting the level: a hole that stays, a spit of sparks, chips of
+   * concrete that fly off and lie where they land, and dust hanging in the
+   * air. Into water it's a splash instead; into the ceiling, grit falls.
+   * `small` for shotgun pellets.
+   */
+  impact(point: THREE.Vector3, normal: THREE.Vector3, small = false): void {
+    if (normal.y > 0.5 && this.world?.waterAt(point.x, point.z)) {
+      this.splash(point, small ? 0.6 : 1);
+      return;
+    }
+    const k = small ? 0.55 : 1;
     const c = new THREE.Color(1, 0.75, 0.4);
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 8 * k; i++) {
       const v = normal.clone().multiplyScalar(2 + Math.random() * 3);
       v.x += (Math.random() - 0.5) * 4;
       v.y += (Math.random() - 0.2) * 4;
       v.z += (Math.random() - 0.5) * 4;
-      this.sparks.emit(point, v, 0.25 + Math.random() * 0.25, 0.05 + Math.random() * 0.04, c, 9);
+      this.sparks.emit(point, v, 0.15 + Math.random() * 0.25, 0.04 + Math.random() * 0.04, c, 9);
     }
-    const dustC = new THREE.Color(0.35, 0.33, 0.3);
-    for (let i = 0; i < 6; i++) {
-      const v = normal.clone().multiplyScalar(0.6 + Math.random());
-      v.y += Math.random() * 0.5;
-      this.blood.emit(point, v, 0.6 + Math.random() * 0.5, 0.12 + Math.random() * 0.1, dustC, -0.3);
+    // Dust: a puff that hangs and drifts. Off the ceiling it falls instead.
+    const ceiling = normal.y < -0.5;
+    const dustC = new THREE.Color(0.38, 0.36, 0.33);
+    for (let i = 0; i < 12 * k; i++) {
+      const v = normal.clone().multiplyScalar(0.3 + Math.random() * 0.9);
+      v.x += (Math.random() - 0.5) * 0.4;
+      v.z += (Math.random() - 0.5) * 0.4;
+      v.y += ceiling ? 0 : Math.random() * 0.3;
+      this.blood.emit(point, v, 1.2 + Math.random() * 1.6, 0.16 + Math.random() * 0.3, dustC, ceiling ? 1.5 : -0.08);
     }
-    const decal = this.decals[this.decalCursor];
-    this.decalCursor = (this.decalCursor + 1) % this.decals.length;
-    decal.visible = true;
-    decal.position.copy(point).addScaledVector(normal, 0.01);
-    decal.lookAt(point.clone().add(normal));
-    decal.rotateZ(Math.random() * Math.PI);
+    // Chips of concrete.
+    const n = Math.round((small ? 1 : 3) + Math.random() * (small ? 1 : 3));
+    for (let i = 0; i < n; i++) {
+      const v = normal.clone().multiplyScalar(1 + Math.random() * 2.5);
+      v.x += (Math.random() - 0.5) * 2;
+      v.y += Math.random() * 1.5;
+      v.z += (Math.random() - 0.5) * 2;
+      this.chip(point.clone().addScaledVector(normal, 0.03), v, 0.015 + Math.random() * (small ? 0.02 : 0.035));
+    }
+    this.holes.place(point, normal, (small ? 0.09 : 0.16) + Math.random() * 0.05);
+  }
+
+  /** A shot into flooded floor: a spout of water and droplets falling back. */
+  splash(point: THREE.Vector3, k = 1): void {
+    const c = new THREE.Color(0.55, 0.62, 0.62);
+    for (let i = 0; i < 18 * k; i++) {
+      const v = new THREE.Vector3((Math.random() - 0.5) * 1.6, 1.5 + Math.random() * 3, (Math.random() - 0.5) * 1.6);
+      this.blood.emit(point, v, 0.4 + Math.random() * 0.4, 0.03 + Math.random() * 0.05, c, 9.8);
+    }
+    for (let i = 0; i < 6 * k; i++) {
+      const a = Math.random() * Math.PI * 2;
+      this.blood.emit(point, new THREE.Vector3(Math.cos(a) * 0.6, 0.05, Math.sin(a) * 0.6), 0.6, 0.18, new THREE.Color(0.3, 0.36, 0.36), 0);
+    }
+  }
+
+  /** Blood thrown onto a surface behind whatever was hit. */
+  bloodSplat(point: THREE.Vector3, normal: THREE.Vector3, size = 0.6): void {
+    this.splats.place(point, normal, size * (0.8 + Math.random() * 0.5));
+  }
+
+  private chip(p: THREE.Vector3, v: THREE.Vector3, size: number): void {
+    const c = this.chips[this.chipCursor];
+    this.chipCursor = (this.chipCursor + 1) % CHIPS;
+    c.pos.copy(p);
+    c.vel.copy(v);
+    c.rot.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    c.spin.set((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20);
+    c.size = size;
+    c.age = 0;
+    c.resting = false;
+    c.alive = true;
+  }
+
+  private readonly chipMatrix = new THREE.Matrix4();
+  private readonly chipQuat = new THREE.Quaternion();
+  private readonly chipScale = new THREE.Vector3();
+
+  /** Gravity, bounces off the floor and walls, friction; chips that settle stay put until they're old. */
+  private updateChips(dt: number): void {
+    let dirty = false;
+    for (let i = 0; i < CHIPS; i++) {
+      const c = this.chips[i];
+      if (!c.alive) continue;
+      c.age += dt;
+      if (c.age > CHIP_LIFE) {
+        c.alive = false;
+        this.chipMesh.setMatrixAt(i, this.chipMatrix.makeScale(0, 0, 0));
+        dirty = true;
+        continue;
+      }
+      if (c.resting) continue;
+      c.vel.y -= 9.8 * dt;
+      const ox = c.pos.x;
+      const oz = c.pos.z;
+      c.pos.addScaledVector(c.vel, dt);
+      if (this.world?.solidAt(c.pos.x, c.pos.z)) {
+        // Off a wall: back out and bounce, losing most of the speed.
+        if (this.world.solidAt(c.pos.x, oz)) {
+          c.pos.x = ox;
+          c.vel.x *= -0.35;
+        }
+        if (this.world.solidAt(ox, c.pos.z)) {
+          c.pos.z = oz;
+          c.vel.z *= -0.35;
+        }
+      }
+      const floor = c.size / 2;
+      if (c.pos.y < floor) {
+        c.pos.y = floor;
+        if (Math.abs(c.vel.y) < 0.7) {
+          c.resting = true;
+          c.rot.x = Math.round(c.rot.x / (Math.PI / 2)) * (Math.PI / 2);
+          c.rot.z = Math.round(c.rot.z / (Math.PI / 2)) * (Math.PI / 2);
+        } else {
+          c.vel.y *= -0.32;
+          c.vel.x *= 0.55;
+          c.vel.z *= 0.55;
+          c.spin.multiplyScalar(0.5);
+        }
+      }
+      if (!c.resting) {
+        c.rot.x += c.spin.x * dt;
+        c.rot.y += c.spin.y * dt;
+        c.rot.z += c.spin.z * dt;
+      }
+      this.chipQuat.setFromEuler(c.rot);
+      this.chipMatrix.compose(c.pos, this.chipQuat, this.chipScale.set(c.size, c.size * 0.7, c.size * 1.2));
+      this.chipMesh.setMatrixAt(i, this.chipMatrix);
+      dirty = true;
+    }
+    if (dirty) this.chipMesh.instanceMatrix.needsUpdate = true;
   }
 
   bloodBurst(point: THREE.Vector3, dir: THREE.Vector3, amount = 16): void {
@@ -248,6 +442,7 @@ export class Effects {
   update(dt: number, camera: THREE.Camera, flashlightLevel: number, time: number): void {
     this.sparks.update(dt);
     this.blood.update(dt);
+    this.updateChips(dt);
     const pos = this.dust.geometry.attributes.position as THREE.BufferAttribute;
     const arr = pos.array as Float32Array;
     const cx = camera.position.x;
@@ -265,6 +460,6 @@ export class Effects {
   }
 
   dispose(): void {
-    this.scene.remove(this.sparks.points, this.blood.points, this.dust, ...this.decals);
+    this.scene.remove(this.sparks.points, this.blood.points, this.dust, this.chipMesh, ...this.holes.all, ...this.splats.all);
   }
 }
