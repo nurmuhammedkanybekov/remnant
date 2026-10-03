@@ -48,6 +48,12 @@ interface HideSpot {
   out: THREE.Vector2;
 }
 
+/** How far away a creature's footsteps can be heard (world units). */
+/** Levels whose hum is machinery (the rest rumble). */
+const MACHINE_HUM = new Set(["ventilation", "power-plant", "lift-shaft"]);
+const STEP_HEAR_RANGE = 22;
+/** How far the room probe looks in each direction. */
+const ROOM_PROBE = 16;
 const LAMP_BREAK_NOISE = 12;
 const EXIT_RADIUS = 1.6;
 const PICKUP_RADIUS = 1.1;
@@ -231,6 +237,8 @@ export class LevelSession {
   private readonly lastSeq = new Map<string, number>();
   /** Down and waiting for the partner, instead of dead. */
   private downed = false;
+  /** Until the room's size is measured again (see `measureRoom`). */
+  private roomTimer = 0;
   /** The lockers you can hide in, and the one you're in (if any). */
   private readonly hideSpots: HideSpot[];
   private hiding: HideSpot | null = null;
@@ -407,6 +415,9 @@ export class LevelSession {
     else this.run(def.events?.start ?? []);
     this.refreshObjective();
 
+    // The building's hum: machinery where there's machinery, a deep rumble everywhere else.
+    services.sound.setRoomTone(0.16, MACHINE_HUM.has(def.id) ? 1 : 0);
+
     // Shadows: the flashlight throws them, and everything solid casts and catches them.
     spotShadows(this.player.flashlight.light, this.services.engine.shadowSize);
     castShadows(this.services.engine.scene);
@@ -534,6 +545,11 @@ export class LevelSession {
     const winded = THREE.MathUtils.clamp((60 - this.player.stamina) / 60, 0, 1);
     sound.updateBreathing(dt, this.dread, winded, this.player.breath.held);
     sound.updateAmbient(dt);
+    this.roomTimer -= dt;
+    if (this.roomTimer <= 0) {
+      this.roomTimer = 0.4;
+      sound.setRoom(this.measureRoom());
+    }
     this.updateHud();
     this.updateBossBar();
 
@@ -694,6 +710,7 @@ export class LevelSession {
       if (heavy) this.player.addTrauma(0.6);
     };
     e.onAlert = (en) => this.enemyVocal(en, "alert");
+    e.onStep = (en) => this.creatureStep(en);
     e.onVocal = (en, kind) => this.enemyVocal(en, kind);
     e.onRanged = (en, from, target) => {
       const r = en.stats.ranged;
@@ -1927,10 +1944,41 @@ export class LevelSession {
     return Math.atan2(right, fwd);
   }
 
+  /** A creature's foot coming down, heard if it's near enough (through walls too, muffled). */
+  private creatureStep(e: Enemy): void {
+    const p = e.position2D;
+    const d = p.distanceTo(this.player.position2D);
+    if (d > STEP_HEAR_RANGE) return;
+    const look = e.stats.look;
+    // A pack of rats would be a wall of noise: only now and then, each.
+    if (e.stats.pack && Math.random() > 0.25) return;
+    const weight = ("build" in look ? (look.build ?? 1) : 1) * e.stats.scale;
+    const crawl = ("gait" in look && look.gait === "crawl") || look.rig === "rat";
+    this.services.sound.playCreatureStep(weight, crawl, this.spatial(p));
+  }
+
+  /**
+   * How open the space around you is (0 a duct, 1 a hall), from how far you
+   * can see in eight directions: the reverb follows it, so a shot in the pump
+   * hall rolls on and on and one in a vent is swallowed.
+   */
+  private measureRoom(): number {
+    const eye = new THREE.Vector3(this.player.position.x, 1.5, this.player.position.z);
+    let sum = 0;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const hit = raycastWorld(this.level, eye, new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), ROOM_PROBE);
+      sum += hit ? hit.distance : ROOM_PROBE;
+    }
+    return THREE.MathUtils.clamp((sum / 8 - 2.2) / 9, 0, 1);
+  }
+
   private spatial(p: THREE.Vector2): Spatial {
     const me = this.player.position2D;
+    const angle = this.relativeAngle(p);
     return {
-      pan: Math.sin(this.relativeAngle(p)),
+      angle,
+      pan: Math.sin(angle),
       distance: me.distanceTo(p),
       muffled: !hasLineOfSight(this.level, me, p),
     };

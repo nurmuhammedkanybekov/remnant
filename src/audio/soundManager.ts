@@ -4,11 +4,13 @@ import type { VocalKind } from "../enemies/enemy";
 import { SampleBank } from "./samples";
 
 /**
- * All audio is synthesized at runtime with the Web Audio API — no sound files.
+ * The game's sound, on the Web Audio API: recordings where there are any
+ * (`content/sounds.ts`), synthesis for everything else and as a fallback.
  *
  * Signal flow:
- *   voice → [lowpass if behind a wall] → panner → dry bus ─┐
- *                                               └→ reverb ─┴→ master → out
+ *   voice → [lowpass if behind a wall] → 3D panner (HRTF) → dry bus ─────────────┐
+ *                                                        └→ reverb (small/large room) ─┴→ master → out
+ *   room tone (recorded loop) ──────────────────────────────────────────────────→ master
  */
 /** What the music engine needs from the sound engine. */
 export interface MusicOutput {
@@ -24,7 +26,16 @@ export interface Spatial {
   distance: number;
   /** true if a wall is between source and listener */
   muffled: boolean;
+  /**
+   * Direction to the source relative to where you face (radians: 0 ahead,
+   * positive to the right, ±π behind). With it the sound is placed in 3D
+   * (HRTF), so on headphones you can tell in front from behind.
+   */
+  angle?: number;
 }
+
+/** How the world sounds around you: a cramped duct or a pump hall. */
+export type RoomSize = number;
 
 const CENTER: Spatial = { pan: 0, distance: 0, muffled: false };
 
@@ -33,6 +44,14 @@ export class SoundManager {
   private master!: GainNode;
   private dry!: GainNode;
   private reverbIn!: GainNode;
+  /** Two rooms' worth of reverb, crossfaded by how open the space around you is. */
+  private smallWet!: GainNode;
+  private largeWet!: GainNode;
+  /** The building's own hum: a recorded loop under everything. */
+  private bed: AudioBufferSourceNode | null = null;
+  private bedGain!: GainNode;
+  private bedWanted = 0;
+  private bedWhich = 0;
   private noiseBuf!: AudioBuffer;
   private musicBus!: GainNode;
   /** Recorded weapon sounds; anything missing falls back to synthesis. */
@@ -68,13 +87,22 @@ export class SoundManager {
     this.dry = ctx.createGain();
     this.dry.connect(this.master);
 
-    const convolver = ctx.createConvolver();
-    convolver.buffer = this.makeImpulse(2.4, 2.8);
+    // Two rooms: a tight, bright one (corridors, ducts) and a big, dark
+    // concrete one (halls, the shaft). `setRoom` crossfades between them.
     this.reverbIn = ctx.createGain();
     this.reverbIn.gain.value = 1;
-    const wet = ctx.createGain();
-    wet.gain.value = 0.35;
-    this.reverbIn.connect(convolver).connect(wet).connect(this.master);
+    const small = ctx.createConvolver();
+    small.buffer = this.makeImpulse(0.9, 3.6, 0.004, 9000);
+    const large = ctx.createConvolver();
+    large.buffer = this.makeImpulse(4.2, 1.9, 0.035, 3200);
+    this.smallWet = ctx.createGain();
+    this.largeWet = ctx.createGain();
+    this.reverbIn.connect(small).connect(this.smallWet).connect(this.master);
+    this.reverbIn.connect(large).connect(this.largeWet).connect(this.master);
+    this.setRoom(0.4);
+    this.bedGain = ctx.createGain();
+    this.bedGain.gain.value = 0;
+    this.bedGain.connect(this.master);
 
     this.noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = this.noiseBuf.getChannelData(0);
@@ -114,15 +142,72 @@ export class SoundManager {
     this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.15);
   }
 
-  private makeImpulse(seconds: number, decay: number): AudioBuffer {
+  /**
+   * A room's impulse: a gap before the first reflections (`predelay`), a few
+   * hard early ones off the nearest walls, then a decaying wash of noise that
+   * loses its highs as it goes (concrete swallows the top end; `tone` is how
+   * bright it starts).
+   */
+  private makeImpulse(seconds: number, decay: number, predelay = 0.01, tone = 6000): AudioBuffer {
     const ctx = this.ctx!;
-    const len = ctx.sampleRate * seconds;
-    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    const sr = ctx.sampleRate;
+    const len = Math.floor(sr * seconds);
+    const buf = ctx.createBuffer(2, len, sr);
+    const pre = Math.floor(predelay * sr);
     for (let ch = 0; ch < 2; ch++) {
       const data = buf.getChannelData(ch);
-      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      let lp = 0;
+      for (let i = pre; i < len; i++) {
+        const k = (i - pre) / (len - pre);
+        // The filter closes as the tail goes on.
+        const cutoff = tone * (1 - k * 0.85);
+        const a = Math.exp((-2 * Math.PI * cutoff) / sr);
+        lp = a * lp + (1 - a) * (Math.random() * 2 - 1);
+        data[i] = lp * Math.pow(1 - k, decay) * 2.2;
+      }
+      for (let r = 0; r < 6; r++) {
+        const at = pre + Math.floor((0.004 + Math.random() * 0.05 * (1 + seconds / 3)) * sr);
+        if (at < len) data[at] += (Math.random() < 0.5 ? -1 : 1) * (0.5 - r * 0.06);
+      }
     }
     return buf;
+  }
+
+  /** How open the space around you is, 0 (a duct) to 1 (a hall): the reverb follows it smoothly. */
+  setRoom(openness: RoomSize): void {
+    if (!this.ctx) return;
+    const o = Math.max(0, Math.min(1, openness));
+    const t = this.ctx.currentTime;
+    this.smallWet.gain.setTargetAtTime(0.32 * (1 - o) + 0.06, t, 0.6);
+    this.largeWet.gain.setTargetAtTime(0.42 * o, t, 0.6);
+  }
+
+  /**
+   * The building's hum for this level (a recorded loop), at `level` (0 off).
+   * Starts once the recording has loaded.
+   */
+  setRoomTone(level: number, which = this.bedWhich): void {
+    this.bedWanted = level;
+    if (!this.ctx) return;
+    this.bedGain.gain.setTargetAtTime(level, this.ctx.currentTime, 1.2);
+    if (this.bed && which !== this.bedWhich) {
+      // A different building: swap the loop.
+      this.bed.stop(this.ctx.currentTime + 1.5);
+      this.bed = null;
+    }
+    this.bedWhich = which;
+    if (level <= 0 || this.bed) return;
+    const buf = this.samples.buffer("roomTone", which);
+    if (!buf) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 2400;
+    src.connect(lp).connect(this.bedGain);
+    src.start();
+    this.bed = src;
   }
 
   /** Output chain for one voice. Returns the node to connect the voice into. */
@@ -141,12 +226,27 @@ export class SoundManager {
       g.connect(lp);
       node = lp;
     }
-    const pan = ctx.createStereoPanner();
-    pan.pan.value = Math.max(-1, Math.min(1, sp.pan)) * 0.85;
+    let pan: AudioNode;
+    if (sp.angle !== undefined && sp.distance > 0.6) {
+      // Placed in 3D around your head (HRTF): it tells in front from behind on headphones.
+      const p = ctx.createPanner();
+      p.panningModel = "HRTF";
+      p.distanceModel = "linear";
+      p.rolloffFactor = 0; // distance is already in `att`
+      p.positionX.value = Math.sin(sp.angle);
+      p.positionY.value = 0;
+      p.positionZ.value = -Math.cos(sp.angle);
+      pan = p;
+    } else {
+      const s = ctx.createStereoPanner();
+      s.pan.value = Math.max(-1, Math.min(1, sp.pan)) * 0.85;
+      pan = s;
+    }
     node.connect(pan);
     pan.connect(this.dry);
+    // Far things are mostly room: the further away, the more of it is reverb.
     const send = ctx.createGain();
-    send.gain.value = reverb * (sp.muffled ? 1.5 : 1);
+    send.gain.value = reverb * (sp.muffled ? 1.5 : 1) * (1 + Math.min(1, sp.distance / maxDist) * 0.8);
     pan.connect(send).connect(this.reverbIn);
     return g;
   }
@@ -1035,20 +1135,49 @@ export class SoundManager {
     lp.connect(g).connect(this.master);
   }
 
+  /**
+   * Something walking near you: a bare foot slapping concrete, heavier and
+   * lower for big things (`weight` 1 = a husk, 2 = a brute), a scrabble of
+   * claws for things on all fours, now and then a foot dragged. You hear
+   * them through walls, muffled, before you see them.
+   */
+  playCreatureStep(weight: number, crawl: boolean, sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (crawl) {
+      if (Math.random() < 0.5) this.sample("skitter", t, sp, 0.55, 0.5, 1.1 + Math.random() * 0.2, 16);
+      return;
+    }
+    const rate = 1 / Math.sqrt(weight);
+    this.sample("creatureStep", t, sp, 0.6 + weight * 0.25, 0.45, rate, 18 + weight * 4);
+    if (weight > 1.3) {
+      // The weight of it, in the floor.
+      const o = this.out(sp, 26, 0.6);
+      if (o) this.tone(o, "sine", 70, 38, t, 0.18, 0.35 * (weight - 1), 0.004);
+    }
+    if (Math.random() < 0.12) this.sample("creatureDrag", t + 0.05, sp, 0.5, 0.5, rate, 16);
+  }
+
   /** Random distant sounds (drips, metal groans, clanks) — call every frame. */
   updateAmbient(dt: number): void {
     if (!this.ctx) return;
+    if (this.bedWanted > 0 && !this.bed) this.setRoomTone(this.bedWanted);
     this.ambientTimer -= dt;
     if (this.ambientTimer > 0) return;
     this.ambientTimer = 3 + Math.random() * 9;
     const t = this.ctx.currentTime;
-    const sp: Spatial = { pan: Math.random() * 2 - 1, distance: 6 + Math.random() * 10, muffled: Math.random() < 0.6 };
+    const angle = Math.random() * Math.PI * 2 - Math.PI;
+    const sp: Spatial = { pan: Math.sin(angle), angle, distance: 6 + Math.random() * 10, muffled: Math.random() < 0.6 };
+    const r = Math.random();
+    // The building settling, recorded: a creak in the steel, a knock along a pipe, water.
+    const recorded: SampleId = r < 0.4 ? "drip" : r < 0.7 ? "metalCreak" : "pipeKnock";
+    if (r <= 0.82 && this.sample(recorded, t, sp, recorded === "drip" ? 0.8 : 0.9, 1.6, 0.85 + Math.random() * 0.25, 24)) return;
     const o = this.out(sp, 20, 1.6);
     if (!o) return;
-    const r = Math.random();
     if (r > 0.82) {
       // Something that isn't there: a creature's breath behind the wall, or one far off, screaming.
-      const far: Spatial = { pan: Math.random() < 0.5 ? -0.9 : 0.9, distance: 14 + Math.random() * 12, muffled: true };
+      const a = (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 1.8);
+      const far: Spatial = { pan: Math.sin(a), angle: a, distance: 14 + Math.random() * 12, muffled: true };
       const id = r > 0.95 ? "creatureAlert" : "creatureIdle";
       if (this.sample(id, t, far, id === "creatureAlert" ? 0.5 : 0.8, 1.4, 0.75 + Math.random() * 0.2, 34)) return;
     }
