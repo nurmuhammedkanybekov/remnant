@@ -69,6 +69,8 @@ describe("footsteps", () => {
     walker.onStep = () => steps++;
     still.onStep = () => quiet++;
     walker.alertTo(cellCenter(9, 2));
+    // Waiting at its post (it would otherwise wander off on patrol).
+    (still as unknown as { patrolWait: number }).patrolWait = 100;
     run(walker, perceive(10, { playerDead: true }), 3);
     run(still, perceive(10, { playerDead: true, playerPos: cellCenter(3, 2) }), 3);
     expect(steps).toBeGreaterThan(4);
