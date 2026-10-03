@@ -83,6 +83,7 @@ export class Hud {
     this.root = document.createElement("div");
     this.root.className = "hud";
     this.root.innerHTML = `
+      <div class="slats" data-k="slats"></div>
       <div class="objective"><div class="lvl" data-k="lvl"></div><div class="txt" data-k="obj"></div></div>
       <div class="aware" data-k="aware">${ICON.eye}<div class="lbl" data-k="awareLbl"></div></div>
       <div class="xhair" data-k="xhair"><i class="c"></i><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i></div>
@@ -349,6 +350,12 @@ export class Hud {
     el.className = `subtitle show ${line.speaker}`;
     this.el.subWho.textContent = speakerName(line.speaker);
     this.el.subLine.textContent = line.text;
+  }
+
+  /** Inside a locker: the world through its slats. */
+  hiding(on: boolean): void {
+    this.el.slats.classList.toggle("show", on);
+    this.el.xhair.style.visibility = on ? "hidden" : "";
   }
 
   /** The "[E] OPEN DOOR" prompt. Pass null to hide. */

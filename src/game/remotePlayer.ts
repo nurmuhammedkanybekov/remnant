@@ -163,9 +163,10 @@ export class RemotePlayer {
       this.yaw = s.yaw;
       this.pitch = s.pitch;
     }
+    const wasHidden = this.state?.hid ?? false;
     this.state = s;
     if (isCharacterLook(s.look)) this.setLook(s.look);
-    if (!this.present) this.showFigure(true);
+    if (!this.present || wasHidden !== !!s.hid) this.showFigure(!s.hid);
     this.present = true;
   }
 

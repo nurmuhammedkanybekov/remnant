@@ -86,6 +86,8 @@ export interface PlayerState {
   held?: boolean;
   /** Talking on voice chat right now (creatures close by can hear it). */
   talk?: boolean;
+  /** Hiding in a locker: out of sight. */
+  hid?: boolean;
   /** Counts up with every state sent (see `EnemySnapshot.n`). */
   n?: number;
 }

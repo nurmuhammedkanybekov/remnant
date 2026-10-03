@@ -78,6 +78,8 @@ hides a room behind a loose wall panel.
 **Stealth that matters.** The creatures are blind, but they hear everything.
 Every step makes noise, sprinting and wading make more, and a creature right
 beside you can hear you breathe, so you hold your breath while it walks past.
+Every level has lockers to hide in: inside, you watch through the slats
+while it searches. Anything that saw you climb in knows where you are.
 Your flashlight is the other half of it: turn it on in the dark and anything
 that sees the light comes for you straight away. A thrown bottle sends them
 somewhere else. Every shot leaves its mark: holes and chips of concrete that
@@ -120,7 +122,7 @@ Headphones help a lot, because most threats are heard before they are seen.
 | Fire / reload         | Left click / R     | RT / X   |
 | Sprint / crouch       | Shift / C          | LT / B   |
 | Flashlight            | F                  | LB       |
-| Use, hold to revive   | E                  | A        |
+| Use, hide, revive     | E (hold to revive) | A        |
 | Melee or takedown     | V or right click   | RB       |
 | Medkit                | H                  | D-pad up |
 | Hold breath           | B (hold)           | L3       |
@@ -452,7 +454,7 @@ The game is then at http://localhost:5173. Other useful commands:
   session: joining with a code, shared doors and pickups, reviving, retrying,
   finishing a level together and leaving.
 
-There are 262 unit tests covering level validation, collision, pathfinding,
+There are 275 unit tests covering level validation, collision, pathfinding,
 movement, breathing, weapons, thrown bottles, creature AI, loot placement,
 room furnishing, co-op, save merging, cloud sync, the leaderboard, settings
 and more. Adding `?debug` to the URL exposes test hooks on `window.game`.

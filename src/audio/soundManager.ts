@@ -619,6 +619,18 @@ export class SoundManager {
     this.burst(o, "bandpass", 650 * pitch, 0.8, t + period * 0.42, period * 0.34, v * 1.15, period * 0.06);
   }
 
+  /** A locker door: a hinge creak and the latch, closing (in) or opening (out). Close by, quiet. */
+  playLocker(closing: boolean): void {
+    if (!this.ctx) return;
+    const o = this.out(CENTER, 1, 0.35);
+    if (!o) return;
+    const t = this.ctx.currentTime;
+    this.tone(o, "sawtooth", closing ? 340 : 260, closing ? 230 : 380, t, 0.28, 0.035);
+    this.burst(o, "bandpass", 2400, 6, t + 0.02, 0.22, 0.12, 0.03);
+    this.tone(o, "sine", 140, 70, t + (closing ? 0.3 : 0.05), 0.12, 0.5);
+    this.burst(o, "highpass", 3000, 1, t + (closing ? 0.3 : 0.05), 0.05, 0.35, 0.001);
+  }
+
   /** A loose panel pried out of the wall: a metal scrape, then it drops with a thud. */
   playPanel(sp: Spatial): void {
     if (!this.ctx) return;

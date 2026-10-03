@@ -208,7 +208,7 @@ export class Game {
     });
 
     // The world behind the title and menus.
-    this.backdrop = new MenuBackdrop(this.engine, LEVELS[1], QUALITY[this.settings.quality]);
+    this.backdrop = new MenuBackdrop(this.engine, QUALITY[this.settings.quality]);
     document.getElementById("boot")?.remove();
     this.showTitle();
     this.cloud.start();
@@ -250,7 +250,7 @@ export class Game {
     this.viewmodel.setVisible(false);
     this.sound.setPaused(false);
     // The maintenance wing's long lamp-lit corridor makes the best establishing shot.
-    if (this.session || !this.backdrop) this.backdrop = new MenuBackdrop(this.engine, LEVELS[1], QUALITY[this.settings.quality]);
+    if (this.session || !this.backdrop) this.backdrop = new MenuBackdrop(this.engine, QUALITY[this.settings.quality]);
     this.session = null;
     this.run = null;
 

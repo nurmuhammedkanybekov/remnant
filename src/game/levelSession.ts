@@ -8,7 +8,7 @@ import { ACTIONS, type Action } from "../core/actions";
 import type { Engine } from "../core/engine";
 import type { QualityPreset } from "../core/quality";
 import { RemnantBoss } from "../enemies/boss";
-import type { Enemy, Perception, VocalKind } from "../enemies/enemy";
+import { wrapAngle, type Enemy, type Perception, type VocalKind } from "../enemies/enemy";
 import { EnemyManager } from "../enemies/enemyManager";
 import { Projectiles } from "../enemies/projectiles";
 import { Effects } from "../fx/particles";
@@ -24,6 +24,7 @@ import type { Hud } from "../ui/hud";
 import { Weapon } from "../weapons/weapon";
 import type { Viewmodel } from "../weapons/viewmodel";
 import { circleHitsWall, hasLineOfSight, isSolid, randomFloorNear, raycastWorld, worldToCell } from "../world/grid";
+import { planDressing } from "../world/dressing";
 import { CheckpointMarker, DetonatorConsole, Door, Generator, Intercom, type Interactable } from "../world/interactables";
 import { LampSystem } from "../world/lamps";
 import { animateWater, buildLevel, type LevelData } from "../world/levelBuilder";
@@ -40,6 +41,12 @@ import { RemotePlayer } from "./remotePlayer";
 import { freshStats, type RunStats } from "./stats";
 
 /** How far the crash of a lamp being shot out carries (world units). */
+/** A locker you can hide in: where it stands, and which way its door faces. */
+interface HideSpot {
+  pos: THREE.Vector2;
+  out: THREE.Vector2;
+}
+
 const LAMP_BREAK_NOISE = 12;
 const EXIT_RADIUS = 1.6;
 const PICKUP_RADIUS = 1.1;
@@ -52,6 +59,13 @@ const GENERATOR_HUM_NOISE = 11;
 const GENERATOR_HUM_INTERVAL = 4.5;
 /** cos of the widest angle off-centre you can be looking and still use something. */
 const INTERACT_FACING = Math.cos(THREE.MathUtils.degToRad(55));
+/** How close you have to be to a locker to climb in. */
+const HIDE_REACH = 1.6;
+/** In a locker you can look through the slats, this far either side and up or down (radians). */
+const HIDE_YAW = 0.6;
+const HIDE_PITCH = 0.35;
+/** The locker muffles you: your breathing carries this much as far. */
+const HIDE_MUFFLE = 0.55;
 const SWITCH_TIME = 0.45;
 const MELEE_COOLDOWN = 0.55;
 const MELEE_RANGE = 1.9;
@@ -216,6 +230,11 @@ export class LevelSession {
   private readonly lastSeq = new Map<string, number>();
   /** Down and waiting for the partner, instead of dead. */
   private downed = false;
+  /** The lockers you can hide in, and the one you're in (if any). */
+  private readonly hideSpots: HideSpot[];
+  private hiding: HideSpot | null = null;
+  /** Health when you got in: hurt in there means something pulled you out. */
+  private hideHp = 0;
   private bleed = 0;
   private reviveProgress = 0;
   private stateTimer = 0;
@@ -242,6 +261,9 @@ export class LevelSession {
     const sp = this.level.spawns;
     const cellIndex = (c: { col: number; row: number }) => c.row * this.level.cols + c.col;
     this.lamps = new LampSystem(scene, sp.lamps, this.level.lampFixtures, quality.lampLights);
+    this.hideSpots = planDressing(this.level)
+      .props.filter((pr) => pr.kind === "hideLocker")
+      .map((pr) => ({ pos: new THREE.Vector2(pr.x, pr.z), out: new THREE.Vector2(-Math.sin(pr.rot), -Math.cos(pr.rot)) }));
     this.effects = new Effects(scene, quality.dustMotes);
     const water = new Set(sp.water.map((w) => `${w.cell.col},${w.cell.row}`));
     this.effects.setWorld({
@@ -455,7 +477,13 @@ export class LevelSession {
     const cellI = cell.row * this.level.cols + cell.col;
     this.player.terrain = this.waterCells.has(cellI) ? WATER : DRY;
     // Down: you can look around, and that's all.
-    this.player.update(dt, this.downed ? { ...emptyCommand(), turn: cmd.turn, tilt: cmd.tilt } : cmd);
+    // Down: you can look around, and that's all. In a locker: look, breathe, keep still.
+    const still = { ...emptyCommand(), turn: cmd.turn, tilt: cmd.tilt };
+    this.player.update(
+      dt,
+      this.downed ? still : this.hiding ? { ...still, holdBreath: cmd.holdBreath, talk: cmd.talk, interact: cmd.interact } : cmd
+    );
+    if (this.hiding) this.holdInLocker();
     if (this.downed) engine.camera.position.y = 0.4;
     this.keepOutOfBoss();
     this.checkTriggers();
@@ -464,8 +492,10 @@ export class LevelSession {
     this.projectiles.update(dt, this.player.position, this.player.position.y, this.player.health.isDead);
     this.updateThrowables(dt);
     if (!this.downed) {
-      this.updateCombat(dt, cmd);
-      this.updatePickups(dt);
+      if (!this.hiding) {
+        this.updateCombat(dt, cmd);
+        this.updatePickups(dt);
+      }
       this.updateInteraction(dt, cmd.interact);
     }
     this.updateCoop(dt, cmd);
@@ -595,8 +625,9 @@ export class LevelSession {
         playerNoise: s.down
           ? 0
           : Math.max(NOISE_RADIUS[s.gait] * (s.wet ? WATER.noise : 1), s.held ? 0 : BREATH_NOISE, s.talk ? VOICE_NOISE : 0),
-        torchOn: !s.down && s.torch > 0.3,
+        torchOn: !s.down && !s.hid && s.torch > 0.3,
         playerDead: s.down || s.hp <= 0,
+        hidden: !!s.hid,
         eye: r.eyePosition,
         look: r.lookDirection,
       });
@@ -607,11 +638,13 @@ export class LevelSession {
   private perception(dead: boolean): Perception {
     const cam = this.services.engine.camera;
     const torch = this.player.flashlight;
+    const muffle = this.hiding ? HIDE_MUFFLE : 1;
     return {
       playerPos: this.player.position2D,
-      playerNoise: dead ? 0 : Math.max(this.player.noiseRadius, this.services.voice?.speaking && this.coop ? VOICE_NOISE : 0),
-      torchOn: !dead && torch.on && torch.level > 0.3,
+      playerNoise: dead ? 0 : Math.max(this.player.noiseRadius, this.services.voice?.speaking && this.coop ? VOICE_NOISE : 0) * muffle,
+      torchOn: !dead && !this.hiding && torch.on && torch.level > 0.3,
       playerDead: dead || this.player.health.isDead,
+      hidden: !!this.hiding,
       eye: cam.getWorldPosition(new THREE.Vector3()),
       look: cam.getWorldDirection(new THREE.Vector3()),
     };
@@ -860,15 +893,94 @@ export class LevelSession {
   private updateInteraction(dt: number, pressed: boolean): void {
     for (const it of this.interactables) it.update(dt, this.time);
     for (const m of this.markers) m.update(this.time);
+    const key = this.services.keyFor("interact");
+    if (this.hiding) {
+      this.services.hud.interactPrompt(key, "Get out");
+      if (pressed) this.leaveLocker();
+      return;
+    }
     // Reviving a downed partner takes the use key (see updateCoop).
     if (this.canRevive) return;
     const target = this.focusedInteractable();
-    this.services.hud.interactPrompt(target ? this.services.keyFor("interact") : null, target?.prompt ?? null);
+    const locker = this.focusedLocker();
+    if (locker && (!target || locker.d < target.pos.distanceTo(this.player.position2D))) {
+      this.services.hud.interactPrompt(key, "Hide");
+      if (pressed) this.enterLocker(locker.spot);
+      return;
+    }
+    this.services.hud.interactPrompt(target ? key : null, target?.prompt ?? null);
     if (!target || !pressed) return;
     // The guest asks the host, who runs the world — except to hear that a door is locked.
     const lockedDoor = target instanceof Door && target.security && !this.hasKeycard;
     if (this.coop?.role === "guest" && !lockedDoor) this.coop.send({ t: "use", i: this.interactables.indexOf(target) });
     else target.interact();
+  }
+
+  // ------------------------------------------------------------------ hiding
+
+  /** The locker in front of you and within reach, if any (and nobody's in it). */
+  private focusedLocker(): { spot: HideSpot; d: number } | null {
+    const p = this.player.position2D;
+    const fwd = new THREE.Vector2(-Math.sin(this.player.facing), -Math.cos(this.player.facing));
+    let best: { spot: HideSpot; d: number } | null = null;
+    for (const spot of this.hideSpots) {
+      const to = spot.pos.clone().sub(p);
+      const d = to.length();
+      if (d > HIDE_REACH || (d > 0.5 && to.divideScalar(d).dot(fwd) < INTERACT_FACING)) continue;
+      // Only from the front: you get in through the door.
+      if (p.clone().sub(spot.pos).dot(spot.out) < 0.2) continue;
+      if (this.partners.some((r) => r.state?.hid && r.position2D.distanceTo(spot.pos) < 0.6)) continue;
+      if (!best || d < best.d) best = { spot, d };
+    }
+    return best;
+  }
+
+  /**
+   * Into a locker: out of sight, light off, looking out through the slats.
+   * Anything that watched you get in knows where you are; anything else only
+   * has your breathing to go on (muffled; hold it when one comes close).
+   */
+  private enterLocker(spot: HideSpot): void {
+    this.hiding = spot;
+    this.hideHp = this.player.health.current;
+    const fl = this.player.flashlight;
+    if (fl.on) fl.toggle();
+    this.player.setLook(Math.atan2(-spot.out.x, -spot.out.y), 0);
+    this.holdInLocker();
+    this.services.sound.playLocker(true);
+    this.services.hud.hiding(true);
+    this.playerNoise(spot.pos, 3);
+  }
+
+  /** Out of the locker, onto the floor in front of it. Pulled out if something got you. */
+  private leaveLocker(pulled = false): void {
+    const spot = this.hiding;
+    if (!spot) return;
+    this.hiding = null;
+    const p = this.player.position;
+    p.x = spot.pos.x + spot.out.x * 0.95;
+    p.z = spot.pos.y + spot.out.y * 0.95;
+    this.services.sound.playLocker(false);
+    this.services.hud.hiding(false);
+    if (pulled) this.player.addTrauma(0.7);
+    else this.playerNoise(spot.pos, 3);
+  }
+
+  /** Each frame in a locker: stay put, and look out only as far as the slats let you. */
+  private holdInLocker(): void {
+    const spot = this.hiding!;
+    if (this.player.health.current < this.hideHp || this.downed || this.player.health.isDead) {
+      // It found you: dragged out.
+      this.leaveLocker(true);
+      return;
+    }
+    this.hideHp = this.player.health.current;
+    const p = this.player.position;
+    p.x = spot.pos.x + spot.out.x * 0.05;
+    p.z = spot.pos.y + spot.out.y * 0.05;
+    const outYaw = Math.atan2(-spot.out.x, -spot.out.y);
+    const off = THREE.MathUtils.clamp(wrapAngle(this.player.facing - outYaw), -HIDE_YAW, HIDE_YAW);
+    this.player.setLook(outYaw + off, THREE.MathUtils.clamp(this.player.lookPitch, -HIDE_PITCH, HIDE_PITCH));
   }
 
   /** Host: tell the guest something was used (it happens there too). */
@@ -1466,6 +1578,7 @@ export class LevelSession {
       look: this.services.look?.(),
       held: p.breath.held,
       talk: this.services.voice?.speaking || undefined,
+      hid: this.hiding ? true : undefined,
       n: ++this.sentSeq,
     };
     this.coop?.send(state, true);
