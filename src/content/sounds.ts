@@ -1,7 +1,7 @@
 /**
- * Recorded sound effects. Everything else in REMNANT is synthesized, but a
- * weapon never sounds real without a real recording, so these are the one
- * exception to the "no asset files" rule.
+ * Recorded sound effects: the weapons, bodies, voices and the building
+ * itself (footsteps of what walks in it, creaking steel, pipes, water, the
+ * hum of the place). Everything else in REMNANT is synthesized.
  *
  * Files live in `public/sfx/` (served next to the game). An id may list
  * several files; one is picked at random each time so repeated shots don't
@@ -37,7 +37,15 @@ export type SampleId =
   | "flashlight"
   | "ammoPickup"
   | "bottleSmash"
-  | "playerHurt";
+  | "playerHurt"
+  // The level around you: what walks in it, and the building itself.
+  | "creatureStep"
+  | "creatureDrag"
+  | "skitter"
+  | "pipeKnock"
+  | "metalCreak"
+  | "drip"
+  | "roomTone";
 
 export interface SampleDef {
   /** File names inside public/sfx/. */
@@ -94,4 +102,33 @@ export const SAMPLES: Partial<Record<SampleId, SampleDef>> = {
   ammoPickup: { files: ["ammoPickup_1.mp3"], gain: 0.45, pitchJitter: 0.04 },
   bottleSmash: { files: ["bottleSmash_1.mp3", "bottleSmash_2.mp3", "bottleSmash_3.mp3"], gain: 0.9, pitchJitter: 0.06 },
   playerHurt: { files: ["playerHurt_1.mp3", "playerHurt_2.mp3", "playerHurt_3.mp3", "playerHurt_4.mp3"], gain: 0.45, pitchJitter: 0.04 },
+  creatureStep: {
+    files: [
+      "creatureStep_1.mp3",
+      "creatureStep_2.mp3",
+      "creatureStep_3.mp3",
+      "creatureStep_4.mp3",
+      "creatureStep_5.mp3",
+      "creatureStep_6.mp3",
+      "creatureStep_7.mp3",
+      "creatureStep_8.mp3",
+      "creatureStep_9.mp3",
+    ],
+    gain: 0.75,
+    pitchJitter: 0.08,
+  },
+  creatureDrag: { files: ["creatureDrag_1.mp3", "creatureDrag_2.mp3", "creatureDrag_3.mp3"], gain: 0.55, pitchJitter: 0.06 },
+  skitter: { files: ["skitter_1.mp3", "skitter_2.mp3"], gain: 0.5, pitchJitter: 0.1 },
+  pipeKnock: {
+    files: ["pipeKnock_1.mp3", "pipeKnock_2.mp3", "pipeKnock_3.mp3", "pipeKnock_4.mp3", "pipeKnock_5.mp3"],
+    gain: 0.6,
+    pitchJitter: 0.1,
+  },
+  metalCreak: {
+    files: ["metalCreak_1.mp3", "metalCreak_2.mp3", "metalCreak_3.mp3", "metalCreak_4.mp3", "metalCreak_5.mp3", "metalCreak_6.mp3"],
+    gain: 0.32,
+    pitchJitter: 0.12,
+  },
+  drip: { files: ["drip_1.mp3", "drip_2.mp3", "drip_3.mp3", "drip_4.mp3", "drip_5.mp3"], gain: 0.55, pitchJitter: 0.15 },
+  roomTone: { files: ["roomTone_1.mp3", "roomTone_2.mp3"], gain: 0.5, pitchJitter: 0 },
 };

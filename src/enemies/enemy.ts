@@ -131,6 +131,8 @@ export class Enemy {
   onRanged: ((enemy: Enemy, from: THREE.Vector3, target: THREE.Vector3) => void) | null = null;
   /** A Mimic wants to make a sound to draw you in. */
   onLure: ((enemy: Enemy) => void) | null = null;
+  /** A foot came down (puppets too: each player hears their own copy walk). */
+  onStep: ((enemy: Enemy) => void) | null = null;
 
   protected readonly home: THREE.Vector2;
   protected patrolTarget: THREE.Vector2;
@@ -626,7 +628,10 @@ export class Enemy {
     }
     this.root.rotation.y = this.facing;
     this.animSpeed += (this.speedNow - this.animSpeed) * (1 - Math.exp(-ANIM_EASE * dt));
+    const before = Math.floor(this.walkPhase / Math.PI);
     this.walkPhase += dt * this.animSpeed * this.stats.stride;
+    // Each half-turn of the walk cycle is a foot coming down.
+    if (this.animSpeed > 0.3 && Math.floor(this.walkPhase / Math.PI) !== before && !this.onCeiling) this.onStep?.(this);
     this.body.pose({
       time: this.time,
       speed: this.animSpeed,

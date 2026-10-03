@@ -60,6 +60,22 @@ function run(e: Enemy, p: Perception, seconds: number, others: Enemy[] = [e]): v
   for (let t = 0; t < seconds; t += 1 / 30) e.update(1 / 30, level, p, others);
 }
 
+describe("footsteps", () => {
+  it("a walking creature's feet come down in rhythm; a still one makes none", () => {
+    const walker = spawn("husk", 3);
+    const still = spawn("husk", 3);
+    let steps = 0;
+    let quiet = 0;
+    walker.onStep = () => steps++;
+    still.onStep = () => quiet++;
+    walker.alertTo(cellCenter(9, 2));
+    run(walker, perceive(10, { playerDead: true }), 3);
+    run(still, perceive(10, { playerDead: true, playerPos: cellCenter(3, 2) }), 3);
+    expect(steps).toBeGreaterThan(4);
+    expect(quiet).toBe(0);
+  });
+});
+
 describe("hiding", () => {
   it("someone in a locker isn't seen, even right in front of it with the light on", () => {
     const e = spawn("husk", 3);

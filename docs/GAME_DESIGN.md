@@ -92,7 +92,7 @@ src/
 │   └── protocol.ts            Room codes and every message the two games exchange
 ├── items/pickup.ts            Pickup meshes and animation
 ├── fx/                        Procedural canvas textures, particles
-├── audio/soundManager.ts      Synth SFX, stereo panning, wall muffling, reverb, ambience
+├── audio/soundManager.ts      Recorded + synth SFX, 3D panning, wall muffling, room reverb, ambience
 ├── audio/music.ts             Adaptive in-level music: layers and intensity
 └── ui/                        HUD, menus, inventory, styles
 ```
@@ -737,9 +737,29 @@ small modelled mesh and a coloured glow so it's findable with the light off.
 
 ## 10. Audio
 
-All synthesized. Chain: voice → (low-pass if a wall is between you) → stereo
-panner → dry bus + convolution reverb (generated impulse) → master →
+Recordings where there are any, synthesis for the rest. Chain: voice →
+(low-pass if a wall is between you) → 3D panner → dry bus + reverb → master →
 compressor.
+
+- **Direction**: anything placed in the world is panned in 3D (HRTF, from
+  its angle to where you face), so on headphones you can tell a creature
+  behind you from one ahead. Distance is our own curve, and the further
+  away something is, the more of it is reverb.
+- **Rooms**: two generated impulses (a tight, bright 0.9 s one and a big,
+  dark 4.2 s one with a predelay; both with early reflections and a tail
+  that loses its highs) crossfaded by how open the space around you is:
+  eight rays from your eyes every 0.4 s (`measureRoom`). A shot in a vent is
+  swallowed; one in the pump hall rolls on.
+- **Footsteps of what's near**: every creature's foot coming down (each
+  half-turn of its walk cycle, `Enemy.onStep`) plays a bare foot on
+  concrete within 22 units, lower and heavier for big things, with a thud in
+  the floor for a Brute, a scrabble of claws for Crawlers and rats, and now
+  and then a dragged foot. Muffled through walls; a guest hears their own
+  copies walk.
+- **The building**: a recorded room tone under everything (a deep rumble,
+  or machine hum in ventilation, the power plant and the lift shaft; very
+  quietly behind the menu), and every few seconds, somewhere around you,
+  steel creaking, a knock along a pipe, or water dripping in a big space.
 
 - **Weapon**: real recordings (CC0, `public/sfx/`, loaded by
   `audio/samples.ts` from the list in `content/sounds.ts`): a 9 mm fired in

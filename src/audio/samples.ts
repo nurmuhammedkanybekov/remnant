@@ -35,6 +35,13 @@ export class SampleBank {
     return (this.buffers.get(id)?.length ?? 0) > 0;
   }
 
+  /** One of the recordings for `id` (a random one if there are several), or null. */
+  buffer(id: SampleId, which?: number): AudioBuffer | null {
+    const list = this.buffers.get(id);
+    if (!list?.length) return null;
+    return list[which !== undefined ? which % list.length : Math.floor(Math.random() * list.length)];
+  }
+
   /** Plays a random variant of `id` into `dest` at `when`. Returns false if there's no recording for it. */
   play(ctx: BaseAudioContext, id: SampleId, dest: AudioNode, when: number, gain = 1, rate = 1): boolean {
     const list = this.buffers.get(id);
