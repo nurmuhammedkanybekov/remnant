@@ -340,6 +340,26 @@ merged mesh per material (posters and scrawls per texture): about 15–25
 draw calls and 15–200k triangles a level. Props stand against walls and
 stay clear of pickups, so collision stays with the map.
 
+**Hiding.** Every level has lockers to climb into (`hideLocker`, about five,
+spread out against bare walls in rooms, or in corridors if the rooms run
+out; never by a pickup or the start). Facing one from the front within 1.6
+units, the use key gets in: the light goes off, you look out through the
+slats (±0.6 rad, ±0.35 up and down), and you can't move, fire or heal.
+Creatures can't see you (`Perception.hidden`), and your breathing carries
+only 55% as far, so holding it still matters. A creature that could see you
+at the moment you got in knows which locker: it comes, and its strike drags
+you out (any damage while hidden ejects you, with a jolt). Anything else
+walks past. In co-op the state rides on the player stream (`hid`): your
+body disappears for the others, and the host's creatures can't see you
+either. Getting in or out makes a little noise.
+
+**The menu.** Behind the main menu the camera drifts through the places the
+story happened, one slow 16 s push each (the listening circle, R-7's cell,
+the 1991 camp, the cocoons, Arkadin's charges, Hendricks), framed right of
+centre clear of the menu and faded through black between them. In some of
+them the light stutters, and when it steadies someone is standing at the
+edge of it; the next stutter, they're gone (`game/menuBackdrop.ts`).
+
 **Hidden rooms.** A `+` is a loose panel: a door (`DoorSpawn.panel`) that
 wears the walls' own material over the whole cell, with only a faint seam
 and pry marks to give it away. Use pries it loose (quietly, noise 4, where a

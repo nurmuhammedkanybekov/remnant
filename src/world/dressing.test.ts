@@ -86,3 +86,18 @@ describe("story scenes", () => {
     }
   });
 });
+
+describe("hiding places", () => {
+  for (const def of LEVELS) {
+    it(`${def.id}: a few lockers to hide in, each with open floor in front`, () => {
+      const level = parseLevel(def);
+      const hides = planDressing(level).props.filter((p) => p.kind === "hideLocker");
+      expect(hides.length).toBeGreaterThanOrEqual(3);
+      for (const h of hides) {
+        // Its door faces away from the wall (local -Z): you step out to there.
+        const out = worldToCell(h.x - Math.sin(h.rot) * 0.95, h.z - Math.cos(h.rot) * 0.95);
+        expect(isSolid(level, out.col, out.row)).toBe(false);
+      }
+    });
+  }
+});

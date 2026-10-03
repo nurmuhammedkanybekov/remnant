@@ -58,6 +58,8 @@ export type PropKind =
   | "growth"
   | "noteTable"
   | "body"
+  // A tall locker you can climb into and hide in (see `HIDE_SPOTS`).
+  | "hideLocker"
   // Rooms, by what they were for.
   | "curtain"
   | "medCabinet"
@@ -266,6 +268,9 @@ const ROOM_PROPS: Record<RoomKind, PropKind[]> = {
   overgrown: ["growth", "growth", "body", "pod", "growth"],
 };
 
+/** Lockers to hide in, per level. */
+const HIDE_SPOTS = 5;
+
 /** Only one of these to a level: there was one chair, and one table. */
 const UNIQUE: ReadonlySet<PropKind> = new Set(["restraintChair", "opTable"]);
 
@@ -291,6 +296,7 @@ const DEPTH: Record<PropKind, number> = {
   growth: 1.2,
   noteTable: 0,
   body: 0,
+  hideLocker: 0.62,
   curtain: 2.0,
   medCabinet: 0.32,
   wheelchair: 0.75,
@@ -568,6 +574,8 @@ export function planDressing(level: ParsedLevel): DressingPlan {
     });
   };
 
+  // Wall slots (cell:side) that already have something against them.
+  const taken = new Set<string>();
   rooms.forEach((cells, i) => {
     const kind = dressing.rooms[i % dressing.rooms.length];
     const pool = ROOM_PROPS[kind];
@@ -623,6 +631,7 @@ export function planDressing(level: ParsedLevel): DressingPlan {
         const reach = Math.max(1.1, DEPTH[prop] / 2 + 0.7);
         if (itemsNear.some((p) => Math.hypot(p.x - x, p.y - z) < reach || Math.hypot(p.x + 0.6 - x, p.y - 0.4 - z) < reach)) continue;
         plan.props.push({ kind: prop, x, z, rot });
+        taken.add(`${k}:${dc},${dr}`);
       }
       // Whatever was left lying on the floor.
       if (rand() < 0.3) {
@@ -671,6 +680,40 @@ export function planDressing(level: ParsedLevel): DressingPlan {
         const alongX = open(c - 1, r) || open(c + 1, r);
         plan.props.push({ kind: "sinew", x: centre.x, z: centre.y, rot: alongX ? 0 : Math.PI / 2 });
       }
+    }
+
+  // Lockers to hide in: a few to every level, spread out, against bare walls
+  // in rooms (or corridors, if the rooms run out), never by a pickup.
+  const slots: { c: number; r: number; dc: number; dr: number; room: boolean }[] = [];
+  for (const [list, inRooms] of [
+    [rooms.flat(), true],
+    [[...Array(level.rows * level.cols).keys()].filter((k) => !roomCells.has(k)), false],
+  ] as const)
+    for (const k of list) {
+      const c = k % level.cols;
+      const r = Math.floor(k / level.cols);
+      if (!open(c, r) || !plain(c, r) || sceneCells.has(k)) continue;
+      for (const [dc, dr] of SIDES) {
+        if (ch(c + dc, r + dr) !== "#" || taken.has(`${k}:${dc},${dr}`)) continue;
+        // In a corridor, only where it's wide enough not to block it: against the end of a dead end, or a side wall with the way open opposite.
+        if (!inRooms && ch(c - dc, r - dr) === "#") continue;
+        slots.push({ c, r, dc, dr, room: inRooms });
+      }
+    }
+  shuffle(slots, rand);
+  const hides: THREE.Vector2[] = [];
+  for (const pass of [0, 1])
+    for (const s of slots) {
+      if (hides.length >= HIDE_SPOTS) break;
+      const centre = cellCenter(s.c, s.r);
+      const inset = CELL_SIZE / 2 - DEPTH.hideLocker / 2 - 0.04;
+      const at = new THREE.Vector2(centre.x + s.dc * inset, centre.y + s.dr * inset);
+      if (hides.some((h) => h.distanceTo(at) < (pass === 0 ? 14 : 7))) continue;
+      if (!clearOfItems(at.x, at.y, 1.4) || at.distanceTo(level.spawns.playerStart) < 4) continue;
+      // Rooms first, well spread; then anywhere, closer together, to make up the number.
+      if (pass === 0 && !s.room) continue;
+      hides.push(at);
+      plan.props.push({ kind: "hideLocker", x: at.x, z: at.y, rot: Math.atan2(s.dc, s.dr) });
     }
 
   // Every note lies on something: a small table where somebody left it.
@@ -950,6 +993,15 @@ function buildProp(p: Parts, kind: PropKind, rand: () => number, variant = 0): v
       break;
     case "growth":
       for (let i = 0; i < 4; i++) p.blob("flesh", 0.25 + rand() * 0.35, (rand() - 0.5) * 0.9, rand() * 1.4, (rand() - 0.5) * 0.4);
+      break;
+    case "hideLocker":
+      // A tall steel locker with a slatted door: big enough to climb into.
+      p.box("metal", 0.72, 2.05, 0.58, 0, 1.025, 0).box("darkMetal", 0.66, 1.95, 0.02, 0, 1.02, -0.3);
+      for (let i = 0; i < 6; i++) p.box("rubber", 0.42, 0.025, 0.012, 0, 1.45 + i * 0.07, -0.312);
+      for (let i = 0; i < 3; i++) p.box("rubber", 0.42, 0.025, 0.012, 0, 0.25 + i * 0.07, -0.312);
+      p.box("metal", 0.03, 0.18, 0.04, 0.26, 1.05, -0.33).box("paper", 0.14, 0.06, 0.005, 0, 1.85, -0.313);
+      // A scrape on the floor in front where the door has swung a hundred times.
+      p.cyl("stain", 0.35, 0.004, 0, 0.004, -0.55, 0, 0, 8);
       break;
     case "noteTable":
       p.box("wood", 0.55, 0.04, 0.45, 0, 0.48, 0).cyl("metal", 0.02, 0.48, -0.22, 0.24, -0.18).cyl("metal", 0.02, 0.48, 0.22, 0.24, -0.18);
