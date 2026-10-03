@@ -66,7 +66,9 @@ surface, with a story told over the radio, notes left by the people who were
 there before you, a three-phase boss and two endings. Every note answers a
 question the last one raised: why the station was sealed, who the voice on
 the radio really is, and what is waiting at the top, so the story comes
-together as you climb. The rooms have a purpose (wards, labs, freezers,
+together as you climb, and where each note was left, the place shows what it
+says: the bed you slept through it in, the radio with its plug pulled; R-7's
+cell, broken from the inside. The rooms have a purpose (wards, labs, freezers,
 pump halls, an armory with its racks nearly empty) and are furnished to
 match, with signs by their doors. Pipes painted to the Soviet colour code
 run the length of the corridors, frosted and hung with icicles in cold
@@ -448,7 +450,7 @@ The game is then at http://localhost:5173. Other useful commands:
   session: joining with a code, shared doors and pickups, reviving, retrying,
   finishing a level together and leaving.
 
-There are 248 unit tests covering level validation, collision, pathfinding,
+There are 259 unit tests covering level validation, collision, pathfinding,
 movement, breathing, weapons, thrown bottles, creature AI, loot placement,
 room furnishing, co-op, save merging, cloud sync, the leaderboard, settings
 and more. Adding `?debug` to the URL exposes test hooks on `window.game`.

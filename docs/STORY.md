@@ -112,6 +112,25 @@ Mara's notes are always one floor ahead of you.
 | 9 The Hive         | It keeps them, every voice it learned. Mara, absorbed, calling you in. \*Mara's photograph of the valley village: tell them never to answer a radio.                                                                               |
 | 10 Lift Shaft      | Arkadin 1991: the doors open only for the unchanged, and the shaft is wired to bring the mountain down. \*The crew roster: forty scratched out, one left.                                                                          |
 
+### What each place shows
+
+Every note has a scene built around it that shows what the note says, so
+the story can be read off the walls as well as the paper. A few rooms have
+scenes the notes never mention. Built in `world/storyScenes.ts`.
+
+| Level              | Scenes                                                                                                                                                                                                                                                                            |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Infirmary        | Nur's bed, the drip, Mara's bag, and the radio with its plug pulled a hand's width from the socket. Kessler's bed with straps, his chart, the four notes scratched on the wall. Mara's hidden tins. In Ward 1, chairs in a circle round a radio that is still on, food untouched. |
+| 2 Maintenance Wing | The break-room radio, on, Petrov's chair pulled right up to it. Claw gouges and a dropped hard hat. The shift rota ("Heard singing. Sent home."). The 1988 vent, boarded and stencilled shut, three stools in front of it. In the locker room, packed bags nobody came back for.  |
+| 3 Cold Storage     | The lift key cabinet ("HENDRICKS ONLY"). Three pairs of boots in a row. "НЕ ГОВОРИ ЕМУ СВОЁ ИМЯ" over a radio that is on. Hendricks' GLASS crates, packed at 4°C, and his detonator wire.                                                                                         |
+| 4 Pumping Station  | The master valve chained shut under Arkadin's order. Hendricks against the wall, the detonator in his hand, its wire running up the shaft. Arkadin's soundproofed room: foam, two chairs, the recorder.                                                                           |
+| 5 Containment Labs | R-7's cell, broken from the inside, glass across the floor. Arkadin's desk and his daughter's drawing ("ПАПЕ"). The GLASS transport case, open and empty. One chair at the observation window, cigarette ends. The blood cabinet, one vial dark.                                  |
+| 6 Ventilation      | "← ← →" scratched in the duct. The rivet gun bench. The 1991 camp: bedroll, tins, candles, a drawing of the sun, 212 days in tally marks. "THE VOICE IS NOT THE SUPERVISOR".                                                                                                      |
+| 7 Power Plant      | The lift's board, three lamps dark. Mara's map: three X's, "START ONE. RUN." The 1991 engineer's stash and his crossed-out list. A switch cabinet torn open with something grown into the cables.                                                                                 |
+| 8 Armory           | Mara's radio smashed with a hammer, her bag beside it. The security chief's locker: ear defenders, empty magazines, "STOP LISTENING". The sign-out desk turned over as a barricade, the floor brass with spent cases.                                                             |
+| 9 The Hive         | Three of the crew grown into the wall, boots still on. Mara's jacket half taken in, and a radio grown into the wall beside it. Her pack and the photograph of the valley.                                                                                                         |
+| 10 Lift Shaft      | The roster in the hatch: forty-one names, forty crossed out. Arkadin's charges up the shaft wall, linked by det cord.                                                                                                                                                             |
+
 ## Weapons
 
 | Weapon        | Where                  | Notes                                                                                                                                                  |
