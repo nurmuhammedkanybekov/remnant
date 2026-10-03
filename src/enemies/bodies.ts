@@ -268,10 +268,10 @@ function flipWinding(g: THREE.BufferGeometry): void {
 }
 
 /** A lumpy blob (a growth, a fused shoulder, a pustule). */
-function fleshBlob(r: number, seed: number, lump = 0.25): THREE.BufferGeometry {
+function fleshBlob(r: number, seed: number, lump = 0.25, detail = 3): THREE.BufferGeometry {
   // Welded first (the icosphere comes with every corner duplicated, which shades flat and faceted),
   // then wrapped with a spherical UV so the skin texture still lies on it.
-  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(r, 3);
+  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(r, detail);
   g.deleteAttribute("normal");
   g.deleteAttribute("uv");
   g = mergeVertices(g);
@@ -917,9 +917,24 @@ class RatBody implements CreatureBody {
 
     this.torso.position.y = 0.13;
     this.group.add(this.torso);
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.2, 4, 8), this.skin);
-    body.rotation.x = Math.PI / 2;
-    body.scale.set(1, 1, 0.85);
+    // A rat gone wrong: lumpy, hunched at the shoulders, mangy.
+    const body = new THREE.Mesh(
+      fleshTube(
+        0.42,
+        [
+          [0, 0.02],
+          [0.12, 0.07],
+          [0.45, 0.1],
+          [0.7, 0.09],
+          [0.88, 0.065],
+          [1, 0.03],
+        ],
+        { seed: 3, lump: 0.25, flat: [0.95, 0.85] }
+      ),
+      this.skin
+    );
+    body.rotation.x = -Math.PI / 2;
+    body.position.z = -0.22;
     this.torso.add(body);
     this.viewFade = new ViewFade(body);
     // Spines where the Remnant has pushed through.
@@ -932,9 +947,21 @@ class RatBody implements CreatureBody {
 
     this.head.position.set(0, 0.02, 0.18);
     this.torso.add(this.head);
-    const snout = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.14, 8), this.skin);
-    snout.rotation.x = Math.PI / 2;
-    snout.position.z = 0.05;
+    const snout = new THREE.Mesh(
+      fleshTube(
+        0.17,
+        [
+          [0, 0.045],
+          [0.35, 0.05],
+          [0.8, 0.025],
+          [1, 0.006],
+        ],
+        { seed: 5, lump: 0.2 }
+      ),
+      this.skin
+    );
+    snout.rotation.x = -Math.PI / 2;
+    snout.position.z = -0.03;
     this.head.add(snout);
     for (const x of [-0.03, 0.03]) {
       const glow = fadingEye(glowSprite(0xff3a1a, 0.07));
@@ -1063,10 +1090,11 @@ export class MassBody implements CreatureBody {
       [0, 2.4, -0.1, 0.6],
     ];
     for (const [x, y, z, r] of lumps) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 14), this.skin);
+      const m = new THREE.Mesh(fleshBlob(r, x * 7 + z * 3, 0.16, 4), this.skin);
       m.position.set(x, y, z);
       m.scale.set(1, 0.85, 1);
       m.userData.base = m.position.clone();
+      m.userData.radius = r;
       this.group.add(m);
       this.lumps.push(m);
     }
@@ -1116,9 +1144,23 @@ export class MassBody implements CreatureBody {
         const seg = new THREE.Group();
         seg.position.z = j === 0 ? 0 : 0.42;
         const r = 0.16 - j * 0.018;
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.85, r, 0.46, 7), this.skin);
-        m.rotation.x = Math.PI / 2;
-        m.position.z = 0.21;
+        // Each length knotted where it joins the next, and long enough to overlap it.
+        const m = new THREE.Mesh(
+          fleshTube(
+            0.52,
+            [
+              [0, r * 0.6],
+              [0.1, r * 1.1],
+              [0.5, r * 0.88],
+              [0.9, r * 0.92],
+              [1, r * 0.5],
+            ],
+            { seed: i * 11 + j, lump: 0.22, seg: 10, rings: 12 }
+          ),
+          this.skin
+        );
+        m.rotation.x = -Math.PI / 2;
+        m.position.z = -0.03;
         seg.add(m);
         parent.add(seg);
         segs.push(seg);
@@ -1135,9 +1177,7 @@ export class MassBody implements CreatureBody {
   hitVolumes(): { head: THREE.Sphere; body: THREE.Sphere[] } {
     return {
       head: new THREE.Sphere(this.core.getWorldPosition(new THREE.Vector3()), 0.5),
-      body: this.lumps
-        .slice(0, 4)
-        .map((l) => new THREE.Sphere(l.getWorldPosition(new THREE.Vector3()), (l.geometry as THREE.SphereGeometry).parameters.radius)),
+      body: this.lumps.slice(0, 4).map((l) => new THREE.Sphere(l.getWorldPosition(new THREE.Vector3()), l.userData.radius as number)),
     };
   }
 

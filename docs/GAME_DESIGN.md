@@ -211,6 +211,19 @@ or the exit.
   flashlight, which is near-invisible in these units — the main reason it
   rendered almost black.)
 - ACES filmic tone mapping, exposure 1.15, sRGB output.
+- **Light in the air**: every ceiling lamp throws a faint cone of light
+  down through the dust, and a co-op partner's torch shows as a beam, so you
+  see where they're looking (`fx/beams.ts`: an open cone drawn additively,
+  brightest on its axis and near its source; one transparent draw each, no
+  real volumetrics). A lamp's cone flickers with it and goes when it's shot.
+- **Brightness**: a gamma lift in the final pass (raises the shadows, keeps
+  black black), set on first launch on a screen of three marks on black
+  (the left one should be only just visible; its preview runs through the
+  same curve as an SVG filter), and in Settings later.
+- **Automatic quality** (`core/qualityGuard.ts`): while you play it watches
+  the frame rate in four-second windows after a warm-up; two slow windows
+  (under 28 fps) in a row and the graphics step down a level, with a line on
+  screen saying so. Can be switched off in Settings.
 - **Shadows**: the flashlight casts them (soft PCF; 1024 on Medium, 2048 on
   High, none on Low), and everything solid casts and catches them
   (`core/shadows.ts`; glass, water, decals and glows are left out). Shadows
@@ -1113,7 +1126,7 @@ See [`ROADMAP.md`](ROADMAP.md) for the full plan.
    cube shadow map), so lamp light passes through closed doors.
 4. **Creatures are generated, not sculpted.** Noise-deformed flesh reads as
    flesh in the dark, but sculpted, rigged models would be the next step up
-   (the boss and the rats still use the older primitive bodies).
+   The boss's mound and tendrils and the rats are built the same way.
 5. **No touch input.** Touch-only devices are told so on the title screen.
 6. **Co-op** depends on free third-party services: Metered Realtime for
    matchmaking (with the relay it hands out) and, optionally, Metered's
