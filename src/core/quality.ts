@@ -18,12 +18,46 @@ export interface QualityPreset {
   dustMotes: number;
   /** Film grain and chromatic aberration in the final pass. */
   filmEffects: boolean;
+  /** Shadow map size for the flashlight (0: no shadows). Shadows are most of what makes things sit in the world. */
+  shadows: number;
+  /** Ambient occlusion: corners and contact darken (costly; high only). */
+  ao: boolean;
 }
 
 export const QUALITY: Record<QualityId, QualityPreset> = {
-  low: { id: "low", name: "Low", pixelRatioCap: 0.75, lampLights: 3, bumpMaps: false, dustMotes: 80, filmEffects: false },
-  medium: { id: "medium", name: "Medium", pixelRatioCap: 1, lampLights: 4, bumpMaps: true, dustMotes: 160, filmEffects: true },
-  high: { id: "high", name: "High", pixelRatioCap: 1.5, lampLights: 6, bumpMaps: true, dustMotes: 260, filmEffects: true },
+  low: {
+    id: "low",
+    name: "Low",
+    pixelRatioCap: 0.75,
+    lampLights: 3,
+    bumpMaps: false,
+    dustMotes: 80,
+    filmEffects: false,
+    shadows: 0,
+    ao: false,
+  },
+  medium: {
+    id: "medium",
+    name: "Medium",
+    pixelRatioCap: 1,
+    lampLights: 4,
+    bumpMaps: true,
+    dustMotes: 160,
+    filmEffects: true,
+    shadows: 1024,
+    ao: false,
+  },
+  high: {
+    id: "high",
+    name: "High",
+    pixelRatioCap: 1.5,
+    lampLights: 6,
+    bumpMaps: true,
+    dustMotes: 260,
+    filmEffects: true,
+    shadows: 2048,
+    ao: true,
+  },
 };
 
 export const QUALITY_ORDER: QualityId[] = ["low", "medium", "high"];

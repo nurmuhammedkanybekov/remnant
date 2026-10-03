@@ -889,15 +889,53 @@ export function veinTexture(): THREE.CanvasTexture {
   });
 }
 
-/** Mottled, slick skin for the creatures (multiplied with each creature's tint). */
+/**
+ * Dead skin for the creatures (multiplied with each creature's tint): grey
+ * and waxy, bruised purple and green in blotches, veins branching under it,
+ * pores, and grime ground into it.
+ */
 export function fleshTexture(): THREE.CanvasTexture {
-  return canvasTexture(256, 256, 12, (ctx, w, h, rand) => {
-    ctx.fillStyle = "#b8aaa0";
+  const tex = canvasTexture(512, 512, 12, (ctx, w, h, rand) => {
+    ctx.fillStyle = "#a89c94";
     ctx.fillRect(0, 0, w, h);
-    blotches(ctx, w, h, rand, 40, "rgba(90,60,55,0.35)", 30);
-    blotches(ctx, w, h, rand, 30, "rgba(230,220,210,0.25)", 18);
-    noise(ctx, w, h, rand, 40, 1);
+    // Bruising and lividity: big soft patches.
+    blotches(ctx, w, h, rand, 26, "rgba(70,40,58,0.42)", 90);
+    blotches(ctx, w, h, rand, 22, "rgba(70,82,52,0.32)", 70);
+    blotches(ctx, w, h, rand, 30, "rgba(40,24,20,0.35)", 40);
+    blotches(ctx, w, h, rand, 40, "rgba(210,200,190,0.22)", 30);
+    // Veins: dark, branching, just under the surface.
+    ctx.lineCap = "round";
+    for (let v = 0; v < 26; v++) {
+      let x = rand() * w;
+      let y = rand() * h;
+      let a = rand() * Math.PI * 2;
+      let width = 2.5 + rand() * 2;
+      for (let k = 0; k < 14 && width > 0.4; k++) {
+        const nx = x + Math.cos(a) * (10 + rand() * 18);
+        const ny = y + Math.sin(a) * (10 + rand() * 18);
+        ctx.strokeStyle = `rgba(${40 + rand() * 30},${20 + rand() * 15},${40 + rand() * 25},${0.35 + rand() * 0.25})`;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(nx, ny);
+        ctx.stroke();
+        x = nx;
+        y = ny;
+        a += (rand() - 0.5) * 1.1;
+        width *= 0.86;
+      }
+    }
+    // Pores and specks, then grime and dried blood.
+    for (let i = 0; i < 9000; i++) {
+      ctx.fillStyle = `rgba(30,20,18,${rand() * 0.35})`;
+      ctx.fillRect(rand() * w, rand() * h, 1 + rand() * 1.5, 1 + rand() * 1.5);
+    }
+    blotches(ctx, w, h, rand, 18, "rgba(55,12,8,0.35)", 22);
+    blotches(ctx, w, h, rand, 14, "rgba(20,16,12,0.45)", 26);
+    noise(ctx, w, h, rand, 30, 1);
   });
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
 }
 
 let cache: ReturnType<typeof buildAll> | null = null;
