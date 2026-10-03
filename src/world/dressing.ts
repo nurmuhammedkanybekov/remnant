@@ -3,6 +3,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { CELL_SIZE, WALL_HEIGHT, cellCenter } from "./grid";
 import type { ParsedLevel } from "./levelParser";
 import { hash, mulberry32, shuffle } from "./reinforcements";
+import { buildScene, planScenes, storyTexture, storyTextureOnWall, type ScenePlacement } from "./storyScenes";
 
 /**
  * Set dressing: what makes a corridor a hospital ward, a morgue or a
@@ -142,6 +143,8 @@ export interface DressingPlan {
   props: PropPlacement[];
   signs: SignPlacement[];
   runs: CorridorRun[];
+  /** The story told where it happened (see `storyScenes.ts`). */
+  scenes: ScenePlacement[];
 }
 
 interface LevelDressing {
@@ -537,7 +540,10 @@ export function planDressing(level: ParsedLevel): DressingPlan {
   rooms.sort((a, b) => b.length - a.length || a[0] - b[0]);
   const roomCells = new Set(rooms.flat());
 
-  const plan: DressingPlan = { props: [], signs: [], runs: [] };
+  // The story scenes first: their cells are left to them.
+  const story = planScenes(level, { ch, plain: (c, r) => open(c, r) && plain(c, r), rooms });
+  const sceneCells = story.cells;
+  const plan: DressingPlan = { props: [], signs: [], runs: [], scenes: story.scenes };
   const dressing = LEVEL_DRESSING[level.def.id] ?? { rooms: ["stores"], names: [["", ""]] };
   const itemsNear = [...level.spawns.items.map((i) => i.pos), ...level.spawns.notes.map((n) => n.pos)];
   const clearOfItems = (x: number, z: number, d: number) => !itemsNear.some((p) => Math.hypot(p.x - x, p.y - z) < d);
@@ -570,7 +576,7 @@ export function planDressing(level: ParsedLevel): DressingPlan {
     for (const k of cells) {
       const c = k % level.cols;
       const r = Math.floor(k / level.cols);
-      if (!plain(c, r)) continue;
+      if (!plain(c, r) || sceneCells.has(k)) continue;
       const centre = cellCenter(c, r);
       for (const [dc, dr] of SIDES) {
         // A freezer's doorways are hung with plastic strips against the cold.
@@ -642,7 +648,7 @@ export function planDressing(level: ParsedLevel): DressingPlan {
       }
       const centre = cellCenter(c, r);
       if (links || rises) plan.runs.push({ x: centre.x, z: centre.y, links, rises });
-      if (!open(c, r) || !plain(c, r)) continue;
+      if (!open(c, r) || !plain(c, r) || sceneCells.has(key(c, r))) continue;
       for (const [dc, dr] of SIDES) {
         if (ch(c + dc, r + dr) !== "#") continue;
         if (rand() < 0.14) onWall(pick(style.wall), c, r, dc, dr);
@@ -674,7 +680,7 @@ export function planDressing(level: ParsedLevel): DressingPlan {
   const quiet: THREE.Vector2[] = [];
   for (let r = 0; r < level.rows; r++)
     for (let c = 0; c < level.cols; c++) {
-      if (!open(c, r) || !plain(c, r)) continue;
+      if (!open(c, r) || !plain(c, r) || sceneCells.has(key(c, r))) continue;
       const p = cellCenter(c, r);
       if (p.distanceTo(level.spawns.playerStart) < CELL_SIZE * 3) continue;
       if (itemsNear.some((q) => q.distanceTo(p) < 2)) continue;
@@ -690,7 +696,7 @@ export function planDressing(level: ParsedLevel): DressingPlan {
 
 // ---------------------------------------------------------------- building
 
-type MatKey =
+export type MatKey =
   | "metal"
   | "darkMetal"
   | "rust"
@@ -717,7 +723,10 @@ type MatKey =
   | "rubber"
   | "brass"
   | "sandbag"
-  | "stain";
+  | "stain"
+  | "dial"
+  | "orange"
+  | "blood";
 
 function materials(): Record<MatKey, THREE.MeshStandardMaterial> {
   const std = (color: number, roughness: number, metalness = 0, extra: THREE.MeshStandardMaterialParameters = {}) =>
@@ -752,11 +761,16 @@ function materials(): Record<MatKey, THREE.MeshStandardMaterial> {
     brass: std(0x7a6a3a, 0.4, 0.7),
     sandbag: std(0x6a6048, 1),
     stain: std(0x120c0a, 0.35, 0, { polygonOffset: true, polygonOffsetFactor: -2 }),
+    // A radio's dial, still lit: dim, so it's found by looking, not seen across the room.
+    dial: std(0x3a2a10, 0.4, 0, { emissive: 0xc88a2a, emissiveIntensity: 0.45 }),
+    // Consortium kit: the one bright thing down here.
+    orange: std(0xb8601a, 0.6, 0.1),
+    blood: std(0x2a0806, 0.3),
   };
 }
 
 /** Collects boxes and cylinders by material, to merge into one mesh each. */
-class Parts {
+export class Parts {
   readonly byMat = new Map<MatKey, THREE.BufferGeometry[]>();
   /** Textured planes (posters, scrawls, chalkboards), by texture. */
   readonly byTex = new Map<string, THREE.BufferGeometry[]>();
@@ -778,8 +792,14 @@ class Parts {
     return this;
   }
 
-  cyl(m: MatKey, r: number, h: number, x: number, y: number, z: number, rx = 0, rz = 0, seg = 8): this {
-    this.add(m, new THREE.CylinderGeometry(r, r, h, seg), x, y, z, rx, rz);
+  cyl(m: MatKey, r: number, h: number, x: number, y: number, z: number, rx = 0, rz = 0, seg = 8, ry = 0): this {
+    this.add(m, new THREE.CylinderGeometry(r, r, h, seg), x, y, z, rx, rz, ry);
+    return this;
+  }
+
+  /** The top half of a sphere, sitting on y (a hard hat). */
+  dome(m: MatKey, r: number, x: number, y: number, z: number): this {
+    this.add(m, new THREE.SphereGeometry(r, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), x, y, z, 0, 0);
     return this;
   }
 
@@ -1398,6 +1418,19 @@ function canvasTexture(c: HTMLCanvasElement): THREE.CanvasTexture {
 }
 
 function texturedMaterial(key: string): THREE.MeshStandardMaterial {
+  if (key.startsWith("story:")) {
+    const name = key.slice(6);
+    return storyTextureOnWall(name)
+      ? new THREE.MeshStandardMaterial({
+          map: storyTexture(name),
+          roughness: 0.9,
+          transparent: true,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+        })
+      : new THREE.MeshStandardMaterial({ map: storyTexture(name), roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -1 });
+  }
   if (key === "chalk") return new THREE.MeshStandardMaterial({ map: chalkTexture(), roughness: 0.95 });
   const n = Number(key.replace(/\D/g, ""));
   if (key.startsWith("scrawl"))
@@ -1607,6 +1640,7 @@ export function buildDressing(scene: THREE.Scene, level: ParsedLevel, plan: Dres
   const parts = new Parts();
   for (const pr of plan.props) buildProp(parts.at(pr.x, pr.z, pr.rot), pr.kind, rand, pr.variant);
   for (const run of plan.runs) buildRun(parts, run, style, rand);
+  for (const sc of plan.scenes) buildScene(parts.at(sc.x, sc.z, sc.rot), sc.kind, rand);
   for (const [m, geos] of parts.byMat) {
     const merged = geos.length ? mergeGeometries(geos, false) : null;
     for (const g of geos) g.dispose();

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { planDressing } from "./dressing";
+import { STORY_SCENES } from "./storyScenes";
 import { isSolid, worldToCell } from "./grid";
 import { parseLevel } from "./levelParser";
 import { LEVELS } from "./levels";
@@ -61,5 +62,27 @@ describe("level character", () => {
   });
   it("puts pumps in the pumping station", () => {
     expect(plan("pumping-station").props.some((p) => p.kind === "pump")).toBe(true);
+  });
+});
+
+describe("story scenes", () => {
+  for (const def of LEVELS) {
+    it(`${def.id}: every scene in the story is built, in open floor, one to a cell`, () => {
+      const level = parseLevel(def);
+      const { scenes } = planDressing(level);
+      const wanted = STORY_SCENES[def.id] ?? [];
+      expect(scenes.map((s) => s.kind).sort()).toEqual(wanted.map((a) => a.kind).sort());
+      const cells = scenes.map((s) => worldToCell(s.x, s.z));
+      for (const c of cells) expect(isSolid(level, c.col, c.row)).toBe(false);
+      expect(new Set(cells.map((c) => `${c.col},${c.row}`)).size).toBe(cells.length);
+    });
+  }
+
+  it("every note on every level has a scene", () => {
+    for (const def of LEVELS) {
+      const notes = Object.keys(def.notes);
+      const anchored = (STORY_SCENES[def.id] ?? []).flatMap((a) => ("note" in a ? [a.note] : []));
+      expect(anchored.sort(), def.id).toEqual(notes.sort());
+    }
   });
 });
