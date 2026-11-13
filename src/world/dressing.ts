@@ -342,6 +342,9 @@ const ROOM_PROPS: Record<RoomKind, PropKind[]> = {
   school: ["desk", "desk", "desk", "shelf", "desk"],
 };
 
+/** What stands about in a yard or a village street. */
+const OUTDOOR_PROPS: PropKind[] = ["crates", "drums", "bench", "crates"];
+
 /** Lockers to hide in, per level. */
 const HIDE_SPOTS = 5;
 
@@ -735,9 +738,11 @@ export function planDressing(level: ParsedLevel): DressingPlan {
   // Wall slots (cell:side) that already have something against them.
   const taken = new Set<string>();
   rooms.forEach((cells, i) => {
+    // Out under the sky it's a yard or a street, whatever the table says: no beds or filing cabinets in the snow.
+    const outside = cells.filter((k) => sky.has(k)).length * 2 > cells.length;
     const kind = dressing.rooms[i % dressing.rooms.length];
-    const pool = ROOM_PROPS[kind];
-    const name = dressing.names[i % dressing.names.length];
+    const pool = outside ? OUTDOOR_PROPS : ROOM_PROPS[kind];
+    const name: [string, string] = outside ? ["", ""] : dressing.names[i % dressing.names.length];
     let signed = false;
     for (const k of cells) {
       const c = k % level.cols;
