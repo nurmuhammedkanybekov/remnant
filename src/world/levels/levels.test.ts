@@ -1,16 +1,55 @@
 import { describe, expect, it } from "vitest";
-import { ENEMY_GLYPHS, type EnemyKind } from "../../content/enemies";
+import { ENEMY_GLYPHS, enemyDef, type EnemyKind } from "../../content/enemies";
 import { ITEM_GLYPHS, ITEMS } from "../../content/items";
 import { WEAPONS } from "../../content/weapons";
 import { parseLevel } from "../levelParser";
 import { validateLevel } from "../levelValidator";
-import { LEVELS } from ".";
+import { LEVELS, PARTS, partOf } from ".";
 
 describe("shipped levels", () => {
-  it("form a ten-level campaign that ends in the finale", () => {
-    expect(LEVELS).toHaveLength(10);
-    expect(LEVELS[LEVELS.length - 1].finale).toBe(true);
-    expect(LEVELS.slice(0, -1).some((l) => l.finale)).toBe(false);
+  it("form two parts (10 + 7 levels), each ending in a finale with its own endings", () => {
+    expect(LEVELS).toHaveLength(17);
+    expect(PARTS.map((p) => [p.first, p.last])).toEqual([
+      [0, 9],
+      [10, 16],
+    ]);
+    for (const p of PARTS) {
+      expect(LEVELS[p.last].finale).toBe(true);
+      expect(LEVELS.slice(p.first, p.last).some((l) => l.finale)).toBe(false);
+    }
+    // Part One keeps its original endings; Part Two has its own.
+    expect(LEVELS[PARTS[0].last].endings).toBeUndefined();
+    expect(LEVELS[PARTS[1].last].endings).toEqual({ exit: "dawn", console: "silence" });
+    expect(partOf(0).id).toBe(1);
+    expect(partOf(9).id).toBe(1);
+    expect(partOf(10).id).toBe(2);
+    expect(partOf(16).id).toBe(2);
+  });
+
+  it("keep Part One exactly where saves expect it (indices never move)", () => {
+    expect(LEVELS.slice(0, 10).map((l) => l.id)).toEqual([
+      "infirmary",
+      "maintenance-wing",
+      "cold-storage",
+      "pumping-station",
+      "containment-labs",
+      "ventilation",
+      "power-plant",
+      "armory",
+      "hive",
+      "lift-shaft",
+    ]);
+  });
+
+  it("make every Part Two level harder than the one before it (more creature health to get past)", () => {
+    const threat = (i: number) =>
+      parseLevel(LEVELS[i]).spawns.enemies.reduce((n, e) => {
+        const d = enemyDef(e.kind);
+        return n + (d.behaviour === "boss" ? 0 : d.health);
+      }, 0);
+    // The finale is the boss fight; the climb up to it gets steadily worse.
+    for (let i = PARTS[1].first + 1; i < PARTS[1].last; i++) expect(threat(i)).toBeGreaterThan(threat(i - 1));
+    expect(parseLevel(LEVELS[PARTS[1].last]).spawns.enemies.some((e) => e.kind === "choir")).toBe(true);
   });
 
   it.each(LEVELS.map((l) => [l.id, l] as const))("%s has rows of equal width", (_, def) => {

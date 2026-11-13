@@ -390,7 +390,23 @@ rows added there, so nothing already on the map moves), holding a note and a
 medkit, battery or ammunition. Creatures never open panels.
 
 **Themes** (`world/theme.ts`) set fog colour and density, fill light, wall
-and floor tint and lamp colour per level.
+and floor tint and lamp colour per level. Two more settings exist for Part
+Two's valley:
+
+- `outdoor`: opens part of the level to the sky (`world/outdoors.ts`
+  decides which cells, purely from the map). `"streets"` opens the largest
+  area you can cover without opening a door (the village's streets and
+  square; the houses keep their roofs); `"water"` opens the water and any
+  walkway with water on two sides (the dam's reservoir). Over those cells
+  the builder lays no ceiling tile, puts a world-space sheet of drifted snow
+  on the ground and strings any lamp on a wire to the nearest wall; the
+  scene background becomes a night sky (overcast, a few stars, the mountains'
+  ridge) whose horizon matches the fog. `fx/snow.ts` keeps 1,400 flakes in a
+  box anchored to the camera's grid, parking any over a roofed cell out of
+  sight. The set dressing runs no pipes there and furnishes an open-air
+  "room" as a yard (crates, drums, a bench), with no sign.
+- `walls: "timber"`: weathered boards (the CC0 planks photo) instead of
+  concrete.
 
 | #   | Level                         | Creatures                                              | What's new                                      |
 | --- | ----------------------------- | ------------------------------------------------------ | ----------------------------------------------- |
@@ -404,6 +420,29 @@ and floor tint and lamp colour per level.
 | 8   | Sublevel 3 — Armory           | 3 swarms (18 rats), 2 husks, 2 brutes                  | Shotgun, big open hall                          |
 | 9   | Sublevel 2 — The Hive         | listener, watcher, crawler, spitter, 2 brutes, Remnant | Everything so far, then the boss arena          |
 | 10  | Surface — Lift Shaft          | husk, crawler, brute                                   | The choice: leave, or trigger the charges       |
+
+**Part Two, The Valley** (levels 11–17, `src/world/levels/part2/`). New
+Game offers both parts, chapter select always has the first level of each,
+and finishing Part One can continue straight into Part Two with the same
+run. Each level has more creature health to get past than the one before
+(checked by a test), and Part Two has its own prologue and endings
+(`dawn`, `silence`):
+
+| #   | Level                       | Creatures (hand-placed)                                | What's new                                                     |
+| --- | --------------------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
+| 11  | Ak-Suu — Clinic             | 4 husks, listener                                      | Three weeks later; the voice is back                           |
+| 12  | Ak-Suu — The Village        | husks, 2 howlers, watcher, mimic, a swarm              | Outdoors in the snow; the Howler                               |
+| 13  | Kara-Suu — Hydro Dam        | 2 listeners, 2 spitters, howler, husk, crawler, brute  | The reservoir under the sky, three generators for the spillway |
+| 14  | Kosh-Tash — Observatory     | 3 watchers, 2 husks, 2 howlers, brute, mimic           | Security doors                                                 |
+| 15  | Drainage Line — Rail Tunnel | 3 crawlers, 3 howlers, 2 listeners, 2 swarms, 2 brutes | Four kilometres of dark; alarms                                |
+| 16  | Beneath Ten — The Deep      | everything                                             | Two generators and a keycard, under Sublevel 10                |
+| 17  | The Cavity — The Source     | the Choir, 2 howlers, watcher, brute                   | The last boss; walk out or set off the charges                 |
+
+The **Howler** screams when it first finds you (not again for 12 s) and
+every creature within 40 units comes to where it saw you. The **Choir** is
+the Remnant's body grown larger and tougher. Part One's level indices never
+move (saves and checkpoints store them), so new levels are only ever
+appended; Part Two finishes are recorded in `progress.completedTwo`.
 
 The exit is a door + EXIT sign mounted on the wall next to the `X` cell. Its
 sign and light turn red while locked.
@@ -900,6 +939,16 @@ Two or three players, online, through the whole campaign. Main menu →
 **Co-op** → **Host a Game** (pick a sublevel you've reached and a
 difficulty) shows a five-character room code; up to two partners pick
 **Join a Game** and type it. The host starts once at least one is in.
+
+**Invite links.** The host lobby's **Copy Invite Link** copies
+`…/remnant/?join=CODE` (keeping a custom `?signal=`), and the link is also
+printed in the lobby to copy by hand. Opening it shows "press any key to
+join room CODE" on the title screen; the key press (needed anyway, for
+audio) goes through the brightness screen on a first visit and then
+straight into `joinGame`, and the `join` parameter is dropped from the
+address so a later reload doesn't knock on a room that's gone. A guest's
+waiting screen offers the character choice, since someone arriving by link
+never passed the co-op menu.
 
 **Three players.** Each guest has its own connection to the host (a star:
 the guests never connect to each other). The host's first room closes its

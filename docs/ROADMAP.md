@@ -146,6 +146,30 @@ Make the codebase ready to grow to 10 levels, many enemy types and co-op.
 - [x] Free daily encrypted backups of the cloud saves through GitHub Actions,
       with a restore script
 
+## Phase 10 — Part Two, finished and released (done)
+
+Part Two was written on the `v2` branch and waited there for two things:
+real outdoor visuals and a full play-through. Both are done, and it is now
+part of the main game.
+
+- [x] Merged onto everything since: three-player co-op, set dressing, story
+      scenes, lockers, sound placement
+- [x] Open sky over the valley: night sky with the mountains' ridge, falling
+      snow, snow lying on the ground, timber houses, street lamps on wires,
+      and roofs only over what's indoors (`theme.outdoor` in the level data)
+- [x] Every Part Two room furnished and signed, yards and streets furnished
+      as yards, and a story scene for each of its thirteen notes
+- [x] Played through start to finish by a bot that walks every level with
+      real movement and collisions (keycards, doors, generators, exit), and
+      in a two-player co-op game
+
+Also in this round:
+
+- [x] Co-op invite links: the host copies a link, and opening it joins the
+      room with no code to type; guests can choose their character while
+      they wait
+- [x] Subtitles keep clear of the HUD on smaller screens
+
 ## Phase 9 — Play it together, play it scared (done)
 
 - [x] Ammunition in small caches spread over each level, found by exploring;

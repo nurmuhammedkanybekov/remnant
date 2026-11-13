@@ -64,7 +64,27 @@ export type SceneKind =
   | "maraPack"
   // Lift shaft
   | "roster"
-  | "charges";
+  | "charges"
+  // Part Two — clinic
+  | "bed3"
+  | "greyWater"
+  // Village
+  | "keyHooks"
+  | "theSquare"
+  // Dam
+  | "shiftLog"
+  | "reservoirWatch"
+  // Observatory
+  | "channel9"
+  | "callSign"
+  // Rail tunnel
+  | "deadCart"
+  | "sonFound"
+  // The deep
+  | "drillHead"
+  | "addMe"
+  // The source
+  | "lastWiring";
 
 export interface ScenePlacement {
   kind: SceneKind;
@@ -134,6 +154,31 @@ export const STORY_SCENES: Record<string, Anchor[]> = {
     { note: "1", kind: "roster" },
     { note: "2", kind: "charges" },
   ],
+  "ak-suu-clinic": [
+    { note: "1", kind: "bed3" },
+    { note: "2", kind: "greyWater" },
+  ],
+  "ak-suu-village": [
+    { note: "1", kind: "keyHooks" },
+    { note: "2", kind: "theSquare" },
+  ],
+  "kara-suu-dam": [
+    { note: "1", kind: "shiftLog" },
+    { note: "2", kind: "reservoirWatch" },
+  ],
+  "kosh-tash-observatory": [
+    { note: "1", kind: "channel9" },
+    { note: "2", kind: "callSign" },
+  ],
+  "drainage-line": [
+    { note: "1", kind: "deadCart" },
+    { note: "2", kind: "sonFound" },
+  ],
+  "beneath-ten": [
+    { note: "1", kind: "drillHead" },
+    { note: "2", kind: "addMe" },
+  ],
+  "the-cavity": [{ note: "1", kind: "lastWiring" }],
 };
 
 const SIDES = [
@@ -716,6 +761,149 @@ export function buildScene(p: Parts, kind: SceneKind, rand: () => number): void 
       p.box("darkMetal", 0.3, 0.4, 0.12, 0.6, 1.3, WALL - 0.06).box("paintRed", 0.08, 0.08, 0.04, 0.6, 1.35, WALL - 0.14);
       wallText(p, "charges", 1.0, 0.45, 0.6, 2.0);
       break;
+    // ------------------------------------------------ Part Two: the clinic
+    case "bed3":
+      // Bed 3, where the engineer from the mountain slept. A clean square in the dust where a radio would stand — and no radio.
+      bed(p, -1.2, 0.95, true);
+      table(p, 0.15, 1.65, 0.5, 0.45, 0.6);
+      p.box("stain", 0.46, 0.004, 0.41, 0.15, 0.623, 1.65).box("paper", 0.22, 0.003, 0.14, 0.15, 0.626, 1.68);
+      p.box("metal", 0.03, 2.2, 0.03, 0.85, 1.1, 1.0).box("curtain", 0.02, 1.7, 1.6, 0.85, 1.25, 0.95);
+      p.box("wood", 0.25, 0.32, 0.02, -1.2, 0.72, -0.02).plane("story:chartBed3", 0.22, 0.28, -1.2, 0.72, -0.035);
+      break;
+    case "greyWater":
+      // Sadykova's desk: the morning's well water, grey, and what she wrote on the wall before she left.
+      table(p, 0.6, 1.6, 1.2, 0.6);
+      p.cyl("glass", 0.045, 0.14, 0.3, 0.81, 1.5).cyl("liquid", 0.04, 0.09, 0.3, 0.78, 1.5);
+      p.cyl("metal", 0.17, 0.32, 1.35, 0.16, 1.0).cyl("liquid", 0.16, 0.02, 1.35, 0.3, 1.0);
+      chair(p, 0.6, 1.0, Math.PI);
+      p.box("enamel", 0.45, 0.7, 0.12, 0.6, 0.85, 0.85, 0.15);
+      wallText(p, "dontDrink", 1.6, 0.6, -0.8, 1.6, 0.04);
+      break;
+    // ------------------------------------------------ Part Two: the village
+    case "keyHooks":
+      // The teacher's house: the key board by the door, the children's exercise books still marked.
+      p.box("wood", 0.7, 0.5, 0.03, -1.0, 1.55, WALL - 0.015);
+      wallText(p, "keyBoard", 0.62, 0.42, -1.0, 1.55, 0, WALL - 0.035);
+      for (let i = 0; i < 6; i++)
+        p.cyl("brass", 0.008, 0.06, -1.25 + (i % 3) * 0.25, 1.62 - Math.floor(i / 3) * 0.2, WALL - 0.07, Math.PI / 2);
+      table(p, 0.7, 1.5, 1.1, 0.65);
+      for (let i = 0; i < 5; i++)
+        p.box(i % 2 ? "paintBlue" : "paper", 0.2, 0.012 + i * 0.001, 0.28, 0.45 + (i % 3) * 0.06, 0.75 + i * 0.012, 1.45, 0, 0, i * 0.2);
+      chair(p, 0.7, 0.95, Math.PI, "wood");
+      break;
+    case "theSquare":
+      // Where one of them stood and screamed: a dropped string bag, bread in the mud, a chair knocked over, the warning.
+      chair(p, -0.9, 1.1, 0.7, "wood", true);
+      p.box("olive", 0.35, 0.22, 0.25, 0.4, 0.11, 1.3, 0, 0, 0.5).cyl("wood", 0.07, 0.28, 0.75, 0.07, 1.05, Math.PI / 2, 0, 8, 0.9);
+      p.cyl("stain", 0.7, 0.004, 0.0, 0.004, 1.0, 0, 0, 10);
+      wallText(p, "tallOne", 1.9, 0.75, 0.1, 1.7, -0.03);
+      break;
+    // ------------------------------------------------ Part Two: the dam
+    case "shiftLog":
+      // The shift engineer's desk: the log open at the last entry, the telephone off the hook, the three generators on the board.
+      table(p, 0.3, 1.6, 1.3, 0.6);
+      p.box("paper", 0.42, 0.015, 0.3, 0.1, 0.75, 1.55, 0, 0, 0.08).box("darkMetal", 0.22, 0.09, 0.18, 0.75, 0.79, 1.7);
+      cable(p, 0.75, 1.62, 0.6, 1.1, 0.012);
+      p.box("darkMetal", 0.08, 0.05, 0.2, 0.6, 0.03, 1.05, 0, 0, 1.2);
+      wallText(p, "genBoard", 1.2, 0.55, -0.9, 1.7);
+      chair(p, 0.3, 1.0, Math.PI + 0.4);
+      break;
+    case "reservoirWatch":
+      // A chair at the window over the reservoir, binoculars on the sill, and what B.T. drew of what he saw.
+      p.box("darkMetal", 2.2, 0.08, 0.3, 0, 1.0, WALL - 0.15).box("glass", 2.0, 0.9, 0.03, 0, 1.5, WALL - 0.03);
+      p.cyl("darkMetal", 0.035, 0.12, -0.25, 1.1, WALL - 0.18, Math.PI / 2).cyl(
+        "darkMetal",
+        0.035,
+        0.12,
+        -0.15,
+        1.1,
+        WALL - 0.18,
+        Math.PI / 2
+      );
+      chair(p, 0.1, 1.3, 0);
+      p.box("paper", 0.3, 0.01, 0.22, 0.6, 0.47, 1.3, 0, 0, 0.3);
+      wallText(p, "heads", 0.8, 0.5, 1.4, 1.5, 0.05);
+      break;
+    // ------------------------------------------------ Part Two: the observatory
+    case "channel9":
+      // The Zenit relay, repaired and humming: its dials still lit, the headphones left on the desk.
+      p.box("darkMetal", 0.9, 1.9, 0.45, -0.9, 0.95, 1.75);
+      for (let i = 0; i < 4; i++) p.box("dial", 0.3, 0.08, 0.01, -0.9, 0.6 + i * 0.35, 1.52);
+      table(p, 0.6, 1.6, 1.1, 0.6);
+      p.cyl("darkMetal", 0.07, 0.04, 0.4, 0.78, 1.55, Math.PI / 2).cyl("darkMetal", 0.07, 0.04, 0.6, 0.78, 1.55, Math.PI / 2);
+      cable(p, 0.5, 1.55, -0.45, 1.6, 0.76);
+      wallText(p, "channel9", 0.9, 0.35, 0.6, 2.0);
+      break;
+    case "callSign":
+      // Arkadin's tape machine, and the call sign written over and over until the wall ran out.
+      table(p, -0.6, 1.6, 1.0, 0.55);
+      p.box("darkMetal", 0.5, 0.15, 0.35, -0.6, 0.82, 1.6)
+        .cyl("rubber", 0.1, 0.02, -0.72, 0.9, 1.6)
+        .cyl("rubber", 0.1, 0.02, -0.48, 0.9, 1.6);
+      wallText(p, "callSign", 2.4, 1.5, 0.2, 1.65, -0.01);
+      chair(p, -0.6, 1.0, Math.PI, "darkMetal", true);
+      break;
+    // ------------------------------------------------ Part Two: the rail tunnel
+    case "deadCart":
+      // The drainage line's rail cart, dead on its sleepers, with the 1990 work order wired to the wall.
+      for (const z of [0.9, 2.2]) p.box("rust", 3.2, 0.05, 0.08, 0, 0.03, z - 0.6);
+      p.box("rust", 1.6, 0.35, 0.95, 0, 0.35, 1.0).box("darkMetal", 1.5, 0.05, 0.85, 0, 0.55, 1.0);
+      for (const [x, z] of [
+        [-0.6, 0.55],
+        [0.6, 0.55],
+        [-0.6, 1.45],
+        [0.6, 1.45],
+      ])
+        p.cyl("darkMetal", 0.16, 0.08, x, 0.16, z, Math.PI / 2, 0, 10);
+      wallText(p, "workOrder", 0.5, 0.65, 1.35, 1.5);
+      break;
+    case "sonFound":
+      // Where Sadykova stopped: her coat folded on a crate, her bag beside it, and her son's knitted hat on top.
+      crate(p, 0.4, 0, 1.6, 0.8, 0.5, 0.55);
+      p.box("tarp", 0.6, 0.08, 0.45, 0.4, 0.54, 1.6).box("paintRed", 0.18, 0.06, 0.16, 0.45, 0.61, 1.55);
+      p.box("cloth", 0.4, 0.3, 0.2, -0.4, 0.15, 1.7, 0, 0, 0.3);
+      p.plane("story:photoBoy", 0.16, 0.2, 0.15, 0.585, 1.42, 0.2);
+      break;
+    // ------------------------------------------------ Part Two: the deep
+    case "drillHead":
+      // 2,610 metres: the drill head that broke into the void, and the core samples laid out beside it.
+      p.cyl("rust", 0.45, 1.6, -0.6, 0.45, 1.5, Math.PI / 2, 0, 12, 0.4).cyl(
+        "darkMetal",
+        0.5,
+        0.25,
+        -1.35,
+        0.45,
+        1.15,
+        Math.PI / 2,
+        0,
+        12,
+        0.4
+      );
+      p.box("wood", 1.2, 0.1, 0.5, 0.9, 0.05, 1.6);
+      for (let i = 0; i < 5; i++) p.cyl(i === 4 ? "flesh" : "rust", 0.05, 0.22, 0.45 + i * 0.22, 0.13, 1.6, Math.PI / 2, 0, 8);
+      wallText(p, "depth2610", 1.0, 0.4, 0.9, 1.8);
+      break;
+    case "addMe":
+      // Arkadin's last log: a chair turned to the wall where it grows thickest, his glasses on the seat.
+      chair(p, 0, 1.2, 0);
+      p.box("glass", 0.14, 0.03, 0.05, 0, 0.48, 1.2).box("darkMetal", 0.16, 0.01, 0.01, 0, 0.495, 1.23);
+      // Small knots of it, sunk into the wall, thickest around where his head would be.
+      for (let i = 0; i < 14; i++) p.blob("flesh", 0.06 + rand() * 0.1, (rand() - 0.5) * 1.6, 0.6 + rand() * 1.4, WALL + 0.02);
+      wallText(p, "addMe", 1.6, 0.6, 0, 1.75, 0.02);
+      break;
+    // ------------------------------------------------ Part Two: the source
+    case "lastWiring":
+      // B. Toktogulov finished wiring the charges and sat down by them. He didn't get up.
+      for (let i = 0; i < 4; i++) {
+        const x = -1.3 + i * 0.7;
+        p.box("paintRed", 0.32, 0.22, 0.14, x, 1.2 + (i % 2) * 0.5, WALL - 0.08);
+      }
+      p.cyl("paintYellow", 0.008, 2.4, 0.0, 1.45, WALL - 0.03, 0, Math.PI / 2);
+      cable(p, 1.1, WALL - 0.1, 0.8, 1.1, 0.012, "paintYellow", 0.008);
+      slumped(p, 0.6, 1.4, "paintBlue");
+      p.box("wood", 0.22, 0.3, 0.02, 0.2, 0.02, 0.9, Math.PI / 2, 0, 0.5);
+      wallText(p, "charges", 1.0, 0.45, -0.7, 2.2);
+      break;
   }
 }
 
@@ -1246,6 +1434,152 @@ const STORY_TEX: Record<string, TexDef> = {
     },
   },
 };
+
+Object.assign(STORY_TEX, {
+  chartBed3: {
+    w: 128,
+    h: 160,
+    draw: (g, w, h) => {
+      paper(g, w, h);
+      g.fillStyle = "#1a1a28";
+      lines(g, ["КОЙКА 3", "инженер,", "с рудника", "", "просил", "выкл. радио", "×2", "РАДИО НЕТ"], 10, 22, 13, 17);
+    },
+  },
+  dontDrink: {
+    w: 512,
+    h: 192,
+    onWall: true,
+    draw: (g, w, h) => scrawl(g, ["НЕ ПИТЬ", "DON'T DRINK THE WATER"], "rgba(30,40,90,0.85)", 46, w, h),
+  },
+  keyBoard: {
+    w: 256,
+    h: 176,
+    draw: (g, w, h) => {
+      paper(g, w, h, "#b89a70");
+      g.fillStyle = "#2a1a10";
+      // One label over each hook; the garage hook is the empty one.
+      ["ДОМ", "САРАЙ", "ШКОЛА", "ГАРАЖ", "КЛУБ", "ПОЧТА"].forEach((t, i) =>
+        lines(g, [t], 22 + (i % 3) * 80, 40 + Math.floor(i / 3) * 70, 15, 0)
+      );
+    },
+  },
+  tallOne: {
+    w: 640,
+    h: 256,
+    onWall: true,
+    draw: (g, w, h) => scrawl(g, ["DON'T LET", "THE TALL ONE", "SEE YOU"], "rgba(150,30,24,0.9)", 52, w, h),
+  },
+  genBoard: {
+    w: 384,
+    h: 176,
+    draw: (g, w, h) => {
+      paper(g, w, h, "#d0ccb8");
+      g.fillStyle = "#1a1a28";
+      lines(
+        g,
+        ["ГЕНЕРАТОРЫ · ВОДОСБРОС", "№1  ○      №2  ○      №3  ○", "все три — затвор откроется", "ВСЯ ДОЛИНА УСЛЫШИТ"],
+        14,
+        34,
+        17,
+        36
+      );
+    },
+  },
+  heads: {
+    w: 256,
+    h: 160,
+    draw: (g, w, h) => {
+      paper(g, w, h);
+      g.fillStyle = "#3a4a5a";
+      g.fillRect(8, 60, w - 16, h - 70);
+      g.fillStyle = "#1a1a20";
+      for (let i = 0; i < 60; i++) {
+        g.beginPath();
+        g.arc(14 + ((i * 37) % (w - 28)), 62 + ((i * 13) % 20), 4, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.fillStyle = "#1a1a28";
+      lines(g, ["сотни.", "не дышат."], 12, 26, 15, 18);
+    },
+  },
+  channel9: {
+    w: 384,
+    h: 144,
+    draw: (g, w, h) => {
+      g.fillStyle = "#c8c0a0";
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = "#1a1a1a";
+      lines(g, ["КАНАЛ 9", "НЕ ЗАПИСЫВАТЬ"], w / 2, 58, 34, 50, "Arial, sans-serif", "center");
+    },
+  },
+  callSign: {
+    w: 768,
+    h: 512,
+    onWall: true,
+    draw: (g, w, h) => {
+      g.fillStyle = "rgba(30,30,40,0.8)";
+      g.font = "bold 26px 'Courier New', monospace";
+      for (let row = 0; row < 15; row++)
+        for (let col = 0; col < 4; col++) {
+          g.save();
+          g.translate(20 + col * 190, 34 + row * 32);
+          g.rotate((Math.random() - 0.5) * 0.1);
+          g.fillText("ЗЕНИТ-1", 0, 0);
+          g.restore();
+        }
+    },
+  },
+  workOrder: {
+    w: 192,
+    h: 256,
+    draw: (g, w, h) => {
+      paper(g, w, h, "#d8d0b0");
+      g.fillStyle = "#1a1a28";
+      lines(
+        g,
+        ["НАРЯД 1990", "дренаж, бокс 3", "", "вагонетка — нет", "идти по путям", "не по воде", "", "НЕ СМОТРЕТЬ", "ВВЕРХ"],
+        14,
+        30,
+        14,
+        22
+      );
+    },
+  },
+  photoBoy: {
+    w: 128,
+    h: 160,
+    draw: (g, w, h) => {
+      g.fillStyle = "#e8e4d8";
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = "#7a8a96";
+      g.fillRect(8, 8, w - 16, h - 40);
+      g.fillStyle = "#3a2a20";
+      g.beginPath();
+      g.arc(w / 2, 60, 18, 0, Math.PI * 2);
+      g.fill();
+      g.fillRect(w / 2 - 20, 78, 40, 42);
+      g.fillStyle = "#2a2a2a";
+      lines(g, ["Данияр, 9"], w / 2, h - 12, 14, 0, "'Comic Sans MS', cursive", "center");
+    },
+  },
+  depth2610: {
+    w: 384,
+    h: 160,
+    draw: (g, w, h) => {
+      g.fillStyle = "#d8b020";
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = "#1a1a1a";
+      for (let i = -2; i < 12; i++) g.fillRect(i * 40, 0, 16, 18);
+      lines(g, ["2610 м", "БУРОВАЯ ГОЛОВКА"], w / 2, 82, 38, 46, "Arial, sans-serif", "center");
+    },
+  },
+  addMe: {
+    w: 640,
+    h: 224,
+    onWall: true,
+    draw: (g, w, h) => scratched(g, ["ДОБАВЬТЕ МЕНЯ", "ADD ME"], 50, w, h),
+  },
+} satisfies Record<string, TexDef>);
 
 /** Whether a story texture is writing on the wall (transparent) rather than a sheet of something. */
 export function storyTextureOnWall(key: string): boolean {

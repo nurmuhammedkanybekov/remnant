@@ -3,7 +3,7 @@ import { MusicDirector } from "../audio/music";
 import { SoundManager, type VoicePlayer } from "../audio/soundManager";
 import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyDef, type DifficultyId } from "../content/difficulty";
 import { cloneBindings, DEFAULT_BINDINGS, keyLabel, type Action } from "../core/actions";
-import { ENDINGS, PROLOGUE, TRANSMISSIONS, type EndingId } from "../content/story";
+import { ENDINGS, PROLOGUE, PROLOGUE_TWO, TRANSMISSIONS, type EndingId } from "../content/story";
 import { PAD, padLabel } from "../core/gamepad";
 import { QUALITY, QUALITY_ORDER } from "../core/quality";
 import { QualityGuard } from "../core/qualityGuard";
@@ -29,7 +29,7 @@ import { Hud, speakerName } from "../ui/hud";
 import type { InventoryView } from "../ui/inventory";
 import { Screens, type MenuItem } from "../ui/menu";
 import { Viewmodel } from "../weapons/viewmodel";
-import { LEVELS } from "../world/levels";
+import { LEVELS, PARTS, partOf } from "../world/levels";
 import type { CheckpointState } from "./checkpoint";
 import { LevelSession, type CoopLink, type SessionServices } from "./levelSession";
 import { carryOver, cloneLoadout, startingLoadout, type Loadout } from "./loadout";
@@ -128,6 +128,10 @@ export class Game {
   private backgroundTicker: Worker | null = null;
   /** Matchmaking server; `?signal=wss://…` points at a self-hosted one. */
   private readonly signalUrl = new URLSearchParams(location.search).get("signal");
+  /** A room code from an invite link (`?join=K7QX2`): the game joins it as soon as the player presses a key. */
+  private pendingJoin: string | null = normalizeRoomCode(new URLSearchParams(location.search).get("join") ?? "");
+  /** Host lobby: the invite link was just copied (the button says so). */
+  private inviteCopied = false;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -233,14 +237,48 @@ export class Game {
     this.state = "title";
     // Phones and tablets: say so up front rather than leave them stuck at the first corridor.
     const touchOnly = matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches;
-    const prompt = this.input.usingPad ? "PRESS A" : touchOnly ? "NEEDS A KEYBOARD AND MOUSE, OR A GAMEPAD" : "PRESS ANY KEY";
+    const press = this.input.usingPad ? "PRESS A" : touchOnly ? "NEEDS A KEYBOARD AND MOUSE, OR A GAMEPAD" : "PRESS ANY KEY";
+    const prompt = this.pendingJoin && !touchOnly ? `${press} TO JOIN ROOM ${this.pendingJoin}` : press;
     this.screens.title(prompt, () => {
       this.sound.init();
       this.sound.setPaused(false);
       this.music.setMode("silent");
-      if (this.settings.calibrated) this.showMainMenu();
-      else this.showCalibration(() => this.showMainMenu());
+      const next = () => (this.pendingJoin ? this.joinFromInvite(this.pendingJoin) : this.showMainMenu());
+      if (this.settings.calibrated) next();
+      else this.showCalibration(next);
     });
+  }
+
+  /** Opened from an invite link: straight into the partner's room. */
+  private joinFromInvite(code: string): void {
+    this.pendingJoin = null;
+    // Drop `join` from the address, so a reload later doesn't knock on a room that's long gone.
+    const url = new URL(location.href);
+    url.searchParams.delete("join");
+    history.replaceState(null, "", url.toString());
+    this.showMainMenu();
+    this.joinGame(code);
+  }
+
+  /** The link that brings a partner straight into this room (keeps a custom `?signal=` server). */
+  private inviteLink(): string {
+    const url = new URL(location.origin + location.pathname);
+    if (this.signalUrl) url.searchParams.set("signal", this.signalUrl);
+    url.searchParams.set("join", this.roomCode);
+    return url.toString();
+  }
+
+  private copyInvite(): void {
+    const link = this.inviteLink();
+    const done = (ok: boolean) => {
+      this.inviteCopied = ok;
+      this.showHostLobby(ok ? "" : "Couldn't copy automatically. Select the link below and copy it.\n");
+    };
+    if (!navigator.clipboard) return done(false);
+    navigator.clipboard.writeText(link).then(
+      () => done(true),
+      () => done(false)
+    );
   }
 
   /** First launch: the brightness screen, before anything else. */
@@ -287,8 +325,8 @@ export class Game {
       });
     }
     items.push(
-      { label: "New Game", primary: !saved, action: () => this.confirmReplaceRun(() => this.showDifficulty(0)) },
-      { label: "Chapters", disabled: this.save.progress.unlockedLevel === 0, action: () => this.showChapters() },
+      { label: "New Game", primary: !saved, action: () => this.confirmReplaceRun(() => this.showNewGame()) },
+      { label: "Chapters", action: () => this.showChapters() },
       { label: "Co-op", detail: "Two or three players, online", action: () => this.showCoopMenu() },
       {
         label: "Saves",
@@ -309,10 +347,16 @@ export class Game {
       { label: "Exit", detail: "Back to the title screen", action: () => this.exitToTitle() }
     );
     const reached = this.save.progress.unlockedLevel;
+    // The gauge shows the part your run is in (Part One if there's no run).
+    const part = partOf(saved?.levelIndex ?? 0);
     this.screens.main(
       items,
       __APP_VERSION__,
-      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, reached: i <= reached })),
+      LEVELS.slice(part.first, part.last + 1).map((def, i) => ({
+        name: def.name,
+        subtitle: def.subtitle,
+        reached: part.first + i <= reached,
+      })),
       personalise(TRANSMISSIONS[Math.floor(Math.random() * TRANSMISSIONS.length)])
     );
   }
@@ -480,12 +524,43 @@ export class Game {
     );
   }
 
+  /** Has this player finished Part One (or got past it) before? Only changes which part is suggested. */
+  private get partOneDone(): boolean {
+    const p = this.save.progress;
+    return p.completed.length > 0 || p.unlockedLevel >= PARTS[1].first;
+  }
+
+  /** New Game: which part, then difficulty, character, prologue. Both parts are always open; Part Two is suggested once Part One is done. */
+  private showNewGame(): void {
+    const done = this.partOneDone;
+    this.screens.lobby("NEW GAME", "WHICH STORY", "", [
+      {
+        label: `${PARTS[0].title}: ${PARTS[0].name}`,
+        primary: !done,
+        detail: "The mountain. Sublevel 10 to the surface",
+        action: () => this.showDifficulty(0),
+      },
+      {
+        label: `${PARTS[1].title}: ${PARTS[1].name}`,
+        primary: done,
+        detail: done ? "Three weeks later. Seven levels, each worse than the last" : "Three weeks later. Best played after Part One",
+        action: () => this.showDifficulty(PARTS[1].first),
+      },
+      { label: "Back", action: () => this.showMainMenu() },
+    ]);
+  }
+
   private showDifficulty(levelIndex: number): void {
     this.screens.difficulty(
       (id) => this.showCharacter(id, levelIndex),
       () => this.showMainMenu(),
-      this.save.progress.completed
+      partOf(levelIndex).id === 2 ? this.save.progress.completedTwo : this.save.progress.completed
     );
+  }
+
+  /** Can this level be picked in chapter select? Reached before, or the start of either part. */
+  private chapterOpen(i: number): boolean {
+    return i <= this.save.progress.unlockedLevel || PARTS.some((p) => p.first === i);
   }
 
   /** New game: who you play, then the prologue (or the chosen chapter). */
@@ -496,25 +571,26 @@ export class Game {
         this.settings.look = look;
         saveSettings(this.settings);
         this.applyDisplaySettings();
-        if (levelIndex === 0) this.showPrologue(difficulty);
+        if (levelIndex === 0 || levelIndex === PARTS[1].first) this.showPrologue(difficulty, levelIndex);
         else this.startCampaign(difficulty, levelIndex);
       },
       () => this.showDifficulty(levelIndex)
     );
   }
 
-  private showPrologue(difficulty: DifficultyId): void {
+  private showPrologue(difficulty: DifficultyId, levelIndex = 0): void {
+    const prologue = levelIndex === 0 ? PROLOGUE : PROLOGUE_TWO;
     this.screens.story(
-      PROLOGUE.title,
-      PROLOGUE.lines.map((l) => personalise(l)),
-      [{ label: "Begin", primary: true, action: () => this.startCampaign(difficulty, 0) }]
+      prologue.title,
+      prologue.lines.map((l) => personalise(l)),
+      [{ label: "Begin", primary: true, action: () => this.startCampaign(difficulty, levelIndex) }]
     );
   }
 
   private showChapters(): void {
-    const { unlockedLevel, bestTimes } = this.save.progress;
+    const { bestTimes } = this.save.progress;
     this.screens.chapters(
-      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, unlocked: i <= unlockedLevel, bestTime: bestTimes[def.id] })),
+      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, unlocked: this.chapterOpen(i), bestTime: bestTimes[def.id] })),
       (i) => this.confirmReplaceRun(() => this.showDifficulty(i)),
       () => this.showMainMenu()
     );
@@ -751,14 +827,20 @@ export class Game {
     if (card && !this.debug && !run.coop) {
       this.state = "card";
       const def = LEVELS[run.levelIndex];
+      const part = partOf(run.levelIndex);
       this.screens.levelCard(
         {
-          index: run.levelIndex,
+          index: run.levelIndex - part.first,
           name: def.name,
           subtitle: def.subtitle,
+          number: def.number,
           tagline: def.tagline,
           objective: run.checkpoint?.objective ?? def.objective,
-          depth: LEVELS.map((d, i) => ({ name: d.name, subtitle: d.subtitle, reached: i <= run.levelIndex })),
+          depth: LEVELS.slice(part.first, part.last + 1).map((d, i) => ({
+            name: d.name,
+            subtitle: d.subtitle,
+            reached: part.first + i <= run.levelIndex,
+          })),
           prompt: this.input.usingPad ? "PRESS A" : "CLICK OR PRESS ANY KEY",
         },
         () => this.beginLevel(false)
@@ -835,12 +917,22 @@ export class Game {
     this.board.record(session.def.id, run.difficulty.id, run.coop ? "coop" : "solo", session.stats.time);
     this.music.setMode("silent");
 
-    if (run.levelIndex >= LEVELS.length - 1) {
+    // The last level of a part: its ending. After Part One, Part Two can follow straight on.
+    const part = partOf(run.levelIndex);
+    if (run.levelIndex >= part.last) {
       this.state = "victory";
-      const id = ending ?? "leave";
-      if (!run.coop) this.save.completeCampaign(run.difficulty.id, id);
+      const id = ending ?? (part.id === 1 ? "leave" : "dawn");
+      if (!run.coop) this.save.completeCampaign(run.difficulty.id, id, part.id);
+      const next = PARTS.find((p) => p.id === part.id + 1);
+      const onward: MenuItem[] = !next
+        ? []
+        : this.isGuest
+          ? []
+          : [{ label: `Continue to ${next.title}`, primary: true, detail: next.name, action: () => this.continueToPart(next.first) }];
       this.screens.ending(ENDINGS[id], run.stats, run.difficulty.name, [
-        { label: "Main Menu", primary: true, action: () => this.showMainMenu() },
+        ...onward,
+        ...(this.isGuest && next ? this.waitForHost() : []),
+        { label: "Main Menu", primary: onward.length === 0 && !(this.isGuest && next), action: () => this.showMainMenu() },
       ]);
       return;
     }
@@ -870,6 +962,26 @@ export class Game {
             { label: "Leave Game", action: () => this.showMainMenu() },
           ];
     this.screens.levelComplete(session.def.name, session.def.subtitle, session.stats, newBest, next);
+  }
+
+  /** Straight on from one part's ending into the next part: same difficulty, what you carried, fresh stats. */
+  private continueToPart(first: number): void {
+    const run = this.run!;
+    run.levelIndex = first;
+    run.loadout = carryOver(this.session?.loadout ?? run.loadout, run.difficulty);
+    run.stats = freshStats();
+    run.checkpoint = null;
+    this.persistRun();
+    if (run.coop) {
+      this.hostBegins({ t: "start", level: first, difficulty: run.difficulty.id, fresh: false });
+      this.startLevel(true);
+      return;
+    }
+    this.screens.story(
+      PROLOGUE_TWO.title,
+      PROLOGUE_TWO.lines.map((l) => personalise(l)),
+      [{ label: "Begin", primary: true, action: () => this.startLevel(true) }]
+    );
   }
 
   // ------------------------------------------------------------------ co-op
@@ -959,9 +1071,9 @@ export class Game {
 
   private showCoopChapters(): void {
     this.coopMenuToken++;
-    const { unlockedLevel, bestTimes } = this.save.progress;
+    const { bestTimes } = this.save.progress;
     this.screens.chapters(
-      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, unlocked: i <= unlockedLevel, bestTime: bestTimes[def.id] })),
+      LEVELS.map((def, i) => ({ name: def.name, subtitle: def.subtitle, unlocked: this.chapterOpen(i), bestTime: bestTimes[def.id] })),
       (level) =>
         this.screens.difficulty(
           (difficulty) => this.hostGame(level, difficulty),
@@ -980,6 +1092,7 @@ export class Game {
     this.mySlot = 0;
     this.hosting = { level, difficulty, tries };
     this.roomCode = makeRoomCode();
+    this.inviteCopied = false;
     this.openRoom();
     this.showHostLobby(note);
     return this.roomCode;
@@ -1067,7 +1180,11 @@ export class Game {
     const lines: string[] = [];
     if (note) lines.push(note.trimEnd());
     if (guests === 0) {
-      lines.push(step ? `A partner is connecting…\n(${step})` : "Send this code to your partners.\nWaiting for them to join…");
+      lines.push(
+        step
+          ? `A partner is connecting…\n(${step})`
+          : "Send your partners the invite link, or this code for Co-op → Join a Game.\nWaiting for them to join…"
+      );
     } else {
       const who = [...this.links.keys()].sort().map((s) => `Player ${s + 1}: ${this.routes.get(s) ?? "connected."}`);
       lines.push(`${guests + 1} of ${MAX_GUESTS + 1} players in the room.`, ...who);
@@ -1075,6 +1192,7 @@ export class Game {
       else if (guests < MAX_GUESTS) lines.push("A third player can still join with the same code.");
       lines.push("Start when you're all ready.");
     }
+    if (guests < MAX_GUESTS) lines.push(this.inviteLink());
     lines.push(`(build ${BUILD_ID})`);
     this.screens.lobby(
       guests > 0 ? `${guests + 1} PLAYERS` : "HOST",
@@ -1094,6 +1212,16 @@ export class Game {
             this.startCoopRun(h.level, h.difficulty);
           },
         },
+        ...(guests < MAX_GUESTS
+          ? [
+              {
+                label: this.inviteCopied ? "Invite Link Copied" : "Copy Invite Link",
+                detail: this.inviteCopied ? "Paste it into a message — opening it joins this room" : "Opening the link joins this room",
+                primary: guests === 0,
+                action: () => this.copyInvite(),
+              },
+            ]
+          : []),
         { label: "Cancel", action: () => this.showCoopMenu() },
       ],
       this.roomCode,
@@ -1165,14 +1293,39 @@ export class Game {
       link.send({ t: "hello", v: PROTOCOL_VERSION, app: __APP_VERSION__ });
       this.sound.playCheckpoint();
       void this.startVoice();
-      const show = (route: string) =>
-        this.screens.lobby("CONNECTED", `ROOM ${code}`, `${route}\nWaiting for the host to start the game…`, [
-          { label: "Leave", action: () => this.showCoopMenu() },
-        ]);
-      show("Connected.");
-      const route = await this.describeRoute(link);
+      let route = "Connected.";
+      const waiting = () => this.links.get(0) === link && this.state === "menu" && !this.run;
+      const show = () =>
+        this.screens.lobby(
+          "CONNECTED",
+          `ROOM ${code}`,
+          `${route}\nWaiting for the host to start the game…`,
+          [
+            {
+              // Someone who came in through an invite link hasn't picked a character yet.
+              label: `Playing as ${fullName(this.settings.look)}`,
+              detail: "Change character",
+              action: () =>
+                this.screens.character(
+                  this.settings.look,
+                  (look) => {
+                    this.settings.look = look;
+                    saveSettings(this.settings);
+                    this.applyDisplaySettings();
+                    if (waiting()) show();
+                  },
+                  () => waiting() && show()
+                ),
+            },
+            { label: "Leave", action: () => this.showCoopMenu() },
+          ],
+          undefined,
+          "guest-lobby"
+        );
+      show();
+      route = await this.describeRoute(link);
       // Only if nothing has moved on (the host may have started already).
-      if (this.links.get(0) === link && this.state === "menu" && !this.run) show(route);
+      if (waiting() && this.screens.showing("guest-lobby")) show();
     };
     link.start();
   }
