@@ -1,5 +1,5 @@
 import { isDifficultyId, type DifficultyId } from "../content/difficulty";
-import type { EndingId } from "../content/story";
+import { isEndingId, type EndingId } from "../content/story";
 import { parseCheckpoint, type CheckpointState } from "./checkpoint";
 import { cloneLoadout, parseLoadout, upgradeLegacyLoadout, type Loadout } from "./loadout";
 import { freshStats, type RunStats } from "./stats";
@@ -35,8 +35,10 @@ export interface CampaignSave {
 export interface Progress {
   /** Highest level index ever reached; chapter select offers 0..this. */
   unlockedLevel: number;
-  /** Difficulties the campaign has been finished on. */
+  /** Difficulties Part One has been finished on. */
   completed: DifficultyId[];
+  /** Difficulties Part Two has been finished on. */
+  completedTwo: DifficultyId[];
   /** Fastest clear per level id, in seconds. */
   bestTimes: Record<string, number>;
   /** Endings the player has seen. */
@@ -52,7 +54,7 @@ export function emptySave(): SaveData {
   return {
     version: SAVE_VERSION,
     campaign: null,
-    progress: { unlockedLevel: 0, completed: [], bestTimes: {}, endings: [], notes: [] },
+    progress: { unlockedLevel: 0, completed: [], completedTwo: [], bestTimes: {}, endings: [], notes: [] },
     savedAt: 0,
   };
 }
@@ -74,8 +76,8 @@ export function parseSave(raw: unknown, levelCount: number): SaveData {
   if (p) {
     save.progress.unlockedLevel = Math.min(levelCount - 1, Math.max(0, Math.floor(num(p.unlockedLevel))));
     if (Array.isArray(p.completed)) save.progress.completed = [...new Set(p.completed.filter(isDifficultyId))];
-    if (Array.isArray(p.endings))
-      save.progress.endings = [...new Set(p.endings.filter((e): e is EndingId => e === "seal" || e === "leave"))];
+    if (Array.isArray(p.completedTwo)) save.progress.completedTwo = [...new Set(p.completedTwo.filter(isDifficultyId))];
+    if (Array.isArray(p.endings)) save.progress.endings = [...new Set(p.endings.filter(isEndingId))];
     if (Array.isArray(p.notes))
       save.progress.notes = [
         ...new Set(p.notes.filter((n): n is string => typeof n === "string" && n.length < 80 && n.includes(":"))),
@@ -127,6 +129,7 @@ export function mergeSaves(a: SaveData, b: SaveData): SaveData {
     progress: {
       unlockedLevel: Math.max(a.progress.unlockedLevel, b.progress.unlockedLevel),
       completed: union(a.progress.completed, b.progress.completed),
+      completedTwo: union(a.progress.completedTwo, b.progress.completedTwo),
       bestTimes,
       endings: union(a.progress.endings, b.progress.endings),
       notes: union(a.progress.notes, b.progress.notes),
@@ -230,8 +233,10 @@ export class SaveStore {
     this.write();
   }
 
-  completeCampaign(difficulty: DifficultyId, ending: EndingId): void {
-    if (!this.data.progress.completed.includes(difficulty)) this.data.progress.completed.push(difficulty);
+  /** A part of the campaign was finished: remember the difficulty and the ending, and close the run. */
+  completeCampaign(difficulty: DifficultyId, ending: EndingId, part: 1 | 2 = 1): void {
+    const list = part === 1 ? this.data.progress.completed : this.data.progress.completedTwo;
+    if (!list.includes(difficulty)) list.push(difficulty);
     if (!this.data.progress.endings.includes(ending)) this.data.progress.endings.push(ending);
     this.data.campaign = null;
     this.write();

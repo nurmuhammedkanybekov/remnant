@@ -28,7 +28,7 @@ import { planDressing } from "../world/dressing";
 import { castShadows, spotShadows } from "../core/shadows";
 import { CheckpointMarker, DetonatorConsole, Door, Generator, Intercom, type Interactable } from "../world/interactables";
 import { LampSystem } from "../world/lamps";
-import { animateWater, buildLevel, type LevelData } from "../world/levelBuilder";
+import { animateWater, animateWeather, buildLevel, type LevelData } from "../world/levelBuilder";
 import type { LevelDef } from "../world/levelDef";
 import { parseLevel } from "../world/levelParser";
 import { lootFor } from "../world/loot";
@@ -102,6 +102,8 @@ const BLEED_TIME = 45;
 const REVIVE_RANGE = 2;
 const REVIVE_TIME = 3;
 const REVIVE_HEALTH = 35;
+/** Every creature this close to a Howler's scream comes looking. */
+const HOWL_RADIUS = 40;
 /**
  * Co-op scaling, by the number of players (index 2 = two players, 3 =
  * three): more creatures, and tougher ones. Supply pickups (ammo, medkits,
@@ -384,7 +386,8 @@ export class LevelSession {
     });
     this.consoles = sp.consoles.map((s) => {
       const c = new DetonatorConsole(scene, s);
-      c.onUse = () => this.finish("seal");
+      c.onUse = () => this.finish(def.endings?.console ?? "seal");
+      c.lockedReason = () => (this.boss && !this.boss.isDead ? `${this.boss.stats.name.toUpperCase()} GUARDS THE CHARGES` : null);
       return c;
     });
     this.interactables = [...this.doors, ...this.generators, ...this.intercoms, ...this.consoles];
@@ -523,6 +526,7 @@ export class LevelSession {
     this.lamps.update(dt, this.player.position, this.time, this.creaturePositions());
     this.effects.update(dt, engine.camera, this.player.flashlight.level, this.time);
     animateWater(this.level, this.time);
+    animateWeather(this.level, dt, engine.camera.position);
     this.updateDirector(dt);
 
     this.muzzleTime -= dt;
@@ -631,6 +635,7 @@ export class LevelSession {
     this.updateThrowables(dt);
     this.lamps.update(dt, this.player.position, this.time, this.creaturePositions());
     this.effects.update(dt, cam, this.player.flashlight.level, this.time);
+    animateWeather(this.level, dt, cam.position);
     this.damageFx = Math.max(0.4, this.damageFx - dt);
     engine.setPostFx(this.damageFx, 1, this.time);
   }
@@ -722,6 +727,7 @@ export class LevelSession {
       this.coop?.send({ t: "proj", from: v(from), to: v(target), speed: r.speed, dmg });
     };
     e.onLure = (en) => this.handleLure(en);
+    e.onHowl = (en) => this.handleHowl(en);
     if (e instanceof RemnantBoss) {
       e.onPhase = (phase) => this.handleBossPhase(phase);
       e.onSummon = (boss) => this.handleSummon(boss);
@@ -745,11 +751,21 @@ export class LevelSession {
     this.services.sound.playLure(r < 0.75 ? "footsteps" : "pickup", sp);
   }
 
+  /**
+   * A Howler has found a player: it screams (a roar everyone hears) and every
+   * creature within HOWL_RADIUS comes to where it saw them.
+   */
+  private handleHowl(e: Enemy): void {
+    this.enemyVocal(e, "roar");
+    this.player.addTrauma(0.25);
+    this.worldNoise(e.lastKnownPosition, HOWL_RADIUS);
+  }
+
   private handleBossPhase(phase: number): void {
     const b = this.boss!;
     if (this.coop?.role === "host") this.coop.send({ t: "bossPhase", phase });
     this.player.addTrauma(0.7);
-    this.services.hud.toast(`THE REMNANT — PHASE ${phase}`, "var(--ui-red)");
+    this.services.hud.toast(`${b.stats.name.toUpperCase()} — PHASE ${phase}`, "var(--ui-red)");
     // The scream reaches every creature on the level.
     this.worldNoise(b.position2D, 60);
     this.run((phase === 2 ? this.def.events?.bossPhase2 : this.def.events?.bossPhase3) ?? []);
@@ -770,11 +786,12 @@ export class LevelSession {
       const p = base.clone().add(new THREE.Vector2(Math.cos(a), Math.sin(a)).multiplyScalar(0.7));
       this.spawnNear("swarm", p);
     }
-    if (boss.phase >= 3) this.spawnNear("husk", base);
+    // The Choir's last phase calls Howlers: every one that sees you screams for the rest.
+    if (boss.phase >= 3) this.spawnNear(boss.stats.id === "choir" ? "howler" : "husk", base);
     this.services.sound.playEnemy("spit", 0.5, this.spatial(base));
   }
 
-  private spawnNear(kind: "swarm" | "husk", p: THREE.Vector2): void {
+  private spawnNear(kind: "swarm" | "husk" | "howler", p: THREE.Vector2): void {
     const c = worldToCell(p.x, p.y);
     if (isSolid(this.level, c.col, c.row)) return;
     const e = this.enemies.spawn(kind, p);
@@ -1262,7 +1279,7 @@ export class LevelSession {
   }
 
   private bossDefeated(): void {
-    this.services.hud.toast("THE REMNANT IS DEAD", "var(--ui-red)");
+    this.services.hud.toast(`${(this.boss?.stats.name ?? "The Remnant").toUpperCase()} IS DEAD`, "var(--ui-red)");
     this.player.addTrauma(0.8);
     this.run(this.def.events?.bossDefeated ?? []);
   }
@@ -1467,7 +1484,7 @@ export class LevelSession {
   // ------------------------------------------------------------------ exit & endings
 
   private exitLockReason(): string | null {
-    if (this.boss && !this.boss.isDead) return "SEALED — THE REMNANT HOLDS THE DOOR";
+    if (this.boss && !this.boss.isDead) return `SEALED — ${this.boss.stats.name.toUpperCase()} HOLDS THE DOOR`;
     if (this.keycardLocksExit && !this.hasKeycard) return "LOCKED — FIND THE KEYCARD";
     if (!this.powerOn) return "NO POWER — START THE GENERATORS";
     return null;
@@ -1490,7 +1507,7 @@ export class LevelSession {
     if (partners.some((r) => r.position2D.distanceTo(exit) > EXIT_TOGETHER))
       return this.throttledPrompt(partners.length > 1 ? "WAITING FOR YOUR PARTNERS" : "WAITING FOR YOUR PARTNER");
     if (this.coop?.role === "guest" && this.coop.connected) return;
-    this.finish(this.def.finale ? "leave" : null);
+    this.finish(this.def.finale ? (this.def.endings?.exit ?? "leave") : null);
   }
 
   private finish(ending: EndingId | null): void {
@@ -1498,7 +1515,7 @@ export class LevelSession {
     this.finished = true;
     if (this.coop?.role === "host") this.coop.send({ t: "finish", ending });
     this.radio.clear();
-    if (ending === "seal") this.services.sound.playDetonation();
+    if (ending && ending === (this.def.endings?.console ?? "seal")) this.services.sound.playDetonation();
     else this.services.sound.playLevelComplete();
     this.onExit?.(ending);
   }
