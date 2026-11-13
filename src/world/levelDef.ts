@@ -1,3 +1,4 @@
+import type { EndingId } from "../content/story";
 import type { ScriptAction } from "../game/script";
 import type { LevelTheme } from "./theme";
 
@@ -61,6 +62,10 @@ export interface LevelDef {
     bossDefeated?: ScriptAction[];
   };
   theme?: Partial<LevelTheme>;
-  /** The last level: the exit and the detonator console each end the game. */
+  /** The last level of a part: the exit and the detonator console each end it. */
   finale?: boolean;
+  /** Which ending the finale's exit and its detonator console lead to. Default: Part One's ("leave", "seal"). */
+  endings?: { exit: EndingId; console: EndingId };
+  /** Shown big on the level card when the name has no number ("Ak-Suu" → 11). */
+  number?: number;
 }
