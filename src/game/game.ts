@@ -128,6 +128,10 @@ export class Game {
   private backgroundTicker: Worker | null = null;
   /** Matchmaking server; `?signal=wss://…` points at a self-hosted one. */
   private readonly signalUrl = new URLSearchParams(location.search).get("signal");
+  /** A room code from an invite link (`?join=K7QX2`): the game joins it as soon as the player presses a key. */
+  private pendingJoin: string | null = normalizeRoomCode(new URLSearchParams(location.search).get("join") ?? "");
+  /** Host lobby: the invite link was just copied (the button says so). */
+  private inviteCopied = false;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -233,14 +237,48 @@ export class Game {
     this.state = "title";
     // Phones and tablets: say so up front rather than leave them stuck at the first corridor.
     const touchOnly = matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches;
-    const prompt = this.input.usingPad ? "PRESS A" : touchOnly ? "NEEDS A KEYBOARD AND MOUSE, OR A GAMEPAD" : "PRESS ANY KEY";
+    const press = this.input.usingPad ? "PRESS A" : touchOnly ? "NEEDS A KEYBOARD AND MOUSE, OR A GAMEPAD" : "PRESS ANY KEY";
+    const prompt = this.pendingJoin && !touchOnly ? `${press} TO JOIN ROOM ${this.pendingJoin}` : press;
     this.screens.title(prompt, () => {
       this.sound.init();
       this.sound.setPaused(false);
       this.music.setMode("silent");
-      if (this.settings.calibrated) this.showMainMenu();
-      else this.showCalibration(() => this.showMainMenu());
+      const next = () => (this.pendingJoin ? this.joinFromInvite(this.pendingJoin) : this.showMainMenu());
+      if (this.settings.calibrated) next();
+      else this.showCalibration(next);
     });
+  }
+
+  /** Opened from an invite link: straight into the partner's room. */
+  private joinFromInvite(code: string): void {
+    this.pendingJoin = null;
+    // Drop `join` from the address, so a reload later doesn't knock on a room that's long gone.
+    const url = new URL(location.href);
+    url.searchParams.delete("join");
+    history.replaceState(null, "", url.toString());
+    this.showMainMenu();
+    this.joinGame(code);
+  }
+
+  /** The link that brings a partner straight into this room (keeps a custom `?signal=` server). */
+  private inviteLink(): string {
+    const url = new URL(location.origin + location.pathname);
+    if (this.signalUrl) url.searchParams.set("signal", this.signalUrl);
+    url.searchParams.set("join", this.roomCode);
+    return url.toString();
+  }
+
+  private copyInvite(): void {
+    const link = this.inviteLink();
+    const done = (ok: boolean) => {
+      this.inviteCopied = ok;
+      this.showHostLobby(ok ? "" : "Couldn't copy automatically. Select the link below and copy it.\n");
+    };
+    if (!navigator.clipboard) return done(false);
+    navigator.clipboard.writeText(link).then(
+      () => done(true),
+      () => done(false)
+    );
   }
 
   /** First launch: the brightness screen, before anything else. */
@@ -980,6 +1018,7 @@ export class Game {
     this.mySlot = 0;
     this.hosting = { level, difficulty, tries };
     this.roomCode = makeRoomCode();
+    this.inviteCopied = false;
     this.openRoom();
     this.showHostLobby(note);
     return this.roomCode;
@@ -1067,7 +1106,11 @@ export class Game {
     const lines: string[] = [];
     if (note) lines.push(note.trimEnd());
     if (guests === 0) {
-      lines.push(step ? `A partner is connecting…\n(${step})` : "Send this code to your partners.\nWaiting for them to join…");
+      lines.push(
+        step
+          ? `A partner is connecting…\n(${step})`
+          : "Send your partners the invite link, or this code for Co-op → Join a Game.\nWaiting for them to join…"
+      );
     } else {
       const who = [...this.links.keys()].sort().map((s) => `Player ${s + 1}: ${this.routes.get(s) ?? "connected."}`);
       lines.push(`${guests + 1} of ${MAX_GUESTS + 1} players in the room.`, ...who);
@@ -1075,6 +1118,7 @@ export class Game {
       else if (guests < MAX_GUESTS) lines.push("A third player can still join with the same code.");
       lines.push("Start when you're all ready.");
     }
+    if (guests < MAX_GUESTS) lines.push(this.inviteLink());
     lines.push(`(build ${BUILD_ID})`);
     this.screens.lobby(
       guests > 0 ? `${guests + 1} PLAYERS` : "HOST",
@@ -1094,6 +1138,16 @@ export class Game {
             this.startCoopRun(h.level, h.difficulty);
           },
         },
+        ...(guests < MAX_GUESTS
+          ? [
+              {
+                label: this.inviteCopied ? "Invite Link Copied" : "Copy Invite Link",
+                detail: this.inviteCopied ? "Paste it into a message — opening it joins this room" : "Opening the link joins this room",
+                primary: guests === 0,
+                action: () => this.copyInvite(),
+              },
+            ]
+          : []),
         { label: "Cancel", action: () => this.showCoopMenu() },
       ],
       this.roomCode,
