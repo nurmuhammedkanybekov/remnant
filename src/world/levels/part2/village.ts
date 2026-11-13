@@ -12,13 +12,16 @@ export const VILLAGE: LevelDef = {
   spawnYaw: -Math.PI / 2,
   // Timber houses and a muddy square under a snow-grey sky: warmer and browner than anything in the mountain.
   theme: {
-    fog: 0x10141a,
-    fogDensity: 0.045,
-    wallTint: 0xb08a68,
+    fog: 0x161b22,
+    fogDensity: 0.04,
+    wallTint: 0xc8b49c,
     floorTint: 0x8f8270,
     lampColor: 0xffc27a,
-    skyLight: 0x7c8898,
+    skyLight: 0x8c98aa,
     groundLight: 0x1a140c,
+    fillIntensity: 1.35,
+    outdoor: "streets",
+    walls: "timber",
   },
   map: [
     "##################################",

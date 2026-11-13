@@ -636,6 +636,92 @@ export function crateSurface(): Surface {
   );
 }
 
+/** Weathered timber for the valley's houses: grey boards, darker at the foot where the snow lies. */
+export function timberSurface(): Surface | null {
+  return photoSurface(
+    "planks",
+    512,
+    83,
+    (ctx, s, rand) => {
+      ctx.fillStyle = "rgba(70,62,52,0.35)";
+      ctx.fillRect(0, 0, s, s);
+      const foot = ctx.createLinearGradient(0, s * 0.7, 0, s);
+      foot.addColorStop(0, "rgba(20,14,8,0)");
+      foot.addColorStop(1, "rgba(20,14,8,0.55)");
+      ctx.fillStyle = foot;
+      ctx.fillRect(0, 0, s, s);
+      blotches(ctx, s, s, rand, 14, "rgba(0,0,0,0.25)", s / 7);
+    },
+    (ctx, s) => {
+      for (let i = 1; i < 8; i++) groove(ctx, false, (i * s) / 8, 0, s, 5);
+    }
+  );
+}
+
+/** A night sky over the valley, wrapped round the world: overcast, a little lighter at the horizon. */
+export function valleySkyTexture(zenith: number, horizon: number): THREE.CanvasTexture {
+  const [canvas, ctx] = blank(1024, 512);
+  const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0, hex(zenith));
+  g.addColorStop(0.42, hex(zenith));
+  g.addColorStop(0.5, hex(horizon));
+  g.addColorStop(1, hex(horizon));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 1024, 512);
+  // Low cloud: soft, pale banks drifting across the upper sky.
+  const rand = mulberry32(911);
+  for (let i = 0; i < 70; i++) {
+    const x = rand() * 1024;
+    const y = 90 + rand() * 150;
+    const r = 30 + rand() * 90;
+    const cloud = ctx.createRadialGradient(x, y, 0, x, y, r);
+    cloud.addColorStop(0, "rgba(120,130,145,0.10)");
+    cloud.addColorStop(1, "rgba(120,130,145,0)");
+    ctx.fillStyle = cloud;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // A few stars where the cloud is thin.
+  for (let i = 0; i < 90; i++) {
+    ctx.fillStyle = `rgba(220,226,235,${0.2 + rand() * 0.5})`;
+    ctx.fillRect(rand() * 1024, rand() * 180, 1.4, 1.4);
+  }
+  // The ridge line of the mountains, black against the sky.
+  ctx.fillStyle = "rgba(6,8,10,0.92)";
+  ctx.beginPath();
+  ctx.moveTo(0, 270);
+  for (let x = 0; x <= 1024; x += 16) ctx.lineTo(x, 236 + Math.sin(x * 0.011) * 18 + Math.sin(x * 0.037 + 1) * 9 + rand() * 4);
+  ctx.lineTo(1024, 512);
+  ctx.lineTo(0, 512);
+  ctx.fill();
+  const t = toTexture(canvas, true);
+  t.mapping = THREE.EquirectangularReflectionMapping;
+  return t;
+}
+
+/** Patchy snow lying on open ground: white where it's drifted, see-through where it hasn't. */
+export function snowGroundTexture(): THREE.CanvasTexture {
+  const [canvas, ctx] = blank(256, 256);
+  const rand = mulberry32(4242);
+  // A thin dusting everywhere, then drifts on top of it.
+  ctx.fillStyle = "rgba(215,222,230,0.28)";
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 220; i++) {
+    const x = rand() * 256;
+    const y = rand() * 256;
+    const r = 10 + rand() * 40;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(228,233,239,${0.3 + rand() * 0.45})`);
+    g.addColorStop(1, "rgba(225,230,236,0)");
+    ctx.fillStyle = g;
+    // Drawn three times over across the edges, so the tile wraps without a seam.
+    for (const dx of [-256, 0, 256]) for (const dy of [-256, 0, 256]) ctx.fillRect(x - r + dx, y - r + dy, r * 2, r * 2);
+  }
+  const t = toTexture(canvas, true);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
 /** Rusted steel drum with rolling hoops and a hazard band. */
 export function barrelSurface(): Surface {
   const HOOPS = [30 / 256, 128 / 256, 226 / 256];
@@ -946,6 +1032,7 @@ function buildAll() {
     ceiling: ceilingSurface(),
     crate: crateSurface(),
     barrel: barrelSurface(),
+    timber: timberSurface(),
     plate: plateSurface(),
     hazard: hazardSurface(),
     skin: skinNormal(),

@@ -1,3 +1,4 @@
+import { skyCells } from "./outdoors";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { CELL_SIZE, WALL_HEIGHT, cellCenter } from "./grid";
@@ -662,8 +663,9 @@ export function planDressing(level: ParsedLevel): DressingPlan {
   const open = (col: number, row: number) => !level.solid[row]?.[col] && ch(col, row) !== "#";
   const plain = (col: number, row: number) => PLAIN.has(ch(col, row)) || /[a-z]/.test(ch(col, row));
   const key = (c: number, r: number) => r * level.cols + c;
-  /** Services run through open floor and doorways, never through a hidden panel or a machine. */
-  const serviced = (c: number, r: number) => open(c, r) || ch(c, r) === "D" || ch(c, r) === "=";
+  /** Services run through open floor and doorways, never through a hidden panel or a machine — and never under the open sky. */
+  const sky = skyCells(level);
+  const serviced = (c: number, r: number) => (open(c, r) || ch(c, r) === "D" || ch(c, r) === "=") && !sky.has(key(c, r));
 
   // Rooms: open cells that belong to a 2×2 block of open cells, grouped.
   const inRoom = new Set<number>();

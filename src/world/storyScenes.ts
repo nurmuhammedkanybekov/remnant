@@ -887,8 +887,9 @@ export function buildScene(p: Parts, kind: SceneKind, rand: () => number): void 
       // Arkadin's last log: a chair turned to the wall where it grows thickest, his glasses on the seat.
       chair(p, 0, 1.2, 0);
       p.box("glass", 0.14, 0.03, 0.05, 0, 0.48, 1.2).box("darkMetal", 0.16, 0.01, 0.01, 0, 0.495, 1.23);
-      for (let i = 0; i < 5; i++) p.blob("flesh", 0.22 + rand() * 0.25, (rand() - 0.5) * 1.8, 0.3 + rand() * 2.0, WALL - 0.1);
-      wallText(p, "addMe", 1.6, 0.6, 0, 2.3, 0.02);
+      // Small knots of it, sunk into the wall, thickest around where his head would be.
+      for (let i = 0; i < 14; i++) p.blob("flesh", 0.06 + rand() * 0.1, (rand() - 0.5) * 1.6, 0.6 + rand() * 1.4, WALL + 0.02);
+      wallText(p, "addMe", 1.6, 0.6, 0, 1.75, 0.02);
       break;
     // ------------------------------------------------ Part Two: the source
     case "lastWiring":
