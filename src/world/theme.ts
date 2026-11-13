@@ -11,6 +11,15 @@ export interface LevelTheme {
   floorTint: number;
   /** Colour of warm ceiling lamps (`L`). */
   lampColor: number;
+  /**
+   * Out under the sky (Part Two's valley): "streets" opens the largest area
+   * you can walk without passing a door (the village's streets and square;
+   * the houses keep their roofs), "water" opens the water and the walkways
+   * between it (the dam's reservoir). Snow falls there.
+   */
+  outdoor?: "streets" | "water";
+  /** What the walls are built from. Concrete unless said otherwise. */
+  walls?: "concrete" | "timber";
 }
 
 export const DEFAULT_THEME: LevelTheme = {
