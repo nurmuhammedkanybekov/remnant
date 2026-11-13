@@ -1219,14 +1219,39 @@ export class Game {
       link.send({ t: "hello", v: PROTOCOL_VERSION, app: __APP_VERSION__ });
       this.sound.playCheckpoint();
       void this.startVoice();
-      const show = (route: string) =>
-        this.screens.lobby("CONNECTED", `ROOM ${code}`, `${route}\nWaiting for the host to start the game…`, [
-          { label: "Leave", action: () => this.showCoopMenu() },
-        ]);
-      show("Connected.");
-      const route = await this.describeRoute(link);
+      let route = "Connected.";
+      const waiting = () => this.links.get(0) === link && this.state === "menu" && !this.run;
+      const show = () =>
+        this.screens.lobby(
+          "CONNECTED",
+          `ROOM ${code}`,
+          `${route}\nWaiting for the host to start the game…`,
+          [
+            {
+              // Someone who came in through an invite link hasn't picked a character yet.
+              label: `Playing as ${fullName(this.settings.look)}`,
+              detail: "Change character",
+              action: () =>
+                this.screens.character(
+                  this.settings.look,
+                  (look) => {
+                    this.settings.look = look;
+                    saveSettings(this.settings);
+                    this.applyDisplaySettings();
+                    if (waiting()) show();
+                  },
+                  () => waiting() && show()
+                ),
+            },
+            { label: "Leave", action: () => this.showCoopMenu() },
+          ],
+          undefined,
+          "guest-lobby"
+        );
+      show();
+      route = await this.describeRoute(link);
       // Only if nothing has moved on (the host may have started already).
-      if (this.links.get(0) === link && this.state === "menu" && !this.run) show(route);
+      if (waiting() && this.screens.showing("guest-lobby")) show();
     };
     link.start();
   }
