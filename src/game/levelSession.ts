@@ -28,7 +28,7 @@ import { planDressing } from "../world/dressing";
 import { castShadows, spotShadows } from "../core/shadows";
 import { CheckpointMarker, DetonatorConsole, Door, Generator, Intercom, type Interactable } from "../world/interactables";
 import { LampSystem } from "../world/lamps";
-import { animateWater, buildLevel, type LevelData } from "../world/levelBuilder";
+import { animateWater, animateWeather, buildLevel, type LevelData } from "../world/levelBuilder";
 import type { LevelDef } from "../world/levelDef";
 import { parseLevel } from "../world/levelParser";
 import { lootFor } from "../world/loot";
@@ -526,6 +526,7 @@ export class LevelSession {
     this.lamps.update(dt, this.player.position, this.time, this.creaturePositions());
     this.effects.update(dt, engine.camera, this.player.flashlight.level, this.time);
     animateWater(this.level, this.time);
+    animateWeather(this.level, dt, engine.camera.position);
     this.updateDirector(dt);
 
     this.muzzleTime -= dt;
@@ -634,6 +635,7 @@ export class LevelSession {
     this.updateThrowables(dt);
     this.lamps.update(dt, this.player.position, this.time, this.creaturePositions());
     this.effects.update(dt, cam, this.player.flashlight.level, this.time);
+    animateWeather(this.level, dt, cam.position);
     this.damageFx = Math.max(0.4, this.damageFx - dt);
     engine.setPostFx(this.damageFx, 1, this.time);
   }

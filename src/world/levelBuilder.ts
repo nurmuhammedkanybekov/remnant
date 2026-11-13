@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { buildDressing } from "./dressing";
-import { textures, type Surface } from "../fx/textures";
+import { snowGroundTexture, textures, valleySkyTexture, type Surface } from "../fx/textures";
+import { Snowfall } from "../fx/snow";
+import { skyCells } from "./outdoors";
 import { CELL_SIZE, WALL_HEIGHT, cellCenter, isSolid, type Cell } from "./grid";
 import type { ParsedLevel } from "./levelParser";
 import { resolveTheme } from "./theme";
@@ -21,6 +23,13 @@ export interface LevelData extends ParsedLevel {
   wallMaterial: THREE.Material;
   /** The water's layers, whose ripples `animateWater` moves. */
   waterMaterials: THREE.MeshStandardMaterial[];
+  /** Snow over the open-air cells (Part Two's outdoors); null underground. */
+  weather: Snowfall | null;
+}
+
+/** Moves the weather along; call every frame with the camera's position. */
+export function animateWeather(level: LevelData, dt: number, camera: THREE.Vector3): void {
+  level.weather?.update(dt, camera);
 }
 
 /** Drifts the water's ripples: each layer its own way, so they cross and never look like a pattern. */
@@ -130,25 +139,27 @@ function varyPanels(mat: THREE.MeshStandardMaterial): void {
 
 /** Builds a parsed level's geometry, props, lamps and exit into `scene`. `bumpMaps` is a quality option. */
 export function buildLevel(scene: THREE.Scene, level: ParsedLevel, bumpMaps = true): LevelData {
-  const { lampFixtures, wallMaterial, waterMaterials } = buildGeometry(scene, level, bumpMaps);
+  const { lampFixtures, wallMaterial, waterMaterials, weather } = buildGeometry(scene, level, bumpMaps);
   const exit = buildExit(scene, level, level.exitCell);
-  return { ...level, lampFixtures, exitSignMat: exit.signMat, exitLight: exit.light, wallMaterial, waterMaterials };
+  return { ...level, lampFixtures, exitSignMat: exit.signMat, exitLight: exit.light, wallMaterial, waterMaterials, weather };
 }
 
 function buildGeometry(
   scene: THREE.Scene,
   level: ParsedLevel,
   bumpMaps: boolean
-): { lampFixtures: LampFixture[]; wallMaterial: THREE.Material; waterMaterials: THREE.MeshStandardMaterial[] } {
+): { lampFixtures: LampFixture[]; wallMaterial: THREE.Material; waterMaterials: THREE.MeshStandardMaterial[]; weather: Snowfall | null } {
   const tex = textures();
   const theme = resolveTheme(level.def.theme);
+  const sky = skyCells(level);
+  const cellKey = (pos: THREE.Vector2) => Math.floor(pos.y / CELL_SIZE) * level.cols + Math.floor(pos.x / CELL_SIZE);
   const { walls, crates, barrels } = level.props;
 
   // Walls: one instanced mesh, one draw call.
   const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
   const wallMat = new THREE.MeshStandardMaterial({
     color: theme.wallTint,
-    ...surfaceMaps(tex.wall, bumpMaps),
+    ...surfaceMaps(theme.walls === "timber" && tex.timber ? tex.timber : tex.wall, bumpMaps),
     bumpScale: 1.2,
     roughness: tex.wall.roughnessMap ? 1 : 0.92,
     metalness: 0.05,
@@ -187,10 +198,68 @@ function buildGeometry(
     ...surfaceMaps(tex.ceiling, bumpMaps, level.cols * ceilPerCell, level.rows * ceilPerCell),
     roughness: 1,
   });
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), ceilMat);
-  ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.set(width / 2, WALL_HEIGHT, depth / 2);
-  scene.add(ceiling);
+  if (sky.size === 0) {
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), ceilMat);
+    ceiling.rotation.x = Math.PI / 2;
+    ceiling.position.set(width / 2, WALL_HEIGHT, depth / 2);
+    scene.add(ceiling);
+  } else {
+    // Out in the open: a roof only over what's indoors, tile by tile, and the sky over the rest.
+    const roofed: [number, number][] = [];
+    for (let r = 0; r < level.rows; r++)
+      for (let c = 0; c < level.cols; c++) if (!sky.has(r * level.cols + c) && level.def.map[r]?.[c] !== "#") roofed.push([c, r]);
+    const tileMat = new THREE.MeshStandardMaterial({ ...surfaceMaps(tex.ceiling, bumpMaps, ceilPerCell, ceilPerCell), roughness: 1 });
+    const tiles = new THREE.InstancedMesh(new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE), tileMat, roofed.length);
+    roofed.forEach(([c, r], i) => {
+      dummy.position.set((c + 0.5) * CELL_SIZE, WALL_HEIGHT, (r + 0.5) * CELL_SIZE);
+      dummy.rotation.set(Math.PI / 2, 0, 0);
+      dummy.updateMatrix();
+      tiles.setMatrixAt(i, dummy.matrix);
+    });
+    tiles.instanceMatrix.needsUpdate = true;
+    scene.add(tiles);
+
+    // Snow lying in drifts on the open ground (not on the water).
+    const water = new Set(level.spawns.water.map((w) => w.cell.row * level.cols + w.cell.col));
+    const ground = [...sky].filter((k) => !water.has(k));
+    const snowTex = snowGroundTexture();
+    const snowMat = new THREE.MeshStandardMaterial({
+      map: snowTex,
+      transparent: true,
+      depthWrite: false,
+      roughness: 0.95,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+    });
+    // One sheet over all the open ground, its texture laid in world space, so the drifts run on across cells.
+    const positions: number[] = [];
+    const uvs: number[] = [];
+    const SNOW_TILE = 11; // metres per repeat of the drift texture
+    for (const k of ground) {
+      const x0 = (k % level.cols) * CELL_SIZE;
+      const z0 = Math.floor(k / level.cols) * CELL_SIZE;
+      const x1 = x0 + CELL_SIZE;
+      const z1 = z0 + CELL_SIZE;
+      for (const [x, z] of [
+        [x0, z0],
+        [x0, z1],
+        [x1, z0],
+        [x1, z0],
+        [x0, z1],
+        [x1, z1],
+      ]) {
+        positions.push(x, 0.012, z);
+        uvs.push(x / SNOW_TILE, z / SNOW_TILE);
+      }
+    }
+    const sheet = new THREE.BufferGeometry();
+    sheet.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    sheet.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    sheet.computeVertexNormals();
+    const snow = new THREE.Mesh(sheet, snowMat);
+    snow.renderOrder = 1;
+    scene.add(snow);
+  }
 
   // Crate stacks
   if (crates.length) {
@@ -261,6 +330,8 @@ function buildGeometry(
     );
     halo.scale.set(2.4, 1.2, 1);
     halo.position.set(lamp.pos.x, WALL_HEIGHT - 0.2, lamp.pos.y);
+    // Under the open sky there's no ceiling to hang from: the lamp is strung on a wire from the nearest wall.
+    if (sky.has(cellKey(lamp.pos))) stringLamp(scene, level, lamp.pos);
     fixtures.push({ mesh: fixture, halo });
     scene.add(halo);
   }
@@ -308,10 +379,35 @@ function buildGeometry(
   buildDressing(scene, level);
 
   scene.fog = new THREE.FogExp2(theme.fog, theme.fogDensity);
-  scene.background = new THREE.Color(theme.fog);
+  scene.background = sky.size ? valleySkyTexture(0x07090d, theme.fog) : new THREE.Color(theme.fog);
+  const weather = sky.size ? new Snowfall(scene, sky, level.cols, level.rows, tex.glow) : null;
   // A cool, very dim fill so nothing is ever pure black.
   scene.add(new THREE.HemisphereLight(theme.skyLight, theme.groundLight, theme.fillIntensity));
-  return { lampFixtures: fixtures, wallMaterial: wallMat, waterMaterials };
+  return { lampFixtures: fixtures, wallMaterial: wallMat, waterMaterials, weather };
+}
+
+/** A wire from the lamp over an open-air cell to the top of the nearest wall (if one is close enough). */
+function stringLamp(scene: THREE.Scene, level: ParsedLevel, pos: THREE.Vector2): void {
+  const col = Math.floor(pos.x / CELL_SIZE);
+  const row = Math.floor(pos.y / CELL_SIZE);
+  for (let reach = 1; reach <= 3; reach++)
+    for (const [dc, dr] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      if (level.def.map[row + dr * reach]?.[col + dc * reach] !== "#") continue;
+      // The wall's face, at the eaves.
+      const to = new THREE.Vector3(pos.x + dc * (reach - 0.5) * CELL_SIZE, WALL_HEIGHT, pos.y + dr * (reach - 0.5) * CELL_SIZE);
+      const from = new THREE.Vector3(pos.x, WALL_HEIGHT - 0.05, pos.y);
+      const len = from.distanceTo(to);
+      const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, len, 4), new THREE.MeshBasicMaterial({ color: 0x0c0c0c }));
+      wire.position.copy(from).add(to).multiplyScalar(0.5);
+      wire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
+      scene.add(wire);
+      return;
+    }
 }
 
 /** Door + glowing sign on the wall next to the exit cell. */
