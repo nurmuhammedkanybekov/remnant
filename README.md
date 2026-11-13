@@ -28,6 +28,10 @@ flashlight that is almost dead. The radio still works, and a calm voice on it
 offers to guide you to the surface, 2.4 km above. The things down there hear
 everything. Some of them see your light.
 
+Part Two picks up three weeks later in Ak-Suu, the village at the foot of the
+mountain. The snow melted early, the meltwater came down through the old
+tunnels into the wells, and last night the clinic radio switched itself on.
+
 I built REMNANT from scratch in TypeScript and Three.js to learn the parts of
 software I don't touch in backend work: real-time rendering, game AI, 3D
 audio, networking and performance. There is no game engine underneath.
@@ -49,6 +53,9 @@ are public-domain.
     <td><img src="docs/screenshots/creature.jpg" alt="A Brute in the dark"></td>
   </tr>
   <tr>
+    <td colspan="2"><img src="docs/screenshots/valley.jpg" alt="Part Two: snow falling on the empty village of Ak-Suu at night"></td>
+  </tr>
+  <tr>
     <td><img src="docs/screenshots/characters.jpg" alt="Nur, Raiymbek and Nuraiza with their name tags, as co-op partners see them"></td>
     <td><img src="docs/screenshots/impacts.jpg" alt="Bullet holes and dust left on a wall"></td>
   </tr>
@@ -66,9 +73,13 @@ are public-domain.
 
 ## What's in the game
 
-**A story you piece together.** Ten hand-built levels climb from the deepest
-sublevel to the surface, ending in a three-phase boss and a choice between
-two endings. The story comes over the radio and through notes left by the
+**A story you piece together, in two parts.** Part One's ten hand-built
+levels climb from the deepest sublevel to the surface, ending in a
+three-phase boss and a choice between two endings. Part Two's seven follow
+the Remnant down into the valley: a snowed-in village under an open night
+sky, a hydro dam, the observatory that was really a transmitter, four
+kilometres of drainage tunnel, and back into the mountain from underneath to
+a final boss and two more endings. The story comes over the radio and through notes left by the
 people who were there before you, and each note answers a question the last
 one raised: why the station was sealed, who the voice on the radio really is,
 and what is waiting at the top. Where a note was left, the place shows what
@@ -89,9 +100,10 @@ that sees it comes for you. Lockers let you hide and watch through the slats
 while something searches the room, but one that saw you climb in knows where
 you are. A thrown bottle sends them somewhere else.
 
-**Creatures that hunt.** Nine kinds, each designed to break a habit the
+**Creatures that hunt.** Eleven kinds, each designed to break a habit the
 previous one taught you: one that only hears, one that freezes in your light,
-one that waits on the ceiling, one that imitates the voice on the radio.
+one that waits on the ceiling, one that imitates the voice on the radio, one
+that screams when it finds you and brings everything nearby running.
 Some wander the whole level, and every so often one is drawn towards
 wherever you are, so nowhere stays safe for long. You usually hear them
 first: bare feet on concrete, placed in 3D on headphones, muffled through the
@@ -109,8 +121,9 @@ hall, because each room's echo follows its size.
 medkits you carry and use when you choose. Ammunition comes in small caches
 spread across each level, so you find it by exploring.
 
-**Together.** Online co-op for two or three players with a room code, and
-voice chat that comes from where each player stands. Each character has
+**Together.** Online co-op for two or three players: send a friend a link and
+they're in your game when they open it. Voice chat comes
+from where each player stands. Each character has
 their own helmet colour, reflective tape and a name tag, and their torch
 shows as a beam, so you can find each other in the dark. No accounts, no
 installs.
@@ -188,9 +201,12 @@ and their names on your HUD in the same colour.
 
 <img src="docs/screenshots/coop-lobby.jpg" alt="The co-op lobby showing a room code" width="100%">
 
-One player opens Co-op, chooses Host a Game and gets a five-letter room code.
-Up to two others choose Join a Game and type it in. The host starts when
-everyone is in.
+One player opens Co-op, chooses Host a Game and gets a five-letter room code
+and an invite link. **Copy Invite Link** puts the link on the clipboard: send
+it to up to two friends, and opening it takes them straight into your room
+(they can pick their character while they wait). Or they choose Join a Game
+and type the code. The host starts when everyone is in. Both parts can be
+played together.
 
 When you play together, all of you are hunted, and there are more creatures
 than in solo play (more again with three). If your health runs out you go
