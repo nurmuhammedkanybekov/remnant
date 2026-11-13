@@ -35,7 +35,10 @@ export type RoomKind =
   | "lab"
   | "control"
   | "armory"
-  | "overgrown";
+  | "overgrown"
+  // Part Two: the valley's houses and its school.
+  | "home"
+  | "school";
 
 export type PropKind =
   | "bed"
@@ -247,6 +250,74 @@ export const LEVEL_DRESSING: Record<string, LevelDressing> = {
       ["СКЛАД", "STORES"],
     ],
   },
+  // ---------------------------------------------------------------- Part Two
+  "ak-suu-clinic": {
+    rooms: ["ward", "ward", "office", "stores", "surgery"],
+    names: [
+      ["ПАЛАТА 1", "WARD 1"],
+      ["ПАЛАТА 3", "WARD 3"],
+      ["ВРАЧ САДЫКОВА", "DR SADYKOVA"],
+      ["АПТЕКА", "DISPENSARY"],
+      ["ПРОЦЕДУРНАЯ", "TREATMENT ROOM"],
+    ],
+  },
+  "ak-suu-village": {
+    rooms: ["home", "school", "home", "stores", "home", "office"],
+    names: [
+      ["", ""],
+      ["ШКОЛА", "SCHOOL"],
+      ["", ""],
+      ["МАГАЗИН", "SHOP"],
+      ["", ""],
+      ["ПОЧТА", "POST OFFICE"],
+    ],
+  },
+  "kara-suu-dam": {
+    rooms: ["control", "pumps", "workshop", "stores", "dorm"],
+    names: [
+      ["ПУЛЬТ ГЭС", "DAM CONTROL"],
+      ["ТУРБИННЫЙ ЗАЛ", "TURBINE HALL"],
+      ["МАСТЕРСКАЯ", "WORKSHOP"],
+      ["СКЛАД", "STORES"],
+      ["ВАХТА", "SHIFT BUNKS"],
+    ],
+  },
+  "kosh-tash-observatory": {
+    rooms: ["control", "office", "lab", "dorm", "stores"],
+    names: [
+      ["РЕТРАНСЛЯТОР", "RELAY ROOM"],
+      ["АРКАДИН Л.", "DR ARKADIN"],
+      ["ЛАБОРАТОРИЯ", "LAB"],
+      ["ЖИЛОЙ БЛОК", "QUARTERS"],
+      ["СКЛАД", "STORES"],
+    ],
+  },
+  "drainage-line": {
+    rooms: ["workshop", "stores", "dorm"],
+    names: [
+      ["РЕМБОКС 3", "MAINT. BAY 3"],
+      ["СКЛАД", "STORES"],
+      ["БЫТОВКА", "REST CABIN"],
+    ],
+  },
+  "beneath-ten": {
+    rooms: ["lab", "overgrown", "stores", "lab"],
+    names: [
+      ["БУРОВАЯ", "DRILL HEAD"],
+      ["", ""],
+      ["СКЛАД 1987", "STORES 1987"],
+      ["ЗАМЕРЫ", "SURVEY"],
+    ],
+  },
+  "the-cavity": {
+    rooms: ["overgrown", "overgrown", "control", "overgrown"],
+    names: [
+      ["", ""],
+      ["", ""],
+      ["ПОДРЫВ", "DEMOLITION"],
+      ["", ""],
+    ],
+  },
 };
 
 /** What each kind of room is furnished with, against its walls. */
@@ -266,6 +337,8 @@ const ROOM_PROPS: Record<RoomKind, PropKind[]> = {
   control: ["panel", "switchboard", "panel", "desk", "cabinet"],
   armory: ["gunRack", "locker", "gunRack", "ammoBoxes", "sandbags"],
   overgrown: ["growth", "growth", "body", "pod", "growth"],
+  home: ["bed", "desk", "shelf", "cabinet", "bed"],
+  school: ["desk", "desk", "desk", "shelf", "desk"],
 };
 
 /** Lockers to hide in, per level. */
@@ -481,6 +554,86 @@ const STYLES: Record<string, LevelStyle> = {
   },
 };
 
+// Part Two: the valley. The clinic is a small country hospital, the village has
+// water pipes and no cable trays, the dam and the tunnel are heavy plant, and
+// the deep and the source are the Remnant's own.
+Object.assign(STYLES, {
+  "ak-suu-clinic": {
+    pipes: [
+      { r: 0.08, mat: "paintBlue" },
+      { r: 0.05, mat: "paintGreen" },
+    ],
+    tray: false,
+    wall: ["poster", "clock", "extinguisher", "poster"],
+    floor: ["papers", "stain"],
+    posters: [0, 4],
+    extra: [],
+  },
+  "ak-suu-village": {
+    pipes: [{ r: 0.06, mat: "rust" }],
+    tray: false,
+    wall: ["clock", "chalkboard", "poster"],
+    floor: ["stain", "papers"],
+    posters: [0, 4],
+    extra: ["crates"],
+  },
+  "kara-suu-dam": {
+    pipes: [
+      { r: 0.15, mat: "rust" },
+      { r: 0.09, mat: "paintGreen" },
+      { r: 0.06, mat: "paintYellow" },
+    ],
+    tray: true,
+    wall: ["gauges", "junction", "extinguisher", "poster"],
+    floor: ["stain"],
+    posters: [0, 2],
+    extra: ["drums", "valve"],
+  },
+  "kosh-tash-observatory": {
+    pipes: [
+      { r: 0.07, mat: "metal" },
+      { r: 0.05, mat: "paintRed" },
+    ],
+    tray: true,
+    wall: ["clock", "junction", "poster", "chalkboard"],
+    floor: ["papers", "papers", "stain"],
+    posters: [1, 4],
+    extra: ["panel"],
+  },
+  "drainage-line": {
+    pipes: [
+      { r: 0.16, mat: "rust" },
+      { r: 0.08, mat: "rust" },
+    ],
+    tray: false,
+    wall: ["junction", "scrawl", "extinguisher"],
+    floor: ["stain", "stain"],
+    posters: [2],
+    extra: ["drums"],
+  },
+  "beneath-ten": {
+    pipes: [
+      { r: 0.12, mat: "rust" },
+      { r: 0.07, mat: "rust" },
+    ],
+    tray: false,
+    growth: true,
+    wall: ["scrawl", "junction"],
+    floor: ["stain", "stain"],
+    posters: [1],
+    extra: ["pod"],
+  },
+  "the-cavity": {
+    pipes: [{ r: 0.1, mat: "rust" }],
+    tray: false,
+    growth: true,
+    wall: ["scrawl"],
+    floor: ["stain", "stain"],
+    posters: [1, 2],
+    extra: ["pod", "growth"],
+  },
+} satisfies Record<string, LevelStyle>);
+
 const DEFAULT_STYLE: LevelStyle = STYLES["maintenance-wing"];
 
 export function styleFor(levelId: string): LevelStyle {
@@ -496,6 +649,9 @@ const SIDES = [
   [0, 1],
   [0, -1],
 ] as const;
+
+/** The four sides and the four corners. */
+const AROUND = [...SIDES, [1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
 
 /** Decides every prop, sign and pipe run for a level. Pure and seeded. */
 export function planDressing(level: ParsedLevel): DressingPlan {
@@ -598,7 +754,12 @@ export function planDressing(level: ParsedLevel): DressingPlan {
         // Only against real walls, never across a doorway.
         if (ch(c + dc, r + dr) !== "#") continue;
         // The sign goes on the wall of a room cell that opens onto the rest of the level.
-        const entrance = SIDES.some(([ec, er]) => open(c + ec, r + er) && !inRoom.has(key(c + ec, r + er)));
+        // (A doorway with a door in it counts: the valley's houses are all entered through one.
+        // So does the wall just beside a doorway, where a sign usually hangs.)
+        const entrance = AROUND.some(
+          ([ec, er]) =>
+            (open(c + ec, r + er) && !inRoom.has(key(c + ec, r + er))) || ch(c + ec, r + er) === "D" || ch(c + ec, r + er) === "="
+        );
         if (!signed && entrance && name[0]) {
           signed = true;
           // The sign faces out of the wall, into the room.
