@@ -174,6 +174,32 @@ idea** so the game keeps teaching until the end.
 
 ---
 
+## Part Two: The Valley
+
+Three weeks later. Nur woke in the clinic at **Ak-Suu**, the village at the
+foot of the mountain, with frostbite and no memory of the walk down. The snow
+melted early; the meltwater came down through the old drainage tunnels into
+the wells, and everyone who drank it went quiet and walked towards the dam.
+Last night the clinic radio switched itself on, and a calm voice asked if
+anyone could hear it.
+
+| #   | Level           | Location      | What's new                                                                        | Story beat                                                                                      |
+| --- | --------------- | ------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 11  | **Clinic**      | Ak-Suu        | Three weeks later. The voice is back on the radio.                                | Bed 3 asked for the radio to be turned off; there is no radio. Dr Sadykova goes after her son.  |
+| 12  | **The Village** | Ak-Suu        | Out under the night sky in the snow. The **Howler**: if it sees you, all hear it. | The garage key in the teacher's house; "don't let the tall one see you".                        |
+| 13  | **Hydro Dam**   | Kara-Suu      | Flooded channels and an open reservoir; three generators for the spillway.        | Hundreds standing in the reservoir, up to the neck, waiting.                                    |
+| 14  | **Observatory** | Kosh-Tash     | Security doors.                                                                   | It was never a control room: it was a transmitter. The Remnant learned to speak from the radio. |
+| 15  | **Rail Tunnel** | Drainage Line | Four kilometres of dark, alarms.                                                  | Sadykova found her son. She stays with him.                                                     |
+| 16  | **The Deep**    | Beneath Ten   | Everything at once, under the floor Nur woke up on.                               | Arkadin's first and last logs: it is a choir, and he asked to be added.                         |
+| 17  | **The Source**  | The Cavity    | The **Choir**, the last boss.                                                     | Walk out at dawn, or set off the Soviet charges: silence.                                       |
+
+**Endings.** _Dawn_: the Choir's voices go out one by one until only yours is
+left, and you climb out into a pink, freezing morning. _Silence_: the charges
+take the cavity and the Source with it; every radio in the valley goes quiet,
+and in spring the meltwater runs clear.
+
+---
+
 ## Tone and writing rules
 
 - Notes are short (1–3 sentences), written by real people in a hurry. No
