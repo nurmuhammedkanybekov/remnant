@@ -166,7 +166,9 @@ button, input, output, kbd { font-variant-numeric: lining-nums; }
 .interact.show { display: flex; }
 .interact kbd { font-family: var(--font-mono); font-size: 12px; padding: 2px 8px; border: 1px solid rgba(255,255,255,.55);
   border-bottom-width: 2px; border-radius: 3px; background: rgba(0,0,0,.45); }
-.subtitle { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); width: min(760px, 86vw); text-align: center;
+/* Kept between the vitals (left) and the ammo counter (right) so a two-line subtitle never runs over them. */
+.subtitle { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
+  width: clamp(320px, calc(100vw - 2 * (300px * var(--hud-scale) + 16px)), 760px); text-align: center;
   opacity: 0; transition: opacity .25s ease; pointer-events: none; }
 .subtitle.show { opacity: 1; }
 .subtitle .who { font-size: 10px; letter-spacing: 4px; color: var(--ui-amber); margin-bottom: 5px; }
@@ -180,7 +182,8 @@ button, input, output, kbd { font-variant-numeric: lining-nums; }
 /* ---- no text selection in the game UI (the page-wide rule is in index.html) ---- */
 .screen, .hud { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; cursor: default; }
 /* ...except where copying is the point: typing a room code, and the host's code to send to a friend. */
-.screen input, .screen textarea, .room-code { -webkit-user-select: text; user-select: text; }
+.screen input, .screen textarea, .room-code, .screen .sub { -webkit-user-select: text; user-select: text; }
+.screen .sub { overflow-wrap: anywhere; }
 .screen button { -webkit-user-select: none; user-select: none; }
 
 /* ---- screens (menus) ---- */
