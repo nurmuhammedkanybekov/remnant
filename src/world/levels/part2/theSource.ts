@@ -20,6 +20,8 @@ export const THE_SOURCE: LevelDef = {
     lampColor: 0xd08aff,
     skyLight: 0x4a3458,
     groundLight: 0x120616,
+    walls: "rock",
+    fillIntensity: 1.3,
   },
   map: [
     "########################################",

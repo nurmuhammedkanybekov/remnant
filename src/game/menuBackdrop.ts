@@ -78,7 +78,7 @@ export class MenuBackdrop {
       const levelDef = LEVELS.find((l) => l.id === def.level);
       if (!levelDef) continue;
       this.engine.resetWorld();
-      const level = buildLevel(this.engine.scene, parseLevel(levelDef), this.quality.bumpMaps);
+      const level = buildLevel(this.engine.scene, parseLevel(levelDef), this.quality.bumpMaps, this.quality.skyScale);
       const scene = planDressing(level).scenes.find((s) => s.kind === def.scene);
       const shot = scene ? this.frame(level, scene.x, scene.z, scene.rot) : null;
       if (!shot) continue;

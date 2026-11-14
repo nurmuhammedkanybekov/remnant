@@ -59,3 +59,31 @@ export function skyCells(level: ParsedLevel): Set<number> {
   for (const k of best) sky.add(k);
   return sky;
 }
+
+/**
+ * The wall cells that become cliffs when the theme asks for them: walls
+ * (`#`) beside open sky, on any side or corner, that don't also stand beside
+ * a roofed floor cell (those are the walls of a building, and stay walls).
+ */
+export function cliffCells(level: ParsedLevel, sky: ReadonlySet<number>): Set<number> {
+  const cliffs = new Set<number>();
+  if (!resolveTheme(level.def.theme).cliffs || sky.size === 0) return cliffs;
+  const { cols, rows } = level;
+  const key = (c: number, r: number) => r * cols + c;
+  const inside = (c: number, r: number) => c >= 0 && r >= 0 && c < cols && r < rows;
+  const wall = (c: number, r: number) => !inside(c, r) || level.def.map[r]?.[c] === "#" || level.def.map[r]?.[c] === undefined;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      if (!wall(c, r)) continue;
+      let open = false;
+      let roofed = false;
+      for (let dr = -1; dr <= 1; dr++)
+        for (let dc = -1; dc <= 1; dc++) {
+          if ((dc === 0 && dr === 0) || !inside(c + dc, r + dr)) continue;
+          if (sky.has(key(c + dc, r + dr))) open = true;
+          else if (!wall(c + dc, r + dr) && (dc === 0 || dr === 0)) roofed = true;
+        }
+      if (open && !roofed) cliffs.add(key(c, r));
+    }
+  return cliffs;
+}
