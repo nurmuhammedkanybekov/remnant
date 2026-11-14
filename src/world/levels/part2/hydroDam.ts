@@ -20,6 +20,8 @@ export const HYDRO_DAM: LevelDef = {
     groundLight: 0x0c1410,
     // The reservoir lies under the open sky, the walkways across it with it.
     outdoor: "water",
+    cliffs: true,
+    skyline: "peaks",
   },
   map: [
     "####################################",
