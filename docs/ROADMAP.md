@@ -170,6 +170,25 @@ Also in this round:
       they wait
 - [x] Subtitles keep clear of the HUD on smaller screens
 
+## Phase 11 — Places that look like what they are (done)
+
+The campaign used to look like one long corridor: ten floors of concrete
+up, then more concrete on the way back in. Now every stretch of it looks
+like where it is.
+
+- [x] The top of Part One opens onto the mountain: the portal hall, the
+      blast door, then out under the stars into the portal yard, among
+      cliffs and snowy peaks, with the road down to the valley
+- [x] Cliffs: walls that face the sky become tall broken rock with snow on
+      top; the village and the dam get them too
+- [x] A new horizon of high peaks (snow fields, gullies, a moon), sharper
+      on High quality
+- [x] The observatory opens onto the ridge; Laboratory Zero is white
+      tile; the Source is a bare rock cavern
+- [x] The story's seams: both of Part One's endings now lead into Part
+      Two, the relay explains the broadcast, and Nur goes back in because
+      Nur let it out
+
 ## Phase 9 — Play it together, play it scared (done)
 
 - [x] Ammunition in small caches spread over each level, found by exploring;

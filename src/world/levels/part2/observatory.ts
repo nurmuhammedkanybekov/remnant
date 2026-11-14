@@ -1,7 +1,11 @@
 import { checkpoint, hint, nur, objective, op, radio, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
-/** Level 14 — the old Soviet observatory above the dam: the relay. Security doors, and the truth about the voice. */
+/**
+ * Level 14 — the old Soviet observatory on the ridge above the dam: the Zenit
+ * relay the voice broadcasts through. Out along the ridge under the peaks,
+ * security doors, and the truth about the voice.
+ */
 export const OBSERVATORY: LevelDef = {
   id: "kosh-tash-observatory",
   name: "Kosh-Tash",
@@ -48,9 +52,15 @@ export const OBSERVATORY: LevelDef = {
     "2": "ARKADIN, LOG 214. It learned to speak by listening to the radio. The first word it said was the operator's call sign. Then it asked for us by name.",
   },
   events: {
-    start: [radio(op("The observatory. I used to watch the stars from here."), nur("You were never here. You're in the mountain."))],
+    start: [
+      radio(
+        op("The observatory. I used to watch the stars from here."),
+        nur("You were never here. You're in the mountain, talking through that dish."),
+        nur("Cut the relay, and the valley stops hearing you.")
+      ),
+    ],
     keycard: [
-      radio(nur("Security card. Now the transmitter room.")),
+      radio(nur("Security card. Now the transmitter room. Then the ridge, and the drainage portal.")),
       objective("Reach the transmitter room, then the exit."),
       checkpoint(),
     ],
@@ -70,6 +80,11 @@ export const OBSERVATORY: LevelDef = {
     a: [hint("Watchers again. Keep your light on them, and keep your battery up")],
     b: [radio(nur("An intercom. Someone left a message."))],
     c: [radio(unknown("...we see you through the big lens, Nur...")), checkpoint()],
-    d: [radio(op("The exit leads to the drainage line. The drainage line leads to me."))],
+    d: [
+      radio(
+        op("The relay was only a mouth, Nur. I have others. The wells. The water. You."),
+        op("The ridge leads to the drainage line. The drainage line leads to me.")
+      ),
+    ],
   },
 };

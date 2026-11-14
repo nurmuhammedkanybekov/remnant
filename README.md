@@ -29,8 +29,10 @@ offers to guide you to the surface, 2.4 km above. The things down there hear
 everything. Some of them see your light.
 
 Part Two picks up three weeks later in Ak-Suu, the village at the foot of the
-mountain. The snow melted early, the meltwater came down through the old
-tunnels into the wells, and last night the clinic radio switched itself on.
+mountain. Whatever you did at the top, the mountain cracked: the meltwater
+ran through the cavity into the village wells, the old Soviet relay on the
+ridge began to broadcast, and this morning the village is empty. You let it
+out. You go back in to finish it.
 
 I built REMNANT from scratch in TypeScript and Three.js to learn the parts of
 software I don't touch in backend work: real-time rendering, game AI, 3D
@@ -74,12 +76,14 @@ are public-domain.
 ## What's in the game
 
 **A story you piece together, in two parts.** Part One's ten hand-built
-levels climb from the deepest sublevel to the surface, ending in a
-three-phase boss and a choice between two endings. Part Two's seven follow
-the Remnant down into the valley: a snowed-in village under an open night
-sky, a hydro dam, the observatory that was really a transmitter, four
-kilometres of drainage tunnel, and back into the mountain from underneath to
-a final boss and two more endings. The story comes over the radio and through notes left by the
+levels climb from the deepest sublevel to the surface, a three-phase boss
+on the way, and end out on the mountain itself, under the stars among
+cliffs and snowy peaks, with a choice between two endings. Part Two's seven
+follow the Remnant down into the valley: a snowed-in village under an open
+night sky, a hydro dam, the observatory on the ridge that was really a
+transmitter, four kilometres of drainage tunnel, Arkadin's tiled first
+laboratory, and the bare rock cavern at the heart of it all, with a final
+boss and two more endings. The story comes over the radio and through notes left by the
 people who were there before you, and each note answers a question the last
 one raised: why the station was sealed, who the voice on the radio really is,
 and what is waiting at the top. Where a note was left, the place shows what
