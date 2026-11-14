@@ -18,8 +18,19 @@ export interface LevelTheme {
    * between it (the dam's reservoir). Snow falls there.
    */
   outdoor?: "streets" | "water";
-  /** What the walls are built from. Concrete unless said otherwise. */
-  walls?: "concrete" | "timber";
+  /**
+   * What the walls are built from. Concrete unless said otherwise: timber for
+   * the village's houses, rock for caverns, tile for the old laboratories.
+   */
+  walls?: "concrete" | "timber" | "rock" | "tile";
+  /**
+   * Out on the mountain: every wall that faces the open sky and isn't part of
+   * a building becomes a tall, broken face of rock, so the open ground reads
+   * as a ledge, a gully or a valley floor rather than a maze.
+   */
+  cliffs?: boolean;
+  /** What's on the horizon under the open sky: a low ridge (the valley floor) or the high peaks (up on the mountain). */
+  skyline?: "ridge" | "peaks";
 }
 
 export const DEFAULT_THEME: LevelTheme = {
