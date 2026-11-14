@@ -390,8 +390,9 @@ rows added there, so nothing already on the map moves), holding a note and a
 medkit, battery or ammunition. Creatures never open panels.
 
 **Themes** (`world/theme.ts`) set fog colour and density, fill light, wall
-and floor tint and lamp colour per level. Two more settings exist for Part
-Two's valley:
+and floor tint and lamp colour per level. A few more settings say what a
+place is built from and whether it is under the sky, so the campaign moves
+from concrete to the open mountain, a tiled laboratory and bare rock:
 
 - `outdoor`: opens part of the level to the sky (`world/outdoors.ts`
   decides which cells, purely from the map). `"streets"` opens the largest
@@ -405,21 +406,34 @@ Two's valley:
   box anchored to the camera's grid, parking any over a roofed cell out of
   sight. The set dressing runs no pipes there and furnishes an open-air
   "room" as a yard (crates, drums, a bench), with no sign.
-- `walls: "timber"`: weathered boards (the CC0 planks photo) instead of
-  concrete.
+- `walls`: what the walls are built from. `"timber"`: weathered boards
+  (the CC0 planks photo) for the village. `"tile"`: Laboratory Zero's
+  off-white 1980s tiles, grout lines, missing and cracked tiles and damp,
+  with a glossier finish. `"rock"`: procedural granite (strata, cracks,
+  grit) for the walls, roof and floor of the Source's cavern.
+- `cliffs`: on the mountain, every wall that faces the open sky and isn't
+  part of a building (`cliffCells`: no roofed floor beside it) is built as
+  a cliff instead: an instanced, noise-displaced rock block two to four
+  and a half storeys tall that tapers to a ragged top, with snow lying on
+  it above a certain height (a few lines added to the standard shader).
+  The open ground reads as a yard on a ledge or a ridge, not a maze.
+- `skyline`: `"ridge"` puts the valley's low ridge on the horizon;
+  `"peaks"` draws the high Tian Shan instead: a far and a near range, snow
+  fields down to a wandering snow line, gullies, and a moon. The sky is
+  drawn at twice the resolution on the High preset.
 
-| #   | Level                         | Creatures                                              | What's new                                      |
-| --- | ----------------------------- | ------------------------------------------------------ | ----------------------------------------------- |
-| 1   | Sublevel 10 — Infirmary       | 2 husks                                                | Tutorial, intercom, doors, hints                |
-| 2   | Sublevel 9 — Maintenance Wing | 3 husks                                                | Stealth                                         |
-| 3   | Sublevel 8 — Cold Storage     | 2 husks, brute                                         | Keycard-locked exit, first Brute                |
-| 4   | Sublevel 7 — Pumping Station  | 2 listeners, husk, brute                               | Water, security doors, first Listener           |
-| 5   | Sublevel 6 — Containment Labs | 2 watchers, 2 husks, brute                             | Doors everywhere, first Watcher                 |
-| 6   | Sublevel 5 — Ventilation      | 2 crawlers, mimic, 2 husks                             | Duct maze, takedowns, rivet gun, the radio lies |
-| 7   | Sublevel 4 — Power Plant      | 2 spitters, husk, brute                                | Three generators power the exit                 |
-| 8   | Sublevel 3 — Armory           | 3 swarms (18 rats), 2 husks, 2 brutes                  | Shotgun, big open hall                          |
-| 9   | Sublevel 2 — The Hive         | listener, watcher, crawler, spitter, 2 brutes, Remnant | Everything so far, then the boss arena          |
-| 10  | Surface — Lift Shaft          | husk, crawler, brute                                   | The choice: leave, or trigger the charges       |
+| #   | Level                         | Creatures                                              | What's new                                                       |
+| --- | ----------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| 1   | Sublevel 10 — Infirmary       | 2 husks                                                | Tutorial, intercom, doors, hints                                 |
+| 2   | Sublevel 9 — Maintenance Wing | 3 husks                                                | Stealth                                                          |
+| 3   | Sublevel 8 — Cold Storage     | 2 husks, brute                                         | Keycard-locked exit, first Brute                                 |
+| 4   | Sublevel 7 — Pumping Station  | 2 listeners, husk, brute                               | Water, security doors, first Listener                            |
+| 5   | Sublevel 6 — Containment Labs | 2 watchers, 2 husks, brute                             | Doors everywhere, first Watcher                                  |
+| 6   | Sublevel 5 — Ventilation      | 2 crawlers, mimic, 2 husks                             | Duct maze, takedowns, rivet gun, the radio lies                  |
+| 7   | Sublevel 4 — Power Plant      | 2 spitters, husk, brute                                | Three generators power the exit                                  |
+| 8   | Sublevel 3 — Armory           | 3 swarms (18 rats), 2 husks, 2 brutes                  | Shotgun, big open hall                                           |
+| 9   | Sublevel 2 — The Hive         | listener, watcher, crawler, spitter, 2 brutes, Remnant | Everything so far, then the boss arena                           |
+| 10  | Surface — The Portal          | husk, crawler, brute                                   | Out under the sky on the mountain; leave, or trigger the charges |
 
 **Part Two, The Valley** (levels 11–17, `src/world/levels/part2/`). New
 Game offers both parts, chapter select always has the first level of each,
@@ -428,15 +442,15 @@ run. Each level has more creature health to get past than the one before
 (checked by a test), and Part Two has its own prologue and endings
 (`dawn`, `silence`):
 
-| #   | Level                       | Creatures (hand-placed)                                | What's new                                                     |
-| --- | --------------------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
-| 11  | Ak-Suu — Clinic             | 4 husks, listener                                      | Three weeks later; the voice is back                           |
-| 12  | Ak-Suu — The Village        | husks, 2 howlers, watcher, mimic, a swarm              | Outdoors in the snow; the Howler                               |
-| 13  | Kara-Suu — Hydro Dam        | 2 listeners, 2 spitters, howler, husk, crawler, brute  | The reservoir under the sky, three generators for the spillway |
-| 14  | Kosh-Tash — Observatory     | 3 watchers, 2 husks, 2 howlers, brute, mimic           | Security doors                                                 |
-| 15  | Drainage Line — Rail Tunnel | 3 crawlers, 3 howlers, 2 listeners, 2 swarms, 2 brutes | Four kilometres of dark; alarms                                |
-| 16  | Beneath Ten — The Deep      | everything                                             | Two generators and a keycard, under Sublevel 10                |
-| 17  | The Cavity — The Source     | the Choir, 2 howlers, watcher, brute                   | The last boss; walk out or set off the charges                 |
+| #   | Level                         | Creatures (hand-placed)                                | What's new                                                         |
+| --- | ----------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------ |
+| 11  | Ak-Suu — Clinic               | 4 husks, listener                                      | Three weeks later; the voice is back                               |
+| 12  | Ak-Suu — The Village          | husks, 2 howlers, watcher, mimic, a swarm              | Outdoors in the snow; the Howler                                   |
+| 13  | Kara-Suu — Hydro Dam          | 2 listeners, 2 spitters, howler, husk, crawler, brute  | The reservoir under the sky, three generators for the spillway     |
+| 14  | Kosh-Tash — Observatory       | 3 watchers, 2 husks, 2 howlers, brute, mimic           | Security doors; out along the ridge under the peaks                |
+| 15  | Drainage Line — Rail Tunnel   | 3 crawlers, 3 howlers, 2 listeners, 2 swarms, 2 brutes | Four kilometres of dark; alarms                                    |
+| 16  | Laboratory Zero — Beneath Ten | everything                                             | Two generators and a keycard, under Sublevel 10                    |
+| 17  | The Cavity — The Source       | the Choir, 2 howlers, watcher, brute                   | A bare rock cavern; the last boss; walk out or set off the charges |
 
 The **Howler** screams when it first finds you (not again for 12 s) and
 every creature within 40 units comes to where it saw you. The **Choir** is

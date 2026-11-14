@@ -110,7 +110,7 @@ Mara's notes are always one floor ahead of you.
 | 7 Power Plant      | The lift needs all three generators. Mara's plan. Arkadin 1991: it can't climb; it wants to be carried by someone the doors open for. \*A 1991 engineer's list, Arkadin crossed out.                                               |
 | 8 Armory           | Mara: every time it talks to you it leaves a little of itself behind. The inventory: "They were already inside." \*Security: bullets run out, its voice doesn't.                                                                   |
 | 9 The Hive         | It keeps them, every voice it learned. Mara, absorbed, calling you in. \*Mara's photograph of the valley village: tell them never to answer a radio.                                                                               |
-| 10 Lift Shaft      | Arkadin 1991: the doors open only for the unchanged, and the shaft is wired to bring the mountain down. \*The crew roster: forty scratched out, one left.                                                                          |
+| 10 Surface         | Arkadin 1991: the doors open only for the unchanged, and the shaft is wired to bring the mountain down. \*The crew roster: forty scratched out, one left.                                                                          |
 
 ### What each place shows
 
@@ -129,7 +129,7 @@ scenes the notes never mention. Built in `world/storyScenes.ts`.
 | 7 Power Plant      | The lift's board, three lamps dark. Mara's map: three X's, "START ONE. RUN." The 1991 engineer's stash and his crossed-out list. A switch cabinet torn open with something grown into the cables.                                                                                 |
 | 8 Armory           | Mara's radio smashed with a hammer, her bag beside it. The security chief's locker: ear defenders, empty magazines, "STOP LISTENING". The sign-out desk turned over as a barricade, the floor brass with spent cases.                                                             |
 | 9 The Hive         | Three of the crew grown into the wall, boots still on. Mara's jacket half taken in, and a radio grown into the wall beside it. Her pack and the photograph of the valley.                                                                                                         |
-| 10 Lift Shaft      | The roster in the hatch: forty-one names, forty crossed out. Arkadin's charges up the shaft wall, linked by det cord.                                                                                                                                                             |
+| 10 Surface         | The roster in the hatch: forty-one names, forty crossed out. Arkadin's charges up the shaft wall, linked by det cord.                                                                                                                                                             |
 
 ## Weapons
 
@@ -143,14 +143,20 @@ scenes the notes never mention. Built in `world/storyScenes.ts`.
 
 ## Endings
 
-At the top of the lift shaft the blast door opens for you. Nur has a choice:
+At the top of the lift shaft is the portal hall, and the blast door opens
+for you. Past it is the mountain itself: the old portal yard under the
+stars, snowy peaks all round, cliffs, and the road down to the valley. Nur
+has a choice:
 
-- **Seal** — Trigger the consortium's self-destruct charges from the lift
-  controls. The shaft collapses with Nur inside. The Remnant stays buried.
-  _"Daylight was never the point."_
-- **Leave** — Walk out into the snow. Roll credits over the mountains. After
-  the credits: a short scene of the Operator's radio crackling to life in a
-  village clinic in the valley.
+- **Seal** — Go back into the hall and trigger Arkadin's charges from the
+  console by the door. The shaft comes down. Three days later a rescue team
+  digs one survivor out of the portal hall and carries Nur down to the
+  clinic at Ak-Suu. _"Daylight was never the point."_
+- **Leave** — Walk the mountain road down through the night. After the
+  credits: the Operator's radio crackling to life in a village clinic in
+  the valley.
+
+Either way the mountain cracked, and that is where Part Two begins.
 
 ---
 
@@ -170,28 +176,45 @@ idea** so the game keeps teaching until the end.
 | 7   | **Power Plant**      | Sublevel 4  | Multi-step objective: restart 3 generators. Each is loud and draws enemies. **Spitters**.                | The lift has power again. The Operator is pleased. Too pleased. |
 | 8   | **Armory**           | Sublevel 3  | Shotgun. Large combat arena, **Swarms**.                                                                 | Mara's last note: "Don't trust the radio."                      |
 | 9   | **The Hive**         | Sublevel 2  | The Remnant's core. Boss fight.                                                                          | The Operator stops pretending.                                  |
-| 10  | **Lift Shaft**       | Surface     | Escape sequence, then the ending choice.                                                                 | Seal or Leave.                                                  |
+| 10  | **Surface**          | The Portal  | The portal hall, the blast door, then out under the sky: the mountain yard, cliffs and peaks.            | Seal or Leave.                                                  |
 
 ---
 
 ## Part Two: The Valley
 
 Three weeks later. Nur woke in the clinic at **Ak-Suu**, the village at the
-foot of the mountain, with frostbite and no memory of the walk down. The snow
-melted early; the meltwater came down through the old drainage tunnels into
-the wells, and everyone who drank it went quiet and walked towards the dam.
-Last night the clinic radio switched itself on, and a calm voice asked if
-anyone could hear it.
+foot of the mountain, with frostbite and no memory of the road down.
 
-| #   | Level           | Location      | What's new                                                                        | Story beat                                                                                      |
-| --- | --------------- | ------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 11  | **Clinic**      | Ak-Suu        | Three weeks later. The voice is back on the radio.                                | Bed 3 asked for the radio to be turned off; there is no radio. Dr Sadykova goes after her son.  |
-| 12  | **The Village** | Ak-Suu        | Out under the night sky in the snow. The **Howler**: if it sees you, all hear it. | The garage key in the teacher's house; "don't let the tall one see you".                        |
-| 13  | **Hydro Dam**   | Kara-Suu      | Flooded channels and an open reservoir; three generators for the spillway.        | Hundreds standing in the reservoir, up to the neck, waiting.                                    |
-| 14  | **Observatory** | Kosh-Tash     | Security doors.                                                                   | It was never a control room: it was a transmitter. The Remnant learned to speak from the radio. |
-| 15  | **Rail Tunnel** | Drainage Line | Four kilometres of dark, alarms.                                                  | Sadykova found her son. She stays with him.                                                     |
-| 16  | **The Deep**    | Beneath Ten   | Everything at once, under the floor Nur woke up on.                               | Arkadin's first and last logs: it is a choir, and he asked to be added.                         |
-| 17  | **The Source**  | The Cavity    | The **Choir**, the last boss.                                                     | Walk out at dawn, or set off the Soviet charges: silence.                                       |
+**Why it happened.** Whichever ending Nur chose, the mountain cracked. The
+snow melted early; the meltwater ran down through the cracks, through the
+cavity, through the old drainage line and into the wells, and everyone who
+drank it went quiet and walked towards the dam. Then the Soviet Zenit relay
+at the **Kosh-Tash observatory** came back on by itself and began to
+broadcast the voice over the whole valley. Nur let it out, and goes back in
+to finish it.
+
+**Why the route goes where it goes.** Part Two never goes back down the way
+Part One came up. It goes _round_ the mountain and in from underneath, and
+every place looks like what it is:
+
+| Place                | What you see                                                               |
+| -------------------- | -------------------------------------------------------------------------- |
+| Ak-Suu (11, 12)      | Timber houses, snow, street lamps on wires, the peaks over the roofs       |
+| Kara-Suu dam (13)    | The open reservoir under the sky, cliffs on both sides                     |
+| Kosh-Tash (14)       | The observatory on the ridge, then out along the ridge under the peaks     |
+| Drainage line (15)   | The rail tunnel the meltwater came down: the only way back in              |
+| Laboratory Zero (16) | Arkadin's first laboratory: white tile, drains, cold light, the drill site |
+| The Source (17)      | Bare rock: the cavity itself, a cavern with no concrete left in it         |
+
+| #   | Level               | Location      | What's new                                                                        | Story beat                                                                                      |
+| --- | ------------------- | ------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 11  | **Clinic**          | Ak-Suu        | Three weeks later. The voice is back on the radio.                                | Bed 3 asked for the radio to be turned off; there is no radio. Dr Sadykova goes after her son.  |
+| 12  | **The Village**     | Ak-Suu        | Out under the night sky in the snow. The **Howler**: if it sees you, all hear it. | The garage key in the teacher's house; "don't let the tall one see you".                        |
+| 13  | **Hydro Dam**       | Kara-Suu      | Flooded channels and an open reservoir; three generators for the spillway.        | Hundreds standing in the reservoir, up to the neck, waiting.                                    |
+| 14  | **Observatory**     | Kosh-Tash     | Security doors, then out along the ridge under the peaks.                         | It was never a control room: it was a transmitter. The Remnant learned to speak from the radio. |
+| 15  | **Rail Tunnel**     | Drainage Line | Four kilometres of dark, alarms.                                                  | Sadykova found her son. She stays with him.                                                     |
+| 16  | **Laboratory Zero** | Beneath Ten   | Everything at once, in Arkadin's tiled first laboratory under Sublevel 10.        | Arkadin's first and last logs: it is a choir, and he asked to be added.                         |
+| 17  | **The Source**      | The Cavity    | The **Choir**, the last boss.                                                     | Walk out at dawn, or set off the Soviet charges: silence.                                       |
 
 **Endings.** _Dawn_: the Choir's voices go out one by one until only yours is
 left, and you climb out into a pink, freezing morning. _Silence_: the charges

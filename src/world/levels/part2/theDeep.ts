@@ -1,13 +1,13 @@
 import { checkpoint, hint, nur, objective, op, radio, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
-/** Level 16 — beneath Sublevel 10, the original drill site. Everything the mountain has, and two generators. */
+/** Level 16 — Laboratory Zero, beneath Sublevel 10: Arkadin's first laboratory and the original drill site. Everything the mountain has, and two generators. */
 export const THE_DEEP: LevelDef = {
   id: "beneath-ten",
-  name: "Beneath Ten",
-  subtitle: "The Deep",
+  name: "Laboratory Zero",
+  subtitle: "Beneath Ten",
   number: 16,
-  tagline: "Under the floor you woke up on.",
+  tagline: "Arkadin's first laboratory. Under the floor you woke up on.",
   objective: "Restore power to the cavity lift.",
   spawnYaw: -Math.PI / 2,
   theme: {
@@ -46,7 +46,12 @@ export const THE_DEEP: LevelDef = {
     "2": "ARKADIN, LAST LOG. It isn't one thing. It's a choir. Every mind it takes adds a voice. I have asked to be added. I would like to hear the whole song.",
   },
   events: {
-    start: [radio(op("Beneath ten. You're nearly home."), nur("I was never home. I was just on top of you."))],
+    start: [
+      radio(
+        op("Laboratory Zero. Where Arkadin first heard us. You're nearly home."),
+        nur("Tiles and drains. They hosed this place down every night. It didn't help.")
+      ),
+    ],
     keycard: [radio(nur("The drill-site card. The lower gate is open now.")), checkpoint()],
     power: [
       radio(op("Yes. Come down to us. All of us."), nur("I'm coming. Not for the reason you think.")),
