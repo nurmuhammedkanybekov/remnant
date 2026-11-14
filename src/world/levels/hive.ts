@@ -1,4 +1,4 @@
-import { nur, checkpoint, hint, objective, radio, unknown } from "../../game/script";
+import { nur, checkpoint, hint, objective, radio, unknown, sound } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 9 — the Remnant has grown into the whole sublevel. The Operator stops pretending, and the mass itself blocks the lift. */
@@ -64,7 +64,7 @@ export const HIVE: LevelDef = {
     ],
   },
   triggers: {
-    a: [radio(nur("You're not in a control room. Are you."), unknown("We are in every room.")), checkpoint()],
+    a: [radio(nur("You're not in a control room. Are you."), unknown("We are in every room.")), sound("hum", 11, 8), checkpoint()],
     b: [
       radio(
         unknown("You were always going to come up. We need you to. We need someone whole."),

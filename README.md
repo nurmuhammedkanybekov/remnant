@@ -463,20 +463,23 @@ Levels are plain text maps with a small script attached:
 ```ts
 map: [
   "############",
-  "#S.a.D..L.A#", // S start, a trigger, D door, L lamp, A ammo
+  "#S.a.D.bL.A#", // S start, a/b triggers, D door, L lamp, A ammo
   "#.####.###.#",
   "#.Y..E.K.=X#", // Y intercom, E creature, K keycard, = locked door, X exit
   "############",
 ],
 triggers: {
   a: [radio(op("Something is moving past that door. Stay low.")), checkpoint()],
+  // The power dies, the world goes quiet, and something stands at the end of the corridor.
+  b: [blackout(8), silence(6), apparition("husk", 4, 3)],
 },
 ```
 
 Every system and its tuning values are written up in
 [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), the plan and its history in
-[docs/ROADMAP.md](docs/ROADMAP.md), and the story in
-[docs/STORY.md](docs/STORY.md).
+[docs/ROADMAP.md](docs/ROADMAP.md), the story and its scripted moments in
+[docs/STORY.md](docs/STORY.md), and the latest quality audit (what was found,
+what changed, what is still open) in [docs/AUDIT.md](docs/AUDIT.md).
 
 ## Running it yourself
 
