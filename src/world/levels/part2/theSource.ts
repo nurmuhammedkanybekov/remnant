@@ -1,4 +1,4 @@
-import { checkpoint, hint, nur, objective, op, radio, unknown } from "../../../game/script";
+import { checkpoint, hint, nur, objective, op, radio, silence, sound, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 17 — the Source: the Choir's cavern. The last boss, then leave or bring it all down. */
@@ -13,32 +13,32 @@ export const THE_SOURCE: LevelDef = {
   finale: true,
   endings: { exit: "dawn", console: "silence" },
   theme: {
-    fog: 0x0a040e,
-    fogDensity: 0.05,
+    fog: 0x150a1c,
+    fogDensity: 0.042,
     wallTint: 0xc8b0d8,
     floorTint: 0xb098c0,
     lampColor: 0xd08aff,
-    skyLight: 0x4a3458,
-    groundLight: 0x120616,
+    skyLight: 0xa888c8,
+    groundLight: 0x2a1232,
     walls: "rock",
-    fillIntensity: 1.3,
+    fillIntensity: 2.1,
   },
   map: [
     "########################################",
     "#S....#.....R........#.......R.........#",
-    "#..a..D.......A..N...D...............B.#",
+    "#..a..D.....L.A..N...D...............B.#",
     "#.....#...W..........#....H......M.....#",
     "###.#######.######.######.##############",
     "#.....R......#....b....#......R........#",
-    "#..A.........D.........D.........N.....#",
+    "#..A......L..D.........D......L..N.....#",
     "#......1.....#.........#...............#",
     "########.###############.###########.###",
     "#.......R.......................R......#",
-    "#..O.............................O.....#",
+    "#..O........L.............L......O.....#",
     "#........~~~.............~~~...........#",
     "#........~~~.......&.....~~~...........#",
     "#.....c..........................d.....#",
-    "#..O.............................O.....#",
+    "#..O........L.............L......O.....#",
     "#.......R.J.......*.............R......#",
     "#################.Z.###########...X#####",
     "########################################",
@@ -58,7 +58,15 @@ export const THE_SOURCE: LevelDef = {
   },
   triggers: {
     a: [hint("The Choir only opens its core when it attacks. Shoot the core, and never stand still")],
-    b: [radio(unknown("...listen to us, Nur. Just listen..."))],
+    // Everything stops. Then every voice it ever took sings Kessler's four notes, and Nur knows where they started.
+    b: [
+      silence(8),
+      sound("choir", 19, 12),
+      radio(
+        unknown("...listen to us, Nur. Just listen..."),
+        nur("Kessler's four notes. That's where it started. A man humming in a hospital bed.")
+      ),
+    ],
     c: [radio(nur("There. That's the Source.")), objective("Kill the Choir.")],
     d: [radio(nur("The charges' console is by the lift."))],
   },

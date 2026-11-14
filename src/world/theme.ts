@@ -29,6 +29,13 @@ export interface LevelTheme {
    * as a ledge, a gully or a valley floor rather than a maze.
    */
   cliffs?: boolean;
+  /**
+   * What the place sounds like when nothing is happening (see
+   * `Soundscape`). By default it follows the rest of the theme: the valley
+   * where there's sky, a laboratory's hum with tile walls, a cavern's
+   * breath with rock, the mountain's concrete everywhere else.
+   */
+  soundscape?: "facility" | "valley" | "lab" | "cavern";
   /** What's on the horizon under the open sky: a low ridge (the valley floor) or the high peaks (up on the mountain). */
   skyline?: "ridge" | "peaks";
 }
@@ -43,6 +50,15 @@ export const DEFAULT_THEME: LevelTheme = {
   floorTint: 0xffffff,
   lampColor: 0xffd9a0,
 };
+
+/** The soundscape a theme asks for, or the one its other settings imply. */
+export function soundscapeOf(t: LevelTheme): "facility" | "valley" | "lab" | "cavern" {
+  if (t.soundscape) return t.soundscape;
+  if (t.outdoor) return "valley";
+  if (t.walls === "tile") return "lab";
+  if (t.walls === "rock") return "cavern";
+  return "facility";
+}
 
 export function resolveTheme(t: Partial<LevelTheme> | undefined): LevelTheme {
   return { ...DEFAULT_THEME, ...t };

@@ -1,3 +1,4 @@
+import { resolveTheme, soundscapeOf } from "./theme";
 import { describe, expect, it } from "vitest";
 import type { LevelDef } from "./levelDef";
 import { parseLevel } from "./levelParser";
@@ -55,5 +56,17 @@ describe("cliffCells", () => {
     expect(cliffs.has(0 * l.cols + 1)).toBe(false); // the hut's wall
     expect(cliffs.has(2 * l.cols + 3)).toBe(false); // the wall between hut and yard (beside the hut's floor)
     expect(cliffCells(l, new Set()).size).toBe(0);
+  });
+});
+
+describe("soundscapeOf", () => {
+  it("gives each kind of place its own sound", () => {
+    const of = (id: string) => soundscapeOf(resolveTheme(LEVELS.find((l) => l.id === id)!.theme));
+    expect(of("infirmary")).toBe("facility");
+    expect(of("ak-suu-clinic")).toBe("valley");
+    expect(of("ak-suu-village")).toBe("valley");
+    expect(of("lift-shaft")).toBe("valley");
+    expect(of("beneath-ten")).toBe("lab");
+    expect(of("the-cavity")).toBe("cavern");
   });
 });

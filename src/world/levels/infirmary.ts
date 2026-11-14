@@ -1,4 +1,4 @@
-import { nur, checkpoint, hint, objective, op, radio, unknown } from "../../game/script";
+import { nur, checkpoint, hint, objective, op, radio, sound, unknown } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 1 — the tutorial. Wake up, meet the Operator, learn to be quiet. */
@@ -52,7 +52,8 @@ export const INFIRMARY: LevelDef = {
   ],
   triggers: {
     a: [hint("Press {flashlight} for your flashlight — it drains fast")],
-    b: [hint("Hold {crouch} to crouch. Crouching is nearly silent")],
+    // Kessler's four notes, hummed somewhere east of you, before you know what they are. They come back.
+    b: [hint("Hold {crouch} to crouch. Crouching is nearly silent"), sound("hum", 19, 6), radio(nur("...Someone's humming. Down here?"))],
     c: [radio(op("Something is moving in the east ward. Stay low. Don't run."), nur("Is that... Kessler? From drilling?")), checkpoint()],
     d: [radio(op("The stairwell. Nine is the old maintenance wing. Stay off the main corridors."))],
   },
