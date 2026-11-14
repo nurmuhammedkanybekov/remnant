@@ -22,6 +22,8 @@ export const VILLAGE: LevelDef = {
     fillIntensity: 1.35,
     outdoor: "streets",
     walls: "timber",
+    cliffs: true,
+    skyline: "peaks",
   },
   map: [
     "##################################",

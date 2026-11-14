@@ -659,8 +659,16 @@ export function timberSurface(): Surface | null {
 }
 
 /** A night sky over the valley, wrapped round the world: overcast, a little lighter at the horizon. */
-export function valleySkyTexture(zenith: number, horizon: number): THREE.CanvasTexture {
-  const [canvas, ctx] = blank(1024, 512);
+/** The sky is drawn in 1024 × 512 coordinates; this scales the canvas it's drawn into. */
+let SKY_SCALE = 1;
+export function setSkyScale(scale: number): void {
+  SKY_SCALE = scale;
+}
+
+export function valleySkyTexture(zenith: number, horizon: number, peaks = false): THREE.CanvasTexture {
+  // Drawn at twice the size (in 1024 × 512 coordinates), so the mountains stay sharp when the sky fills the screen.
+  const [canvas, ctx] = blank(1024 * SKY_SCALE, 512 * SKY_SCALE);
+  ctx.scale(SKY_SCALE, SKY_SCALE);
   const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
   const g = ctx.createLinearGradient(0, 0, 0, 512);
   g.addColorStop(0, hex(zenith));
@@ -686,6 +694,7 @@ export function valleySkyTexture(zenith: number, horizon: number): THREE.CanvasT
     ctx.fillStyle = `rgba(220,226,235,${0.2 + rand() * 0.5})`;
     ctx.fillRect(rand() * 1024, rand() * 180, 1.4, 1.4);
   }
+  if (peaks) drawPeaks(ctx, rand);
   // The ridge line of the mountains, black against the sky.
   ctx.fillStyle = "rgba(6,8,10,0.92)";
   ctx.beginPath();
@@ -697,6 +706,195 @@ export function valleySkyTexture(zenith: number, horizon: number): THREE.CanvasT
   const t = toTexture(canvas, true);
   t.mapping = THREE.EquirectangularReflectionMapping;
   return t;
+}
+
+/**
+ * The Tian Shan by moonlight, for the levels high on the mountain: a moon
+ * behind thin cloud, a far range of snow-capped peaks catching its light,
+ * and a nearer, darker range in front. Drawn into the equirectangular sky,
+ * where y = 256 is the horizon.
+ */
+function drawPeaks(ctx: CanvasRenderingContext2D, rand: () => number): void {
+  // The moon, low over the eastern peaks, with a halo in the haze.
+  const mx = 300;
+  const my = 120;
+  const halo = ctx.createRadialGradient(mx, my, 0, mx, my, 90);
+  halo.addColorStop(0, "rgba(210,220,235,0.35)");
+  halo.addColorStop(1, "rgba(210,220,235,0)");
+  ctx.fillStyle = halo;
+  ctx.fillRect(mx - 90, my - 90, 180, 180);
+  ctx.fillStyle = "rgba(236,240,246,0.95)";
+  ctx.beginPath();
+  ctx.arc(mx, my, 9, 0, Math.PI * 2);
+  ctx.fill();
+
+  /** A ragged skyline across the whole panorama (wrapping at x = 0 / 1024). */
+  const range = (base: number, height: number, count: number): number[] => {
+    const tops: number[] = [];
+    for (let i = 0; i <= 64; i++) tops.push(base);
+    for (let k = 0; k < count; k++) {
+      const centre = rand() * 64;
+      const h = height * (0.45 + rand() * 0.55);
+      const width = 3 + rand() * 7;
+      for (let i = 0; i <= 64; i++) {
+        let d = Math.abs(i - centre);
+        d = Math.min(d, 64 - d);
+        const lift = Math.max(0, h * (1 - d / width));
+        tops[i] = Math.min(tops[i], base - lift);
+      }
+    }
+    // Rough the slopes up a little.
+    return tops.map((y, i) => (i === 64 ? tops[0] : y + (rand() - 0.5) * 3));
+  };
+  const fill = (tops: number[], style: string | CanvasGradient) => {
+    ctx.fillStyle = style;
+    ctx.beginPath();
+    ctx.moveTo(0, 300);
+    tops.forEach((y, i) => ctx.lineTo(i * 16, y));
+    ctx.lineTo(1024, 300);
+    ctx.closePath();
+    ctx.fill();
+  };
+
+  // The far range: snow on the summits, broken up by rock and following each slope down.
+  const far = range(254, 78, 18);
+  fill(far, "rgb(26,31,42)");
+  const topAt = (x: number) => {
+    const f = (((x % 1024) + 1024) % 1024) / 16;
+    const i = Math.floor(f);
+    return far[i] + (far[Math.min(64, i + 1)] - far[i]) * (f - i);
+  };
+  // Snowfields: from each summit down to a ragged snowline, then gullies of bare rock cutting down through them.
+  ctx.save();
+  ctx.filter = "blur(0.6px)";
+  // Deep on the high, shaded faces and thin on the low ones: the snowline wanders.
+  const snowline = (x: number) =>
+    topAt(x) + 8 + Math.max(0, 250 - topAt(x)) * 0.25 + Math.sin(x * 0.045) * 7 + Math.sin(x * 0.17 + 2) * 4 + Math.sin(x * 0.53) * 2;
+  const snow = ctx.createLinearGradient(0, 170, 0, 252);
+  snow.addColorStop(0, "rgba(186,196,212,0.85)");
+  snow.addColorStop(1, "rgba(150,160,178,0.35)");
+  ctx.fillStyle = snow;
+  ctx.beginPath();
+  ctx.moveTo(0, topAt(0));
+  for (let x = 0; x <= 1024; x += 3) ctx.lineTo(x, topAt(x) + 0.5);
+  for (let x = 1024; x >= 0; x -= 3) ctx.lineTo(x, Math.min(252, snowline(x)));
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(26,31,42,0.8)";
+  for (let i = 0; i < 90; i++) {
+    // A gully: starts just under a summit and runs down the fall line, wandering a little.
+    let x = rand() * 1024;
+    let y = topAt(x) + 4 + rand() * 8;
+    ctx.lineWidth = 0.5 + rand() * 0.9;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    const lean = (rand() - 0.5) * 0.8;
+    for (let k = 0; k < 6; k++) {
+      x += lean * 4 + (rand() - 0.5) * 2;
+      y += 3 + rand() * 4;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // The near range: dark and close, its shoulders just touched with snow.
+  const near = range(262, 34, 10);
+  const nearFill = ctx.createLinearGradient(0, 200, 0, 262);
+  nearFill.addColorStop(0, "rgb(22,26,34)");
+  nearFill.addColorStop(1, "rgb(10,12,16)");
+  fill(near, nearFill);
+}
+
+/** Fractured granite for cliffs and caves: grey-brown, banded, split by dark cracks. */
+export function rockSurface(): Surface {
+  const [canvas, ctx] = blank(512, 512);
+  const s = 512;
+  const rand = mulberry32(2701);
+  ctx.fillStyle = "#5c5a56";
+  ctx.fillRect(0, 0, s, s);
+  // Bands of strata running across the face.
+  for (let i = 0; i < 14; i++) {
+    const y = rand() * s;
+    ctx.fillStyle = rand() < 0.5 ? "rgba(90,84,76,0.35)" : "rgba(40,38,36,0.3)";
+    ctx.fillRect(0, y, s, 8 + rand() * 30);
+  }
+  blotches(ctx, s, s, rand, 60, "rgba(30,28,26,0.45)", s / 6);
+  blotches(ctx, s, s, rand, 40, "rgba(130,126,118,0.3)", s / 8);
+  blotches(ctx, s, s, rand, 12, "rgba(70,60,40,0.3)", s / 5);
+  // Cracks: dark, branching, mostly running down the face.
+  ctx.lineCap = "round";
+  for (let i = 0; i < 46; i++) {
+    let x = rand() * s;
+    let y = rand() * s;
+    ctx.strokeStyle = `rgba(14,12,10,${0.5 + rand() * 0.4})`;
+    ctx.lineWidth = 1 + rand() * 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    const steps = 4 + Math.floor(rand() * 8);
+    for (let k = 0; k < steps; k++) {
+      x += (rand() - 0.5) * 40;
+      y += 10 + rand() * 30;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  // Grit.
+  for (let i = 0; i < 4000; i++) {
+    ctx.fillStyle = rand() < 0.5 ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.12)";
+    ctx.fillRect(rand() * s, rand() * s, 2, 2);
+  }
+  return { map: toTexture(canvas, true), normalMap: null, roughnessMap: null, photo: false };
+}
+
+/** Soviet laboratory tile: off-white squares, dark grout, a tile missing here and there, grime at the foot. */
+export function tileSurface(): Surface {
+  const [canvas, ctx] = blank(512, 512);
+  const s = 512;
+  const n = 8;
+  const t = s / n;
+  const rand = mulberry32(1987);
+  ctx.fillStyle = "#3a3c3a";
+  ctx.fillRect(0, 0, s, s);
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      if (rand() < 0.03) {
+        // A tile gone: bare, rough render behind it.
+        ctx.fillStyle = "#6a665c";
+        ctx.fillRect(x * t + 3, y * t + 3, t - 6, t - 6);
+        continue;
+      }
+      const v = 200 + Math.floor(rand() * 26);
+      ctx.fillStyle = `rgb(${v},${v + 4},${v + 2})`;
+      ctx.fillRect(x * t + 3, y * t + 3, t - 6, t - 6);
+      // A glaze highlight along the top edge.
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillRect(x * t + 3, y * t + 3, t - 6, 4);
+      if (rand() < 0.08) {
+        ctx.strokeStyle = "rgba(40,40,40,0.6)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x * t + rand() * t, y * t + 3);
+        ctx.lineTo(x * t + rand() * t, y * t + t - 3);
+        ctx.stroke();
+      }
+    }
+  // Grime: rising damp at the foot, streaks from above.
+  const damp = ctx.createLinearGradient(0, s * 0.65, 0, s);
+  damp.addColorStop(0, "rgba(60,54,40,0)");
+  damp.addColorStop(1, "rgba(60,54,40,0.55)");
+  ctx.fillStyle = damp;
+  ctx.fillRect(0, 0, s, s);
+  blotches(ctx, s, s, rand, 30, "rgba(70,62,46,0.25)", s / 7);
+  for (let i = 0; i < 18; i++) {
+    const x = rand() * s;
+    const g = ctx.createLinearGradient(0, 0, 0, s * (0.3 + rand() * 0.5));
+    g.addColorStop(0, "rgba(80,70,50,0.35)");
+    g.addColorStop(1, "rgba(80,70,50,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x, 0, 3 + rand() * 6, s);
+  }
+  return { map: toTexture(canvas, true), normalMap: null, roughnessMap: null, photo: false };
 }
 
 /** Patchy snow lying on open ground: white where it's drifted, see-through where it hasn't. */
@@ -1033,6 +1231,8 @@ function buildAll() {
     crate: crateSurface(),
     barrel: barrelSurface(),
     timber: timberSurface(),
+    rock: rockSurface(),
+    tile: tileSurface(),
     plate: plateSurface(),
     hazard: hazardSurface(),
     skin: skinNormal(),

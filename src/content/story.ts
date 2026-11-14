@@ -24,11 +24,11 @@ export function isEndingId(v: unknown): v is EndingId {
 export const PROLOGUE_TWO = {
   title: "THE VALLEY",
   lines: [
-    "Three weeks after Object 9. You woke in the clinic at Ak-Suu, the village at the foot of the mountain, with frostbite and no memory of the walk down.",
-    "The snow melted early this year. The meltwater came down the mountain, through the old drainage tunnels, into the wells.",
-    "Last night the clinic radio switched itself on. Nobody has touched it since the Soviets left. A calm voice asked if anyone could hear it.",
-    "This morning the village is empty.",
-    "You are Nur Kanybekov. You know that voice.",
+    "Three weeks after Object 9. You woke in the clinic at Ak-Suu, the village under the mountain, with frostbite and no memory of the road down.",
+    "Whatever you did at the top, the mountain cracked. When the snow melted early this year, the meltwater ran down through the cracks, through the cavity, through the old drainage line and into the village wells.",
+    "Then the Soviet relay at the Kosh-Tash observatory came back on by itself, and began to broadcast over the whole valley.",
+    "Last night the clinic radio asked, in a calm voice, if anyone could hear it. This morning the village is empty.",
+    "You are Nur Kanybekov. You know that voice. You are the one who let it out, and you are going back in to finish it.",
   ],
 };
 
@@ -45,7 +45,8 @@ export const ENDINGS: Record<EndingId, Ending> = {
     lines: [
       "The charges go off one after another, all the way down the shaft.",
       "The radio screams in forty-one voices, then in one, then goes quiet.",
-      "Object 9 is under a mountain again. Nobody will open it this time. There's nobody left who knows it's there.",
+      "Object 9 is under a mountain again. Nobody will open it this time.",
+      "Three days later a rescue team from the valley digs one survivor out of the portal hall, and carries you down to the clinic at Ak-Suu. Up on the mountain, the snow is starting to melt.",
     ],
   },
   silence: {
@@ -70,8 +71,8 @@ export const ENDINGS: Record<EndingId, Ending> = {
     title: "DAYLIGHT",
     tag: "YOU MADE IT OUT",
     lines: [
-      "The blast door grinds open on a white, blinding morning. Snow. Wind. The valley far below.",
-      "You walk until the mountain is behind you and you can't hear anything but your own breathing.",
+      "You walk the old mountain road all night, under more stars than you knew there were. By dawn the valley is below you, white and still.",
+      "You walk until the mountain is behind you and you can't hear anything but your own breathing. Nothing follows you. Nothing you can see.",
       "Three weeks later, in a village clinic in the valley, a radio nobody has turned on crackles to life. A calm voice asks if anyone can hear it.",
     ],
   },
@@ -101,4 +102,5 @@ export const TRANSMISSIONS = [
   "…Ak-Suu clinic, Ak-Suu clinic, is anyone at the radio…",
   "…the wells taste of iron. Don't drink the water, Nur…",
   "…the observatory still has power. Something is using it…",
+  "…Kosh-Tash relay, broadcasting on all channels. Is anyone there…",
 ];
