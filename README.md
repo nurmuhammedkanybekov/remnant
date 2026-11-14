@@ -55,6 +55,9 @@ are public-domain.
     <td><img src="docs/screenshots/creature.jpg" alt="A Brute in the dark"></td>
   </tr>
   <tr>
+    <td colspan="2"><img src="docs/screenshots/mountain.jpg" alt="The end of Part One: out of the blast door into the portal yard, among cliffs and snowy peaks"></td>
+  </tr>
+  <tr>
     <td colspan="2"><img src="docs/screenshots/valley.jpg" alt="Part Two: snow falling on the empty village of Ak-Suu at night"></td>
   </tr>
   <tr>
