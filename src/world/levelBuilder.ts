@@ -194,11 +194,13 @@ function buildGeometry(
   const width = level.cols * CELL_SIZE;
   const depth = level.rows * CELL_SIZE;
 
+  // A cavern's floor is bare rock; everywhere else, the facility's concrete.
+  const floorSurface = theme.walls === "rock" ? tex.rock : tex.floor;
   const floorMat = new THREE.MeshStandardMaterial({
     color: theme.floorTint,
-    ...surfaceMaps(tex.floor, bumpMaps, level.cols, level.rows),
+    ...surfaceMaps(floorSurface, bumpMaps, level.cols, level.rows),
     bumpScale: 0.8,
-    roughness: tex.floor.roughnessMap ? 0.9 : 0.75,
+    roughness: floorSurface.roughnessMap ? 0.9 : theme.walls === "rock" ? 0.95 : 0.75,
     metalness: 0.15,
   });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), floorMat);
