@@ -23,6 +23,9 @@ interface Lamp {
   broken: boolean;
   /** The cone of light it throws down through the dust. */
   beam: THREE.ShaderMaterial | null;
+  /** A scripted blackout: dark from `outAt` until `backAt` (session time). */
+  outAt: number;
+  backAt: number;
 }
 
 /** Lamps within this distance (world units) of a creature stutter. */
@@ -51,6 +54,8 @@ export class LampSystem {
       disturbed: false,
       broken: false,
       beam: fixtures[i] ? beamMaterial(spawn.color, 0) : null,
+      outAt: Infinity,
+      backAt: -Infinity,
     }));
     for (const l of this.lamps) {
       if (!l.beam) continue;
@@ -76,6 +81,19 @@ export class LampSystem {
     for (const lamp of this.lamps) {
       if (lamp.broken) continue;
       lamp.timer -= dt;
+      if (time >= lamp.outAt && time < lamp.backAt + 0.5) {
+        // Blacked out: a last stutter as it goes, dark, then a stutter as it catches again.
+        const going = time - lamp.outAt < 0.3;
+        const coming = time >= lamp.backAt;
+        if (going || coming) {
+          if (lamp.timer <= 0) {
+            lamp.timer = 0.03 + Math.random() * 0.07;
+            lamp.brightness = Math.random() < 0.45 ? 0.3 + Math.random() * 0.7 : 0.02;
+          }
+        } else lamp.brightness = 0;
+        this.paint(lamp);
+        continue;
+      }
       const near = creatures.some((c) => Math.hypot(c.x - lamp.spawn.pos.x, c.y - lamp.spawn.pos.y) < DISTURB_RADIUS);
       if (near) {
         lamp.disturbed = true;
@@ -158,6 +176,24 @@ export class LampSystem {
       if (distance <= maxDist && (!best || distance < best.distance)) best = { index, point: hit.clone(), distance };
     });
     return best;
+  }
+
+  /**
+   * The power fails. The lamps go out in a wave that starts at the far end
+   * of the level and arrives at `origin` (the player) last, about a second
+   * and a half later, as if the dark were coming towards you. They come back
+   * after `seconds`, nearest first. Emergency lamps run on their own
+   * batteries and stay on: in a blackout they're all the light there is.
+   */
+  blackout(time: number, seconds: number, origin: THREE.Vector2): void {
+    const reach = Math.max(1, ...this.lamps.map((l) => Math.hypot(l.spawn.pos.x - origin.x, l.spawn.pos.y - origin.y)));
+    for (const l of this.lamps) {
+      if (l.spawn.emergency) continue;
+      const d = Math.hypot(l.spawn.pos.x - origin.x, l.spawn.pos.y - origin.y);
+      l.outAt = time + (1 - d / reach) * 1.5;
+      l.backAt = time + 1.5 + seconds + (d / reach) * 1.2;
+      l.timer = 0;
+    }
   }
 
   /** Shoots a lamp out: the tube goes dark for the rest of the level. Returns where it was, or null if it already was. */

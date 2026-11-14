@@ -189,6 +189,24 @@ like where it is.
       Two, the relay explains the broadcast, and Nur goes back in because
       Nur let it out
 
+## Phase 12 — Horror direction (done)
+
+From an audit of the game as it plays (`docs/AUDIT.md`): the systems were
+strong, but the levels had no tools for authored horror, and every place
+sounded like the same concrete.
+
+- [x] Script actions for authored moments: blackout (emergency lamps stay
+      on), torch failure, silence, placed sounds, and figures that vanish
+      when you light them
+- [x] Seven moments across both parts, joined by one recurring motif
+      (Kessler's four notes)
+- [x] Soundscapes per place: wind and gusts in the valley and on the
+      mountain, a fluorescent hum in the laboratory, the cavern's breath;
+      the underground drone stays underground
+- [x] Snow underfoot sounds like snow
+- [x] Laboratory Zero and the Source lit so you can read them: lab lamps,
+      violet work lamps in the cavern, a higher fill
+
 ## Phase 9 — Play it together, play it scared (done)
 
 - [x] Ammunition in small caches spread over each level, found by exploring;

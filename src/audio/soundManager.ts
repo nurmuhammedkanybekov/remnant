@@ -10,7 +10,10 @@ import { SampleBank } from "./samples";
  * Signal flow:
  *   voice → [lowpass if behind a wall] → 3D panner (HRTF) → dry bus ─────────────┐
  *                                                        └→ reverb (small/large room) ─┴→ master → out
- *   room tone (recorded loop) ──────────────────────────────────────────────────→ master
+ *   room tone (recorded loop), drone, wind, music ──→ world bus ───────────────→ master
+ *
+ * The world bus is everything that is just "being somewhere": it is what a
+ * scripted silence (`hush`) takes away, leaving only what is near you.
  */
 /** What the music engine needs from the sound engine. */
 export interface MusicOutput {
@@ -39,6 +42,20 @@ export type RoomSize = number;
 
 const CENTER: Spatial = { pan: 0, distance: 0, muffled: false };
 
+/**
+ * What a place sounds like when nothing is happening in it. "facility": the
+ * mountain's concrete (drone, drips, steel, pipes). "valley": wind and snow,
+ * the drone only faint indoors. "lab": the same concrete under a fluorescent
+ * hum. "cavern": no machines at all, just a slow breath through the rock.
+ */
+export type Soundscape = "facility" | "valley" | "lab" | "cavern";
+
+/** Sounds a level script can place in the world (see `game/script.ts`). */
+export type Stinger = "knock" | "hum" | "choir" | "steps" | "breath" | "scream" | "radio" | "power";
+
+/** Kessler's four notes, in Hz: the tune the drill crew hummed, and the Remnant still does. */
+export const KESSLER_NOTES = [293.66, 349.23, 329.63, 220.0];
+
 export class SoundManager {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
@@ -52,6 +69,22 @@ export class SoundManager {
   private bedGain!: GainNode;
   private bedWanted = 0;
   private bedWhich = 0;
+  /** Everything ambient: drone, room tone, wind, music. Scripted silences pull this down. */
+  private worldBus!: GainNode;
+  private droneGain!: GainNode;
+  private windGain!: GainNode;
+  private windBand!: BiquadFilterNode;
+  private windShade!: BiquadFilterNode;
+  private humGain!: GainNode;
+  private breathGain!: GainNode;
+  private scape: Soundscape = "facility";
+  /** 0 = under a roof, 1 = out under the sky. */
+  private exposure = 0;
+  private gust = 0;
+  private gustTarget = 0;
+  private gustTimer = 0;
+  private hushUntil = 0;
+  private layerTimer = 0;
   private noiseBuf!: AudioBuffer;
   private musicBus!: GainNode;
   /** Recorded weapon sounds; anything missing falls back to synthesis. */
@@ -100,9 +133,11 @@ export class SoundManager {
     this.reverbIn.connect(small).connect(this.smallWet).connect(this.master);
     this.reverbIn.connect(large).connect(this.largeWet).connect(this.master);
     this.setRoom(0.4);
+    this.worldBus = ctx.createGain();
+    this.worldBus.connect(this.master);
     this.bedGain = ctx.createGain();
     this.bedGain.gain.value = 0;
-    this.bedGain.connect(this.master);
+    this.bedGain.connect(this.worldBus);
 
     this.noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = this.noiseBuf.getChannelData(0);
@@ -110,7 +145,7 @@ export class SoundManager {
 
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = this.musicVolume;
-    this.musicBus.connect(this.master);
+    this.musicBus.connect(this.worldBus);
     const musicSend = ctx.createGain();
     musicSend.gain.value = 0.5;
     this.musicBus.connect(musicSend).connect(this.reverbIn);
@@ -189,7 +224,7 @@ export class SoundManager {
   setRoomTone(level: number, which = this.bedWhich): void {
     this.bedWanted = level;
     if (!this.ctx) return;
-    this.bedGain.gain.setTargetAtTime(level, this.ctx.currentTime, 1.2);
+    this.bedGain.gain.setTargetAtTime(level * (1 - this.exposure * 0.92), this.ctx.currentTime, 1.2);
     if (this.bed && which !== this.bedWhich) {
       // A different building: swap the loop.
       this.bed.stop(this.ctx.currentTime + 1.5);
@@ -588,11 +623,20 @@ export class SoundManager {
 
   // ---------------------------------------------------------------- player
 
-  playFootstep(gait: "crouch" | "walk" | "sprint" | "still"): void {
+  playFootstep(gait: "crouch" | "walk" | "sprint" | "still", snow = false): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     this.stepFlip = !this.stepFlip;
     const vol = gait === "sprint" ? 0.5 : gait === "crouch" ? 0.08 : 0.25;
+    if (snow && gait !== "still") {
+      // Snow: the crust breaking (two bright grains), then the pack giving underfoot.
+      const o = this.out(CENTER, 1, 0.08)!;
+      const k = gait === "crouch" ? 0.45 : 1;
+      this.burst(o, "bandpass", (this.stepFlip ? 1900 : 2300) + Math.random() * 600, 1.3, t, 0.06, vol * 0.8 * k);
+      this.burst(o, "bandpass", 3400 + Math.random() * 900, 2.2, t + 0.03 + Math.random() * 0.02, 0.05, vol * 0.45 * k);
+      this.burst(o, "lowpass", 260, 0.8, t + 0.01, 0.12, vol * 0.6 * k, 0.01);
+      return;
+    }
     if (gait !== "still" && this.sample(gait === "sprint" ? "stepRun" : "stepWalk", t, CENTER, gait === "crouch" ? 0.3 : 1, 0.25)) return;
     const o = this.out(CENTER, 1, 0.25)!;
     this.burst(o, "lowpass", this.stepFlip ? 420 : 520, 1, t, 0.09, vol);
@@ -1107,6 +1151,7 @@ export class SoundManager {
     const ctx = this.ctx!;
     const g = ctx.createGain();
     g.gain.value = 0.09;
+    this.droneGain = g;
     const lp = ctx.createBiquadFilter();
     lp.type = "lowpass";
     lp.frequency.value = 140;
@@ -1132,7 +1177,225 @@ export class SoundManager {
     lfoG.gain.value = 60;
     lfo.connect(lfoG).connect(lp.frequency);
     lfo.start();
-    lp.connect(g).connect(this.master);
+    lp.connect(g).connect(this.worldBus);
+    this.startLayers();
+  }
+
+  /**
+   * The layers a place adds over the drone, all running from the start at
+   * zero and faded in by `updateAmbient`: wind (a band of noise whose pitch
+   * and loudness follow the gusts, shaded duller indoors), a fluorescent
+   * hum (mains and its harmonics through a buzzy band), and the cavern's
+   * breath (low noise swelling in and out every eight seconds or so).
+   */
+  private startLayers(): void {
+    const ctx = this.ctx!;
+    const wind = this.noise();
+    this.windBand = ctx.createBiquadFilter();
+    this.windBand.type = "bandpass";
+    this.windBand.frequency.value = 420;
+    this.windBand.Q.value = 0.8;
+    this.windShade = ctx.createBiquadFilter();
+    this.windShade.type = "lowpass";
+    this.windShade.frequency.value = 900;
+    this.windGain = ctx.createGain();
+    this.windGain.gain.value = 0;
+    wind.connect(this.windBand).connect(this.windShade).connect(this.windGain).connect(this.worldBus);
+    // A thin whistle riding on top of the gusts.
+    const whistle = this.noise();
+    const wf = ctx.createBiquadFilter();
+    wf.type = "bandpass";
+    wf.frequency.value = 1650;
+    wf.Q.value = 14;
+    const wg = ctx.createGain();
+    wg.gain.value = 0.35;
+    whistle.connect(wf).connect(wg).connect(this.windShade);
+    wind.start();
+    whistle.start(0, 0.7);
+
+    this.humGain = ctx.createGain();
+    this.humGain.gain.value = 0;
+    const buzz = ctx.createBiquadFilter();
+    buzz.type = "bandpass";
+    buzz.frequency.value = 1200;
+    buzz.Q.value = 1.5;
+    for (const [f, type, v] of [
+      [100, "sawtooth", 0.6],
+      [200, "square", 0.15],
+      [50, "sine", 1],
+    ] as const) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = f;
+      const og = ctx.createGain();
+      og.gain.value = v;
+      o.connect(og).connect(f === 50 ? this.humGain : buzz);
+      o.start();
+    }
+    buzz.connect(this.humGain);
+    this.humGain.connect(this.worldBus);
+
+    this.breathGain = ctx.createGain();
+    this.breathGain.gain.value = 0;
+    const air = this.noise();
+    const af = ctx.createBiquadFilter();
+    af.type = "lowpass";
+    af.frequency.value = 320;
+    const swell = ctx.createGain();
+    swell.gain.value = 0.5;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.12;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.5;
+    lfo.connect(depth).connect(swell.gain);
+    air.connect(af).connect(swell).connect(this.breathGain);
+    const under = ctx.createOscillator();
+    under.frequency.value = 31;
+    const ug = ctx.createGain();
+    ug.gain.value = 0.6;
+    under.connect(ug).connect(swell);
+    this.breathGain.connect(this.worldBus);
+    air.start(0, 0.3);
+    lfo.start();
+    under.start();
+  }
+
+  /** What this level sounds like (set when it loads). */
+  setSoundscape(scape: Soundscape): void {
+    this.scape = scape;
+  }
+
+  /** How far out under the sky you are, 0..1. The wind comes up and the building's sounds drop away. */
+  setExposure(outside: number): void {
+    this.exposure = Math.max(0, Math.min(1, outside));
+  }
+
+  /**
+   * Silence: the drone, the room, the wind and the music all drain away for
+   * `seconds`, then come back slowly. What's left is what's near you.
+   */
+  hush(seconds: number): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const g = this.worldBus.gain;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.setTargetAtTime(0.0001, t, 0.18);
+    g.setTargetAtTime(1, t + seconds, 1.4);
+    this.hushUntil = t + seconds;
+  }
+
+  /** Any scripted silence is over at once (a new level). */
+  unhush(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.worldBus.gain.cancelScheduledValues(t);
+    this.worldBus.gain.setTargetAtTime(1, t, 0.3);
+    this.hushUntil = 0;
+  }
+
+  /**
+   * A sound a level script places in the world. Each is built to be heard
+   * once, at the right moment: three knocks on steel, Kessler's four notes
+   * hummed by people who aren't there, the same tune as a choir, footsteps
+   * crossing a room, a breath at your back, a scream far down the rock, a
+   * radio coming on by itself, the power dying.
+   */
+  playStinger(kind: Stinger, sp: Spatial = CENTER): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime + 0.05;
+    switch (kind) {
+      case "knock": {
+        const o = this.out(sp, 60, 0.9);
+        if (!o) return;
+        [0, 0.46, 0.92].forEach((dt, i) => {
+          const at = t + dt + (i === 2 ? 0.12 : 0);
+          this.tone(o, "sine", 150, 82, at, 0.22, 0.9);
+          this.burst(o, "lowpass", 700, 1, at, 0.12, 0.7);
+          this.burst(o, "bandpass", 2400, 6, at, 0.35, 0.08); // the steel ringing after
+        });
+        return;
+      }
+      case "hum":
+      case "choir": {
+        const o = this.out(sp, 70, kind === "choir" ? 1.6 : 1.1);
+        if (!o) return;
+        const voices = kind === "choir" ? 9 : 5;
+        const len = kind === "choir" ? 1.15 : 0.8;
+        const formant = this.ctx.createBiquadFilter();
+        formant.type = "bandpass";
+        formant.frequency.value = kind === "choir" ? 650 : 520;
+        formant.Q.value = 1.6;
+        formant.connect(o);
+        KESSLER_NOTES.forEach((f, n) => {
+          for (let v = 0; v < voices; v++) {
+            // Each voice a little out of tune and late: people, not an instrument.
+            const octave = kind === "choir" && v % 3 === 0 ? 0.5 : 1;
+            const cents = (Math.random() - 0.5) * 22;
+            const freq = f * octave * Math.pow(2, cents / 1200);
+            const start = t + n * len + Math.random() * 0.06;
+            const osc = this.ctx!.createOscillator();
+            osc.type = v % 2 ? "triangle" : "sawtooth";
+            osc.frequency.value = freq;
+            const vib = this.ctx!.createOscillator();
+            vib.frequency.value = 4.6 + Math.random();
+            const vd = this.ctx!.createGain();
+            vd.gain.value = freq * 0.006;
+            vib.connect(vd).connect(osc.frequency);
+            const g = this.ctx!.createGain();
+            const peak = (kind === "choir" ? 0.05 : 0.07) / Math.sqrt(voices);
+            g.gain.setValueAtTime(0.0001, start);
+            g.gain.exponentialRampToValueAtTime(peak, start + 0.18);
+            g.gain.setValueAtTime(peak, start + len - 0.12);
+            g.gain.exponentialRampToValueAtTime(0.0001, start + len + (n === 3 ? 1.6 : 0.15));
+            osc.connect(g).connect(formant);
+            osc.start(start);
+            vib.start(start);
+            osc.stop(start + len + 1.8);
+            vib.stop(start + len + 1.8);
+          }
+        });
+        return;
+      }
+      case "steps": {
+        for (let i = 0; i < 6; i++) {
+          const at = t + i * 0.58 + Math.random() * 0.05;
+          this.sample("creatureStep", at, sp, 0.75, 0.6, 0.92, 40) ||
+            (() => {
+              const o = this.out(sp, 40, 0.6);
+              if (o) this.burst(o, "lowpass", 380, 1, at, 0.1, 0.5);
+            })();
+        }
+        return;
+      }
+      case "breath":
+        if (!this.sample("creatureIdle", t, sp, 1, 0.3, 0.78, 20)) {
+          const o = this.out(sp, 20, 0.3);
+          if (o) this.burst(o, "bandpass", 700, 0.9, t, 1.4, 0.35, 0.5);
+        }
+        return;
+      case "scream":
+        if (!this.sample("creatureAlert", t, sp, 0.9, 1.6, 0.68, 90)) {
+          const o = this.out(sp, 90, 1.6);
+          if (o) this.tone(o, "sawtooth", 900, 300, t, 1.6, 0.2, 0.05);
+        }
+        return;
+      case "radio": {
+        const o = this.out(sp, 30, 0.4);
+        if (!o) return;
+        this.burst(o, "bandpass", 2600, 0.7, t, 0.5, 0.25, 0.01);
+        this.playRadioVoice(2.2, true, sp);
+        return;
+      }
+      case "power": {
+        const o = this.out(CENTER, 1, 1.2)!;
+        // A relay drops, the ballasts wind down, the building goes quiet.
+        this.burst(o, "lowpass", 300, 1, t, 0.25, 0.8);
+        this.tone(o, "sawtooth", 140, 28, t + 0.05, 1.6, 0.12, 0.01);
+        this.burst(o, "highpass", 5000, 1, t, 0.06, 0.3);
+        return;
+      }
+    }
   }
 
   /**
@@ -1158,14 +1421,86 @@ export class SoundManager {
     if (Math.random() < 0.12) this.sample("creatureDrag", t + 0.05, sp, 0.5, 0.5, rate, 16);
   }
 
+  /** Fades each ambient layer towards what this place and this spot in it should sound like. */
+  private updateLayers(dt: number): void {
+    // A few times a second is plenty: every change is a slow glide anyway.
+    this.layerTimer -= dt;
+    if (this.layerTimer > 0) return;
+    dt = 0.25 - this.layerTimer;
+    this.layerTimer = 0.25;
+    const t = this.ctx!.currentTime;
+    const out = this.exposure;
+    const valley = this.scape === "valley";
+    // Gusts: a new strength every few seconds, eased into.
+    this.gustTimer -= dt;
+    if (this.gustTimer <= 0) {
+      this.gustTimer = 2 + Math.random() * 5;
+      this.gustTarget = Math.random() < 0.3 ? 0.8 + Math.random() * 0.2 : Math.random() * 0.45;
+    }
+    this.gust += (this.gustTarget - this.gust) * Math.min(1, dt * 0.6);
+    const wind = valley ? (0.025 + out * 0.17) * (0.45 + this.gust) : 0;
+    this.windGain.gain.setTargetAtTime(wind, t, 0.3);
+    this.windBand.frequency.setTargetAtTime(300 + this.gust * 520, t, 0.4);
+    // Indoors you hear it through the walls: dull.
+    this.windShade.frequency.setTargetAtTime(500 + out * 3500, t, 0.5);
+    const drone = valley ? 0.02 * (1 - out) : this.scape === "cavern" ? 0.05 : 0.09;
+    this.droneGain.gain.setTargetAtTime(drone, t, 0.8);
+    this.humGain.gain.setTargetAtTime(this.scape === "lab" ? 0.035 : 0, t, 0.8);
+    this.breathGain.gain.setTargetAtTime(this.scape === "cavern" ? 0.22 : 0, t, 0.8);
+    this.bedGain.gain.setTargetAtTime(this.bedWanted * (1 - out * 0.92), t, 0.8);
+  }
+
+  /** Out under the sky: a gust tearing round a corner, timber straining, and very rarely something calling far off. */
+  private outdoorEvent(t: number): void {
+    const a = Math.random() * Math.PI * 2 - Math.PI;
+    const sp: Spatial = { pan: Math.sin(a), angle: a, distance: 10 + Math.random() * 20, muffled: false };
+    const r = Math.random();
+    if (r < 0.5) {
+      const o = this.out(sp, 40, 1.2);
+      if (o) this.burst(o, "bandpass", 500 + Math.random() * 400, 0.9, t, 2.2, 0.18, 0.9);
+    } else if (r < 0.85) {
+      if (!this.sample("metalCreak", t, { ...sp, muffled: true }, 0.5, 1.2, 0.55 + Math.random() * 0.15, 40)) {
+        const o = this.out(sp, 40, 1.2);
+        if (o) this.tone(o, "triangle", 120, 80, t, 1.6, 0.12, 0.4);
+      }
+    } else {
+      // Far down the valley, carried on the wind.
+      this.sample("creatureAlert", t, { ...sp, distance: 30 + Math.random() * 20 }, 0.35, 2, 0.6 + Math.random() * 0.15, 90);
+    }
+  }
+
   /** Random distant sounds (drips, metal groans, clanks) — call every frame. */
   updateAmbient(dt: number): void {
     if (!this.ctx) return;
     if (this.bedWanted > 0 && !this.bed) this.setRoomTone(this.bedWanted);
+    this.updateLayers(dt);
+    if (this.ctx.currentTime < this.hushUntil) return;
     this.ambientTimer -= dt;
     if (this.ambientTimer > 0) return;
     this.ambientTimer = 3 + Math.random() * 9;
     const t = this.ctx.currentTime;
+    if (this.scape === "valley" && this.exposure > 0.5) {
+      this.outdoorEvent(t);
+      return;
+    }
+    if (this.scape === "lab" && Math.random() < 0.3) {
+      // A tube somewhere starting and failing: the ballast ticks, the light buzzes.
+      const a = Math.random() * Math.PI * 2 - Math.PI;
+      const o = this.out({ pan: Math.sin(a), angle: a, distance: 5 + Math.random() * 8, muffled: Math.random() < 0.5 }, 20, 0.8);
+      if (!o) return;
+      for (let i = 0; i < 3 + Math.floor(Math.random() * 4); i++) this.burst(o, "bandpass", 3200, 4, t + i * 0.09, 0.03, 0.2);
+      this.tone(o, "sawtooth", 100, 100, t, 0.5, 0.05);
+      return;
+    }
+    if (this.scape === "cavern" && Math.random() < 0.45) {
+      // The rock settling round something alive: a wet shift, deep and close.
+      const a = Math.random() * Math.PI * 2 - Math.PI;
+      const o = this.out({ pan: Math.sin(a), angle: a, distance: 8 + Math.random() * 10, muffled: true }, 30, 1.8);
+      if (!o) return;
+      this.burst(o, "lowpass", 160, 2, t, 1.8, 0.5, 0.4);
+      this.tone(o, "sine", 48, 38, t, 2.2, 0.25, 0.5);
+      return;
+    }
     const angle = Math.random() * Math.PI * 2 - Math.PI;
     const sp: Spatial = { pan: Math.sin(angle), angle, distance: 6 + Math.random() * 10, muffled: Math.random() < 0.6 };
     const r = Math.random();

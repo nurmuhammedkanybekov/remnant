@@ -482,6 +482,33 @@ voice), `objective`, `hint` (with `{action}` placeholders replaced by the
 player's current key binding), `checkpoint` and `alarm`. The radio plays one
 line at a time on the simulation clock, so pausing pauses the conversation.
 
+Five more actions exist for authored horror, used sparingly (one moment per
+level at most, each tied to a story beat; see `STORY.md`):
+
+- `blackout(seconds)`: the lamps go out in a wave that starts at the far end
+  of the level and reaches you last (`LampSystem.blackout`), and come back
+  nearest first. Emergency lamps (`R`) run on batteries and stay on, so a
+  blackout is red pools in the dark, never a black screen.
+- `torchFails(seconds)`: your torch stutters and dies whatever its battery,
+  and catches again at the end (`Flashlight.interfere`). Watchers move while
+  it's out.
+- `silence(seconds)`: the world bus (drone, room tone, wind, music) drains
+  away and swells back afterwards. Creatures, weapons, the radio and your own
+  breathing are not on that bus: silence makes them louder.
+- `sound(kind, col?, row?)`: a sound placed at a cell, or right behind you:
+  three knocks on steel, Kessler's four notes hummed, the same tune as a
+  choir, footsteps, a breath, a far scream, a radio switching on, the power
+  dying.
+- `apparition(kind, col, row, facing?)`: a creature's body, posed and still,
+  faintly pale (its own copies of the materials, so in a dark room it is a
+  shape and not nothing), that vanishes the moment your light finds it, you
+  come within 7 units, or after 30 s (`world/apparition.ts`). It can't hurt
+  you and can't be shot.
+
+The level checker rejects a placed sound off the map and a figure on a cell
+you can't reach. In co-op, triggers already fire for every player, so each
+player gets the moment on their own machine, centred on them.
+
 ### Collision & raycasts (`world/grid.ts`)
 
 - `resolveCollision` — circle vs. grid, axis-separated so you slide along walls.
@@ -792,7 +819,21 @@ small modelled mesh and a coloured glow so it's findable with the light off.
 
 Recordings where there are any, synthesis for the rest. Chain: voice →
 (low-pass if a wall is between you) → 3D panner → dry bus + reverb → master →
-compressor.
+compressor. Everything that is just "being somewhere" (the drone, the room
+tone, the wind and the music) goes through a world bus first, which is what
+a scripted `silence` takes away.
+
+- **Soundscapes** (`soundscapeOf` in `world/theme.ts`, set per level): the
+  mountain's concrete (drone, drips, steel, pipe knocks); the valley (wind
+  whose loudness and pitch follow gusts, dull through walls and full under
+  the sky, timber straining, very rarely something calling far off; the
+  drone only faint indoors); the laboratory (a fluorescent mains hum and
+  ballasts ticking); the cavern (no machines, a slow breath through the
+  rock every eight seconds or so, wet shifts). Out under the sky the room
+  tone and drone drop away and the wind comes up, every frame, from whether
+  your cell is open to the sky.
+- **Snow underfoot**: on a sky cell your footsteps are the crust breaking
+  and the pack giving, not concrete.
 
 - **Direction**: anything placed in the world is panned in 3D (HRTF, from
   its angle to where you face), so on headphones you can tell a creature
