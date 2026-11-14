@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import { buildDressing } from "./dressing";
-import { snowGroundTexture, textures, valleySkyTexture, type Surface } from "../fx/textures";
+import { setSkyScale, snowGroundTexture, textures, valleySkyTexture, type Surface } from "../fx/textures";
 import { Snowfall } from "../fx/snow";
-import { skyCells } from "./outdoors";
+import { cliffCells, skyCells } from "./outdoors";
 import { CELL_SIZE, WALL_HEIGHT, cellCenter, isSolid, type Cell } from "./grid";
 import type { ParsedLevel } from "./levelParser";
 import { resolveTheme } from "./theme";
@@ -138,7 +138,8 @@ function varyPanels(mat: THREE.MeshStandardMaterial): void {
 }
 
 /** Builds a parsed level's geometry, props, lamps and exit into `scene`. `bumpMaps` is a quality option. */
-export function buildLevel(scene: THREE.Scene, level: ParsedLevel, bumpMaps = true): LevelData {
+export function buildLevel(scene: THREE.Scene, level: ParsedLevel, bumpMaps = true, skyScale = 1): LevelData {
+  setSkyScale(skyScale);
   const { lampFixtures, wallMaterial, waterMaterials, weather } = buildGeometry(scene, level, bumpMaps);
   const exit = buildExit(scene, level, level.exitCell);
   return { ...level, lampFixtures, exitSignMat: exit.signMat, exitLight: exit.light, wallMaterial, waterMaterials, weather };
@@ -151,23 +152,29 @@ function buildGeometry(
 ): { lampFixtures: LampFixture[]; wallMaterial: THREE.Material; waterMaterials: THREE.MeshStandardMaterial[]; weather: Snowfall | null } {
   const tex = textures();
   const theme = resolveTheme(level.def.theme);
-  const sky = skyCells(level);
   const cellKey = (pos: THREE.Vector2) => Math.floor(pos.y / CELL_SIZE) * level.cols + Math.floor(pos.x / CELL_SIZE);
   const { walls, crates, barrels } = level.props;
 
-  // Walls: one instanced mesh, one draw call.
+  // Walls: one instanced mesh, one draw call. On the mountain, walls that face
+  // the open sky are cliffs instead (below), so they're left out of this one.
+  const sky = skyCells(level);
+  const cliffs = cliffCells(level, sky);
+  const cellOf = (pos: THREE.Vector2) => Math.floor(pos.y / CELL_SIZE) * level.cols + Math.floor(pos.x / CELL_SIZE);
+  const wallSurface =
+    theme.walls === "timber" && tex.timber ? tex.timber : theme.walls === "rock" ? tex.rock : theme.walls === "tile" ? tex.tile : tex.wall;
   const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
   const wallMat = new THREE.MeshStandardMaterial({
     color: theme.wallTint,
-    ...surfaceMaps(theme.walls === "timber" && tex.timber ? tex.timber : tex.wall, bumpMaps),
-    bumpScale: 1.2,
-    roughness: tex.wall.roughnessMap ? 1 : 0.92,
+    ...surfaceMaps(wallSurface, bumpMaps),
+    bumpScale: theme.walls === "tile" ? 0.6 : 1.2,
+    roughness: wallSurface.roughnessMap ? 1 : theme.walls === "tile" ? 0.45 : 0.92,
     metalness: 0.05,
   });
   varyPanels(wallMat);
-  const wallMesh = new THREE.InstancedMesh(wallGeo, wallMat, walls.length);
+  const plainWalls = walls.filter((pos) => !cliffs.has(cellOf(pos)));
+  const wallMesh = new THREE.InstancedMesh(wallGeo, wallMat, plainWalls.length);
   const dummy = new THREE.Object3D();
-  walls.forEach((pos, i) => {
+  plainWalls.forEach((pos, i) => {
     dummy.position.set(pos.x, WALL_HEIGHT / 2, pos.y);
     // Rotate instances by random multiples of 90° so the pattern doesn't repeat obviously.
     dummy.rotation.y = (Math.floor((pos.x * 7 + pos.y * 13) % 4) * Math.PI) / 2;
@@ -176,6 +183,13 @@ function buildGeometry(
   });
   wallMesh.instanceMatrix.needsUpdate = true;
   scene.add(wallMesh);
+  if (cliffs.size)
+    buildCliffs(
+      scene,
+      level,
+      walls.filter((pos) => cliffs.has(cellOf(pos))),
+      bumpMaps
+    );
 
   const width = level.cols * CELL_SIZE;
   const depth = level.rows * CELL_SIZE;
@@ -194,8 +208,11 @@ function buildGeometry(
 
   // The photo ceiling holds a whole cell's tiles; the painted one a quarter.
   const ceilPerCell = tex.ceiling.photo ? 1 : 2;
+  // A cavern's roof is the same rock as its walls.
+  const ceilSurface = theme.walls === "rock" ? tex.rock : tex.ceiling;
   const ceilMat = new THREE.MeshStandardMaterial({
-    ...surfaceMaps(tex.ceiling, bumpMaps, level.cols * ceilPerCell, level.rows * ceilPerCell),
+    ...surfaceMaps(ceilSurface, bumpMaps, level.cols * ceilPerCell, level.rows * ceilPerCell),
+    ...(theme.walls === "rock" ? { color: theme.wallTint } : {}),
     roughness: 1,
   });
   if (sky.size === 0) {
@@ -208,7 +225,7 @@ function buildGeometry(
     const roofed: [number, number][] = [];
     for (let r = 0; r < level.rows; r++)
       for (let c = 0; c < level.cols; c++) if (!sky.has(r * level.cols + c) && level.def.map[r]?.[c] !== "#") roofed.push([c, r]);
-    const tileMat = new THREE.MeshStandardMaterial({ ...surfaceMaps(tex.ceiling, bumpMaps, ceilPerCell, ceilPerCell), roughness: 1 });
+    const tileMat = new THREE.MeshStandardMaterial({ ...surfaceMaps(ceilSurface, bumpMaps, ceilPerCell, ceilPerCell), roughness: 1 });
     const tiles = new THREE.InstancedMesh(new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE), tileMat, roofed.length);
     roofed.forEach(([c, r], i) => {
       dummy.position.set((c + 0.5) * CELL_SIZE, WALL_HEIGHT, (r + 0.5) * CELL_SIZE);
@@ -379,11 +396,93 @@ function buildGeometry(
   buildDressing(scene, level);
 
   scene.fog = new THREE.FogExp2(theme.fog, theme.fogDensity);
-  scene.background = sky.size ? valleySkyTexture(0x07090d, theme.fog) : new THREE.Color(theme.fog);
+  scene.background = sky.size ? valleySkyTexture(0x07090d, theme.fog, theme.skyline === "peaks") : new THREE.Color(theme.fog);
   const weather = sky.size ? new Snowfall(scene, sky, level.cols, level.rows, tex.glow) : null;
   // A cool, very dim fill so nothing is ever pure black.
   scene.add(new THREE.HemisphereLight(theme.skyLight, theme.groundLight, theme.fillIntensity));
   return { lampFixtures: fixtures, wallMaterial: wallMat, waterMaterials, weather };
+}
+
+/** Small deterministic hash of a cell, 0..1, so a level's cliffs come out the same every time. */
+function cellHash(col: number, row: number, salt: number): number {
+  const h = Math.sin(col * 127.1 + row * 311.7 + salt * 74.7) * 43758.5453;
+  return h - Math.floor(h);
+}
+
+/** One rock block, shared by every cliff: a box whose sides are pushed in and out by noise and lean in towards the top. */
+function cliffGeometry(): THREE.BufferGeometry {
+  // Flush with the cell: the noise pushes the face at most a hand's width into the open, never into your way.
+  const w = CELL_SIZE * 1.02;
+  const geo = new THREE.BoxGeometry(w, WALL_HEIGHT, w, 5, 7, 5);
+  const pos = geo.getAttribute("position") as THREE.BufferAttribute;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    // Height through the block, 0 at the foot, 1 at the top.
+    const t = v.y / WALL_HEIGHT + 0.5;
+    // The same offset for the same point, whichever face it belongs to, so the block stays closed.
+    const n =
+      Math.sin(v.x * 1.7 + v.y * 2.3) * 0.5 + Math.sin(v.z * 2.1 - v.y * 1.3 + 1.7) * 0.5 + Math.sin((v.x + v.z) * 3.1 + v.y * 4.2) * 0.25;
+    const taper = 1 - 0.32 * t;
+    const push = 1 + n * 0.09;
+    v.x *= taper * push;
+    v.z *= taper * push;
+    // Ragged top: the upper ring of points rises and falls.
+    if (t > 0.99) v.y += n * 0.35;
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * Cliffs: the walls around open ground on the mountain, as tall broken rock.
+ * Each cell is one block of a height and turn of its own, overlapping its
+ * neighbours so the face reads as one mass.
+ */
+function buildCliffs(scene: THREE.Scene, level: ParsedLevel, cells: THREE.Vector2[], bumpMaps: boolean): void {
+  const tex = textures();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xb8b4ac,
+    ...surfaceMaps(tex.rock, bumpMaps, 1, 2.5),
+    bumpScale: 2,
+    roughness: 0.96,
+    metalness: 0,
+  });
+  // Snow lies on the ledges: lighter as the face goes up.
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying float vCliffY;")
+      .replace(
+        "#include <worldpos_vertex>",
+        "#include <worldpos_vertex>\nvCliffY = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).y;"
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying float vCliffY;")
+      .replace(
+        "#include <map_fragment>",
+        "#include <map_fragment>\n  float snowLine = smoothstep(5.0, 12.0, vCliffY);\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.81, 0.86), snowLine * 0.55);"
+      );
+  };
+  const geo = cliffGeometry();
+  const mesh = new THREE.InstancedMesh(geo, mat, cells.length);
+  const dummy = new THREE.Object3D();
+  cells.forEach((pos, i) => {
+    const col = Math.floor(pos.x / CELL_SIZE);
+    const row = Math.floor(pos.y / CELL_SIZE);
+    const h = WALL_HEIGHT * (2 + cellHash(col, row, 1) * 2.5);
+    dummy.position.set(pos.x, h / 2, pos.y);
+    // Quarter turns only: a square block turned any other way would poke its corners into the open floor.
+    dummy.rotation.set(0, Math.floor(cellHash(col, row, 2) * 4) * (Math.PI / 2), 0);
+    const spread = 1;
+    dummy.scale.set(spread, h / WALL_HEIGHT, spread);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
 }
 
 /** A wire from the lamp over an open-air cell to the top of the nearest wall (if one is close enough). */

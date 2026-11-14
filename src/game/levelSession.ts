@@ -268,7 +268,7 @@ export class LevelSession {
     engine.resetWorld();
 
     const quality = services.quality();
-    this.level = buildLevel(scene, parseLevel(def), quality.bumpMaps);
+    this.level = buildLevel(scene, parseLevel(def), quality.bumpMaps, quality.skyScale);
     const sp = this.level.spawns;
     const cellIndex = (c: { col: number; row: number }) => c.row * this.level.cols + c.col;
     this.lamps = new LampSystem(scene, sp.lamps, this.level.lampFixtures, quality.lampLights);

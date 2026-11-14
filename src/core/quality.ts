@@ -22,6 +22,8 @@ export interface QualityPreset {
   shadows: number;
   /** Ambient occlusion: corners and contact darken (costly; high only). */
   ao: boolean;
+  /** How sharp the night sky over the valley is drawn (1 = 1024 px round, 2 = 2048). */
+  skyScale: number;
 }
 
 export const QUALITY: Record<QualityId, QualityPreset> = {
@@ -35,6 +37,7 @@ export const QUALITY: Record<QualityId, QualityPreset> = {
     filmEffects: false,
     shadows: 0,
     ao: false,
+    skyScale: 1,
   },
   medium: {
     id: "medium",
@@ -46,6 +49,7 @@ export const QUALITY: Record<QualityId, QualityPreset> = {
     filmEffects: true,
     shadows: 1024,
     ao: false,
+    skyScale: 1,
   },
   high: {
     id: "high",
@@ -57,6 +61,7 @@ export const QUALITY: Record<QualityId, QualityPreset> = {
     filmEffects: true,
     shadows: 2048,
     ao: true,
+    skyScale: 2,
   },
 };
 
