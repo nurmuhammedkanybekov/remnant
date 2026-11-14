@@ -1,4 +1,4 @@
-import { alarm, checkpoint, hint, nur, objective, op, radio, unknown } from "../../../game/script";
+import { alarm, apparition, checkpoint, hint, nur, objective, op, radio, silence, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 12 — the village. Houses, a square, two ways round. The Howler: if it sees you, everything hears. */
@@ -59,7 +59,15 @@ export const VILLAGE: LevelDef = {
       hint("Howlers scream when they see you, and everything nearby comes running. Take them first, and quietly"),
       objective("Find the key to the bus garage."),
     ],
-    b: [radio(unknown("...we're in the houses, Nur. It's warm here. Leave the door open.")), checkpoint()],
+    // The people of Ak-Suu, standing in the snow with their backs to you. Put your light on them and they're gone.
+    b: [
+      silence(6),
+      apparition("husk", 16, 7, "away"),
+      apparition("husk", 19, 5, "away"),
+      apparition("husk", 28, 7, "away"),
+      radio(unknown("...we're in the houses, Nur. It's warm here. Leave the door open.")),
+      checkpoint(),
+    ],
     c: [radio(nur("The school. The desks are still in rows."))],
     d: [radio(op("The garage is just ahead. Such a long way you've come."))],
     e: [radio(nur("Something big is moving in the square.")), alarm(14)],

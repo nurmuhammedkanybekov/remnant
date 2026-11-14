@@ -302,7 +302,10 @@ export class Game {
     this.endCoop();
     this.state = "menu";
     this.music.setMode("silent");
-    // Behind the menu: only the building, very quietly.
+    // Behind the menu: only the building, very quietly — not the last level's wind or hum.
+    this.sound.setSoundscape("facility");
+    this.sound.setExposure(0);
+    this.sound.unhush();
     this.sound.setRoomTone(0.07, 0);
     this.hud.setVisible(false);
     this.hud.hideTransient();

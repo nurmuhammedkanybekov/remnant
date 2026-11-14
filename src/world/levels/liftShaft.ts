@@ -1,4 +1,4 @@
-import { checkpoint, nur, objective, radio, unknown } from "../../game/script";
+import { checkpoint, nur, objective, radio, silence, sound, unknown } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /**
@@ -66,7 +66,9 @@ export const LIFT_SHAFT: LevelDef = {
       ),
       objective("Open the blast door."),
     ],
+    // Out under the sky, everything drops away: no drone, no machines, no wind. Just the stars.
     b: [
+      silence(9),
       radio(
         nur("Stars. I'd forgotten there were stars."),
         unknown("Look at them, Nur. We never saw them. Not once, in all those years in the rock."),
@@ -75,6 +77,14 @@ export const LIFT_SHAFT: LevelDef = {
       objective("Take the road down the mountain — or go back in and trigger the charges."),
       checkpoint(),
     ],
-    c: [radio(unknown("A few more steps. Then the valley. Then everyone."), nur("Everyone. That's the part I keep hearing."))],
+    // Behind you, three knocks on the blast door. From the inside. Leave, or go back to the console past it.
+    c: [
+      sound("knock", 9, 4),
+      radio(
+        nur("...Three knocks. On the inside of the door."),
+        unknown("Don't look back, Nur. A few more steps. Then the valley. Then everyone."),
+        nur("Everyone. That's the part I keep hearing.")
+      ),
+    ],
   },
 };

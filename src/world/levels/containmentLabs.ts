@@ -1,4 +1,4 @@
-import { nur, hint, objective, op, radio } from "../../game/script";
+import { blackout, nur, hint, objective, op, radio, silence, sound, torchFails } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 5 — the original Zenit laboratories, and the Watchers: light is now a weapon and a risk. */
@@ -48,7 +48,15 @@ export const CONTAINMENT_LABS: LevelDef = {
   },
   triggers: {
     a: [radio(op("Every door you open makes noise. Open them, then move."))],
-    b: [radio(nur("Something big in here. Breathing slow."))],
+    // R-7 was kept in darkness. The labs remember: the power goes, the torch with it, and something breathes behind you.
+    b: [
+      radio(nur("Something big in here. Breathing slow.")),
+      blackout(9),
+      torchFails(3),
+      silence(7),
+      sound("breath"),
+      radio(nur("No. No, no — come on...")),
+    ],
     c: [
       radio(
         op("Some of them in the labs can't stand light. Keep your torch on one and it locks up."),
