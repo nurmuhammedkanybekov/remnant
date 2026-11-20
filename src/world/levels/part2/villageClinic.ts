@@ -1,4 +1,4 @@
-import { checkpoint, hint, nur, objective, op, radio, unknown } from "../../../game/script";
+import { ask, checkpoint, hint, ifTold, nur, objective, op, ping, radio, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 11 — Part Two begins. The clinic at Ak-Suu, three weeks later. The valley is infected. */
@@ -47,6 +47,18 @@ export const VILLAGE_CLINIC: LevelDef = {
         unknown("...Ak-Suu clinic. Ak-Suu clinic. Is anyone at the radio?"),
         nur("No. Not again. Not that voice."),
         op("You made it down the mountain. I'm glad. I kept a channel open for you, Nur.")
+      ),
+      ifTold(
+        "alone",
+        [radio(op("You told me once you were alone down there. You still are."))],
+        [radio(op("You never did tell me if you were alone. I think you were."))]
+      ),
+      ask(
+        "where",
+        [unknown("...where are you going, Nur? Tell us, and we'll leave the way open...")],
+        [nur("Out. The village, then the dam."), unknown("...the dam. We'll wait for you at the water...")],
+        [ping()],
+        [unknown("...quiet, like her. Mara was quiet too, at the end...")]
       ),
     ],
   },

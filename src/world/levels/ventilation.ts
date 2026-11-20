@@ -1,4 +1,4 @@
-import { nur, hint, objective, op, radio } from "../../game/script";
+import { hint, ifTold, nur, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 6 — a maze of ducts, Crawlers overhead, a rivet gun, and the first time the radio lies. */
@@ -36,7 +36,10 @@ export const VENTILATION: LevelDef = {
     "4": "Scratched into the duct: THE VOICE IS NOT THE SUPERVISOR. THE SUPERVISOR DIED ON DAY TWO. I WAS THERE.",
   },
   events: {
-    start: [radio(op("Five is ventilation. It's a maze. Keep your light off and listen before every corner."))],
+    start: [
+      radio(op("Five is ventilation. It's a maze. Keep your light off and listen before every corner.")),
+      ifTold("alone", [radio(op("And Nur? Nobody else is coming. You told me so yourself."))]),
+    ],
   },
   intercoms: [
     [

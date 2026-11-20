@@ -93,11 +93,18 @@ export function validateLevel(level: ParsedLevel): string[] {
   }
   // Script actions that happen somewhere: on the map, and figures on open floor you can reach.
   const def = level.def;
+  // Every action, including those inside a question's reward and both branches of an ifTold.
+  const nested = (a: ScriptAction): ScriptAction[] =>
+    a.type === "ask"
+      ? [a, ...a.reward.flatMap(nested)]
+      : a.type === "ifTold"
+        ? [a, ...a.then.flatMap(nested), ...a.otherwise.flatMap(nested)]
+        : [a];
   const scripts: ScriptAction[] = [
     ...Object.values(def.events ?? {}).flat(2),
     ...Object.values(def.triggers ?? {}).flat(),
     ...(def.intercoms ?? []).flat(),
-  ];
+  ].flatMap(nested);
   for (const a of scripts) {
     if (a.type !== "sound" && a.type !== "apparition") continue;
     const c = a.at;

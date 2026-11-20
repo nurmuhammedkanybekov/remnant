@@ -1,4 +1,4 @@
-import { nur, checkpoint, hint, objective, op, radio } from "../../game/script";
+import { checkpoint, habitLine, hint, nur, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 8 — the consortium's security floor. A shotgun, a big open hall, and the Swarm. */
@@ -43,6 +43,7 @@ export const ARMORY: LevelDef = {
         nur("Why? What's on two?"),
         op("Take all of it.")
       ),
+      habitLine(),
     ],
     keycard: [
       radio(nur("Armory card. The stairwell is right below the main hall.")),

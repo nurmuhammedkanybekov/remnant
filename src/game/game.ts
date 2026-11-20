@@ -3,7 +3,7 @@ import { MusicDirector } from "../audio/music";
 import { SoundManager, type VoicePlayer } from "../audio/soundManager";
 import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyDef, type DifficultyId } from "../content/difficulty";
 import { cloneBindings, DEFAULT_BINDINGS, keyLabel, type Action } from "../core/actions";
-import { ENDINGS, PROLOGUE, PROLOGUE_TWO, TRANSMISSIONS, type EndingId } from "../content/story";
+import { ENDINGS, type EndingId, PROLOGUE, PROLOGUE_TWO, TRANSMISSIONS, voiceCoda } from "../content/story";
 import { PAD, padLabel } from "../core/gamepad";
 import { QUALITY, QUALITY_ORDER } from "../core/quality";
 import { QualityGuard } from "../core/qualityGuard";
@@ -35,6 +35,7 @@ import { LevelSession, type CoopLink, type SessionServices } from "./levelSessio
 import { carryOver, cloneLoadout, startingLoadout, type Loadout } from "./loadout";
 import { MenuBackdrop } from "./menuBackdrop";
 import { addStats, freshStats, type RunStats } from "./stats";
+import { cloneVoice, freshVoice, parseVoice, type VoiceMemory } from "./voiceMemory";
 
 type GameState = "title" | "menu" | "card" | "playing" | "paused" | "dead" | "levelComplete" | "victory";
 
@@ -61,6 +62,8 @@ interface Run {
   checkpoint: CheckpointState | null;
   /** A co-op run: nothing is written to the save, and the host drives the flow. */
   coop: boolean;
+  /** What the voice has learned about you, as of the start of the current level. */
+  voice: VoiceMemory;
 }
 
 /**
@@ -756,7 +759,7 @@ export class Game {
       LEVELS.map((l) => l.id),
       levelIndex
     );
-    this.run = { difficulty: def, levelIndex, loadout, stats: freshStats(), checkpoint: null, coop: false };
+    this.run = { difficulty: def, levelIndex, loadout, stats: freshStats(), checkpoint: null, coop: false, voice: freshVoice() };
     this.startLevel(true);
   }
 
@@ -770,6 +773,7 @@ export class Game {
       stats: { ...saved.stats },
       checkpoint: saved.checkpoint ? structuredClone(saved.checkpoint) : null,
       coop: false,
+      voice: parseVoice(saved.voice),
     };
     this.startLevel(true);
   }
@@ -789,6 +793,7 @@ export class Game {
       loadout: run.loadout,
       stats: run.stats,
       checkpoint: run.checkpoint,
+      voice: run.voice,
     });
   }
 
@@ -815,7 +820,8 @@ export class Game {
       run.loadout,
       run.checkpoint,
       run.coop ? this.sessionLink() : null,
-      retry
+      retry,
+      cloneVoice(run.voice)
     );
     session.onDeath = () => this.onDeath();
     if (run.coop) this.wireVoices();
@@ -917,6 +923,8 @@ export class Game {
     this.leaveGameplay();
     this.hud.setVisible(false);
     addStats(run.stats, session.stats);
+    // It remembers what it heard on the level you just finished (into Part Two, too).
+    run.voice = cloneVoice(session.voice);
     const newBest = !run.coop && this.save.recordLevelTime(session.def.id, session.stats.time);
     this.board.record(session.def.id, run.difficulty.id, run.coop ? "coop" : "solo", session.stats.time);
     this.music.setMode("silent");
@@ -933,7 +941,10 @@ export class Game {
         : this.isGuest
           ? []
           : [{ label: `Continue to ${next.title}`, primary: true, detail: next.name, action: () => this.continueToPart(next.first) }];
-      this.screens.ending(ENDINGS[id], run.stats, run.difficulty.name, [
+      // What you told the voice is the last thing the ending says.
+      const coda = voiceCoda(run.voice.told, run.voice.withheld);
+      const shown = coda ? { ...ENDINGS[id], lines: [...ENDINGS[id].lines, coda] } : ENDINGS[id];
+      this.screens.ending(shown, run.stats, run.difficulty.name, [
         ...onward,
         ...(this.isGuest && next ? this.waitForHost() : []),
         { label: "Main Menu", primary: onward.length === 0 && !(this.isGuest && next), action: () => this.showMainMenu() },
@@ -1473,7 +1484,7 @@ export class Game {
       LEVELS.map((l) => l.id),
       level
     );
-    this.run = { difficulty: def, levelIndex: level, loadout, stats: freshStats(), checkpoint: null, coop: true };
+    this.run = { difficulty: def, levelIndex: level, loadout, stats: freshStats(), checkpoint: null, coop: true, voice: freshVoice() };
     this.startLevel(true);
   }
 

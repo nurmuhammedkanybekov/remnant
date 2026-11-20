@@ -104,3 +104,18 @@ export const TRANSMISSIONS = [
   "…the observatory still has power. Something is using it…",
   "…Kosh-Tash relay, broadcasting on all channels. Is anyone there…",
 ];
+
+/**
+ * The last line of an ending, from what you gave the voice over the run
+ * (see `game/voiceMemory.ts`): everything it asked, nothing, or some of it.
+ * Null when it never asked you anything (a run started from chapter select).
+ */
+export function voiceCoda(told: readonly string[], withheld: readonly string[]): string | null {
+  const asked = told.length + withheld.length;
+  if (asked === 0) return null;
+  if (told.length === 0)
+    return "It asked you things, down there, and you never told it anything. Mara would have been proud. Some nights the radio still asks.";
+  if (withheld.length === 0)
+    return "You answered everything it asked. Some nights, under the static on the clinic radio, someone is still answering its questions. They sound a lot like you.";
+  return "You told it some of what it asked. It kept every word. Some nights the radio says them back to you, in your own voice, one at a time.";
+}

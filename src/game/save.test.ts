@@ -1,3 +1,4 @@
+import { freshVoice } from "./voiceMemory";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CHECKPOINT_LAYOUT } from "./checkpoint";
 import { emptySave, mergeSaves, parseSave, SaveStore, SAVE_VERSION } from "./save";
@@ -22,7 +23,7 @@ describe("parseSave", () => {
   it("round-trips a valid save", () => {
     const data = {
       version: SAVE_VERSION,
-      campaign: { ...campaign, updatedAt: 5 },
+      campaign: { ...campaign, voice: { ...freshVoice(), told: ["fear"], hides: 3, seconds: 90 }, updatedAt: 5 },
       progress: {
         unlockedLevel: 1,
         completed: ["story"],

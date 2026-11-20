@@ -60,6 +60,22 @@ const THAW_TIME = 0.6;
 const ANIM_EASE = 8;
 /** Behind = more than this far round from where it's facing. */
 const BEHIND_ANGLE = THREE.MathUtils.degToRad(105);
+/** "Behind" for one that's learned to look over its shoulder: a narrower wedge. */
+const WARY_BEHIND_ANGLE = THREE.MathUtils.degToRad(130);
+/** How close (world units) a hunting creature taught about lockers must be to know which one you're in. */
+const LOCKER_HUNCH = 14;
+
+/** What the voice has taught the creatures about you (see `Enemy.wise`). */
+export interface Wisdom {
+  lockers: boolean;
+  /** Multiplies how far they see you with your light on, and without it. */
+  light: number;
+  dark: number;
+  /** They look over their shoulders: harder to take from behind. */
+  wary: boolean;
+}
+
+export const NO_WISDOM: Wisdom = { lockers: false, light: 1, dark: 1, wary: false };
 const MELEE_WINDUP_MAX = 0.45;
 /** With two players, it only switches to the other one if they're this much closer. */
 const TARGET_STICK = 3;
@@ -180,6 +196,12 @@ export class Enemy {
   private sawTarget = false;
   /** Its target hid while it was watching: it knows which locker. */
   private knowsHide = false;
+  /**
+   * What the voice has taught them about you (see `game/voiceMemory.ts`):
+   * they look in the lockers, see your light (or into the dark) from
+   * further, and look over their shoulders. Set for the whole level.
+   */
+  wise: Wisdom = NO_WISDOM;
   protected hitFlash = 0;
   protected stagger = 0;
   protected deathT = 0;
@@ -267,7 +289,7 @@ export class Enemy {
     if (this.frozen) return true; // locked in the light: helpless from any side
     if (this.isHunting) return false;
     const to = from.clone().sub(this.position2D);
-    return Math.abs(wrapAngle(Math.atan2(to.x, to.y) - this.facing)) > BEHIND_ANGLE;
+    return Math.abs(wrapAngle(Math.atan2(to.x, to.y) - this.facing)) > (this.wise.wary ? WARY_BEHIND_ANGLE : BEHIND_ANGLE);
   }
 
   /** Killed silently from behind. */
@@ -452,7 +474,7 @@ export class Enemy {
     let canSee = false;
     if (s.sight > 0 && !p.playerDead) {
       const lit = p.torchOn && s.light !== "ignores";
-      const sightRange = (lit ? SIGHT_LIT : SIGHT_DARK) * this.mods.perception * s.sight;
+      const sightRange = (lit ? SIGHT_LIT * this.wise.light : SIGHT_DARK * this.wise.dark) * this.mods.perception * s.sight;
       const inCone = Math.abs(wrapAngle(angleTo - this.facing)) < VISION_HALF_ANGLE;
       // Once hunting, they track you all round (they know roughly where you are).
       // Body in cover, head out round the corner: it can see that much.
@@ -474,7 +496,8 @@ export class Enemy {
     if (!canSee) this.suspicion = Math.max(0, this.suspicion - dt * 0.35);
     // In a locker you're out of sight; one that watched you get in still knows where.
     if (!p.hidden) this.knowsHide = false;
-    else if (this.sawTarget) this.knowsHide = true;
+    // One that's taught to look in the lockers, close by and hunting when you climb in, knows where you went.
+    else if (this.sawTarget || (this.wise.lockers && this.isHunting && dist < LOCKER_HUNCH)) this.knowsHide = true;
     this.sawTarget = canSee;
     if (p.hidden && this.knowsHide) this.lastKnown.copy(p.playerPos);
     const touch = !p.playerDead && los && dist < TOUCH_RANGE && (!p.hidden || this.knowsHide);

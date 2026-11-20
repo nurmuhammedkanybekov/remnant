@@ -1048,6 +1048,16 @@ export class SoundManager {
     this.tone(o, "square", 60, 60, t + 1.7, 0.8, 0.12, 0.1);
   }
 
+  /** The voice showing you the way: a squelch and three short chirps from where it wants you to go. Carries far. */
+  playPing(sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 70, 0.9);
+    if (!o) return;
+    this.burst(o, "bandpass", 2200, 0.8, t, 0.12, 0.25, 0.005);
+    for (let i = 0; i < 3; i++) this.tone(o, "sine", 1480, 1460, t + 0.18 + i * 0.22, 0.09, 0.22, 0.005);
+  }
+
   /** A relay breaker thrown: a heavy clunk, a spit of sparks, and the carrier dying away in a long falling whine. */
   playRelayCut(sp: Spatial): void {
     if (!this.ctx) return;
