@@ -67,6 +67,11 @@ export class PlayerController {
   private leanOffset = 0;
   /** Set by the level each frame from the cell under the player. */
   terrain: Terrain = DRY;
+  /**
+   * 0..1: how badly you're hurt in the legs, as it were: a limp. Slower,
+   * one step short and heavy, the head dipping on the bad side.
+   */
+  limp = 0;
   /** Scales camera shake and head bob (the "reduced camera shake" setting). */
   motionScale = 1;
   onFootstep: ((gait: Gait, wet: boolean) => void) | null = null;
@@ -149,7 +154,7 @@ export class PlayerController {
       ? Math.max(0, this.stamina - STAMINA_DRAIN_PER_SEC * dt)
       : Math.min(MAX_STAMINA, this.stamina + STAMINA_REGEN_PER_SEC * dt * (crouching || !wantsMove ? 1.3 : 1));
 
-    const speed = (crouching ? CROUCH_SPEED : sprinting ? SPRINT_SPEED : WALK_SPEED) * this.terrain.speed;
+    const speed = (crouching ? CROUCH_SPEED : sprinting ? SPRINT_SPEED : WALK_SPEED) * this.terrain.speed * (1 - this.limp * 0.18);
     const target = new THREE.Vector2();
     if (wantsMove) {
       const len = Math.hypot(mx, mz);
@@ -226,7 +231,9 @@ export class PlayerController {
 
   private applyCamera(time: number): void {
     const bob = this.bobAmount * (0.3 + 0.7 * this.motionScale);
-    const bobY = Math.abs(Math.sin(this.bobPhase)) * 0.06 * bob;
+    // A limp: every other step lands short and heavy, the head dipping on that side.
+    const bad = Math.sin(this.bobPhase) > 0 ? 1 + this.limp * 1.4 : 1 - this.limp * 0.3;
+    const bobY = Math.abs(Math.sin(this.bobPhase)) * 0.06 * bob * bad;
     const bobX = Math.cos(this.bobPhase) * 0.035 * bob;
     const shake = this.trauma * this.trauma;
     const sx = (Math.sin(time * 37.1) + Math.sin(time * 23.3)) * 0.5 * shake;
@@ -245,7 +252,7 @@ export class PlayerController {
     this.camera.rotation.set(
       this.pitch + this.recoil + sy * 0.05 + ty,
       this.yaw + sx * 0.05 + tx,
-      this.roll - this.lean * LEAN_ROLL + Math.sin(this.bobPhase) * 0.004 * bob + sx * 0.03
+      this.roll - this.lean * LEAN_ROLL + Math.sin(this.bobPhase) * (0.004 + this.limp * 0.012) * bob + sx * 0.03
     );
   }
 

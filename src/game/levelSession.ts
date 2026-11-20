@@ -68,6 +68,10 @@ const WET_STEPS = 12;
 const BLOOD_STEPS = 9;
 /** Metres between a creature's prints in the snow. */
 const CREATURE_STRIDE = 0.85;
+/** Below this share of your health you limp and bleed. */
+const WOUNDED = 0.35;
+/** Metres between drops of your blood (fewer when it's not so bad). */
+const DRIP_EVERY = 1.6;
 /** Rates (per second) your eyes adjust at: to the dark, slowly; to light, at once. */
 const DARK_ADAPT = 0.22;
 const LIGHT_ADAPT = 3;
@@ -241,6 +245,9 @@ export class LevelSession {
   private readonly skyAir: Set<number>;
   private readonly footprints: Footprints;
   private readonly pools: BloodPools;
+  /** Your own blood, dripping as you go when you're badly hurt. */
+  private readonly drips: BloodPools;
+  private lastDrip = new THREE.Vector2(-1e6, -1e6);
   /** Creatures already bleeding out on the floor. */
   private readonly bled = new Set<Enemy>();
   /** What's on your soles, and for how many more steps (see `leavePrint`). */
@@ -333,6 +340,7 @@ export class LevelSession {
     this.effects = new Effects(scene, quality.dustMotes);
     this.footprints = new Footprints(scene);
     this.pools = new BloodPools(scene);
+    this.drips = new BloodPools(scene, 90, 0.8);
     this.coldLevel = !!resolveTheme(def.theme).cold;
     const water = new Set(sp.water.map((w) => `${w.cell.col},${w.cell.row}`));
     this.effects.setWorld({
@@ -638,6 +646,7 @@ export class LevelSession {
     this.updateBreathFog(dt);
     this.footprints.update(this.time);
     this.updatePools();
+    this.updateWounds();
     engine.setPostFx(this.damageFx, THREE.MathUtils.clamp((0.4 - hp) / 0.4, 0, 1), this.time, this.player.nerve.level * 0.8, this.eyes);
     // After a fright your heart and lungs take a while to settle, even with nothing near.
     const shaken = Math.max(this.dread, this.player.nerve.level * 0.65);
@@ -705,6 +714,23 @@ export class LevelSession {
       0.35 + strength * 0.65,
       this.time
     );
+  }
+
+  /** Badly hurt, you limp, and you leave a trail of drops behind you. */
+  private updateWounds(): void {
+    const p = this.player;
+    const hp = p.health.fraction;
+    const target = p.health.isDead || this.downed ? 0 : THREE.MathUtils.clamp((WOUNDED - hp) / 0.25, 0, 1);
+    p.limp += (target - p.limp) * 0.05;
+    this.drips.update(this.time);
+    if (target <= 0) return;
+    const me = p.position2D;
+    if (me.distanceTo(this.lastDrip) < DRIP_EVERY * (1.4 - target) + Math.random() * 1.5) return;
+    this.lastDrip.copy(me);
+    if (this.waterCells.has(this.cellOf(me.x, me.y))) return;
+    const a = Math.random() * Math.PI * 2;
+    const r = 0.1 + Math.random() * 0.25;
+    this.drips.spill(me.x + Math.cos(a) * r, me.y + Math.sin(a) * r, 0.14 + Math.random() * 0.14 + target * 0.08, this.time);
   }
 
   /** A creature that's died bleeds out where it fell: the pool starts once the body's down. */

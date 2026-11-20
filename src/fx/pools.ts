@@ -1,11 +1,6 @@
 import * as THREE from "three";
 import { textures } from "./textures";
 
-/** Pools kept at once; the oldest is reused. */
-const MAX_POOLS = 40;
-/** Seconds for a pool to spread most of the way. */
-const SPREAD_TIME = 9;
-
 /**
  * Blood spreading out from under a body, slowly, the way it does: a small
  * dark patch that keeps growing for a few seconds after the thing has
@@ -18,11 +13,19 @@ export class BloodPools {
   private readonly birth: THREE.InstancedBufferAttribute;
   private readonly uTime = { value: 0 };
   private cursor = 0;
+  private readonly count: number;
   private readonly matrix = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private static readonly UP = new THREE.Vector3(0, 1, 0);
 
-  constructor(scene: THREE.Scene) {
+  /**
+   * `count`: pools kept at once (the oldest is reused). `spreadTime`:
+   * seconds for one to spread most of the way.
+   */
+  constructor(scene: THREE.Scene, count = 40, spreadTime = 9) {
+    const MAX_POOLS = count;
+    const SPREAD_TIME = spreadTime;
+    this.count = count;
     const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     this.birth = new THREE.InstancedBufferAttribute(new Float32Array(MAX_POOLS).fill(-1e6), 1);
     geo.setAttribute("aBirth", this.birth);
@@ -62,7 +65,7 @@ export class BloodPools {
   /** A pool starting now at (x, z), `size` metres across when it's done. */
   spill(x: number, z: number, size: number, time: number): void {
     const i = this.cursor;
-    this.cursor = (this.cursor + 1) % MAX_POOLS;
+    this.cursor = (this.cursor + 1) % this.count;
     this.q.setFromAxisAngle(BloodPools.UP, Math.random() * Math.PI * 2);
     // A hair above the footprints' floor height, so prints on top of a pool still show on it.
     this.matrix.compose(new THREE.Vector3(x, 0.018, z), this.q, new THREE.Vector3(size, 1, size));
