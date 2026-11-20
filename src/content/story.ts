@@ -119,3 +119,7 @@ export function voiceCoda(told: readonly string[], withheld: readonly string[]):
     return "You answered everything it asked. Some nights, under the static on the clinic radio, someone is still answering its questions. They sound a lot like you.";
   return "You told it some of what it asked. It kept every word. Some nights the radio says them back to you, in your own voice, one at a time.";
 }
+
+/** Kessler's trail followed to the end (all four of his notes): the tune stays with you. */
+export const TRAIL_CODA =
+  "Some nights you catch yourself humming four notes, slow, under your breath, and you stop, and you don't know how long you'd been at it.";

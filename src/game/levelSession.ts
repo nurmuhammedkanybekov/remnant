@@ -76,6 +76,8 @@ const WOUNDED = 0.35;
 const DRIP_EVERY = 1.6;
 /** Seconds you have to answer the voice, once it's finished asking. */
 const ANSWER_WINDOW = 7;
+/** How far (world units) Kessler's tune carries to you. */
+const HUM_EARSHOT = 34;
 /** What it says when it has noticed how you play (see `habitOf`). */
 const HABIT_LINES: Record<Habit, RadioLine[]> = {
   hider: [
@@ -275,6 +277,10 @@ export class LevelSession {
   /** Cold enough to see your breath everywhere (the cold store); outdoors always is. */
   private readonly coldLevel: boolean;
   private breathTimer = 1;
+  /** Kessler's trail on this level: the note his tune leads to, until it's found (see `LevelDef.hum`). */
+  private readonly humNote: Pickup | null;
+  private humTimer2 = 4;
+  private humHeard = false;
   /** A question the voice is waiting on an answer to (see `updateAsking`). */
   private asking: { a: Extract<ScriptAction, { type: "ask" }>; open: boolean; until: number } | null = null;
   private talkWas = false;
@@ -452,6 +458,7 @@ export class LevelSession {
       ...lootFor(this.level, difficulty.lootSupply * COOP_LOOT[players]).map((i) => new Pickup(scene, i.type, i.pos)),
       ...sp.notes.map((n) => new Pickup(scene, "note", n.pos, n.text, n.key)),
     ];
+    this.humNote = def.hum ? (this.pickups.find((p) => p.noteKey === `${def.id}:${def.hum}`) ?? null) : null;
 
     // ---- interactables
     this.doors = sp.doors.map((d) => {
@@ -679,6 +686,7 @@ export class LevelSession {
     this.updateBounce();
     this.updateScares(dt);
     this.updateAsking(cmd.talk, cmd.interact);
+    this.updateHum(dt);
     viewmodel.update(
       dt,
       this.player.lookDelta.x,
@@ -1324,6 +1332,9 @@ export class LevelSession {
           for (let k = 0; k < 3; k++) this.later(k * 1.4, () => sound.playPing(this.spatial(at)));
           break;
         }
+        case "ifTrail":
+          this.run(this.voice.trail.length >= a.count ? a.then : a.otherwise);
+          break;
         case "habitLine": {
           const lines = this.learned ? HABIT_LINES[this.learned] : null;
           if (lines) this.radio.say(lines);
@@ -1373,6 +1384,30 @@ export class LevelSession {
     // The question stays in front of you while it waits, and so does how long it'll wait.
     const asked = (q.a.question[q.a.question.length - 1]?.text ?? "").split(/(?<=[.?!])\s+/).pop() ?? "";
     hud.prompt(`“${personalise(asked)}”   ${key}: answer  ·  say nothing  (${Math.ceil(q.until - this.time)})`, 0.25);
+  }
+
+  /**
+   * Kessler's tune: every ten seconds or so, while you're within earshot, a
+   * man hums four notes from where his note lies, muffled through the walls
+   * and clearer as you come closer. Found, it stops, and the run remembers.
+   */
+  private updateHum(dt: number): void {
+    const note = this.humNote;
+    if (!note) return;
+    if (note.collected) {
+      if (!this.voice.trail.includes(this.def.id)) this.voice.trail.push(this.def.id);
+      return;
+    }
+    this.humTimer2 -= dt;
+    if (this.humTimer2 > 0) return;
+    this.humTimer2 = 9 + Math.random() * 4;
+    const at = new THREE.Vector2(note.group.position.x, note.group.position.z);
+    if (at.distanceTo(this.player.position2D) > HUM_EARSHOT) return;
+    this.services.sound.playStinger("hummer", this.spatial(at));
+    if (!this.humHeard) {
+      this.humHeard = true;
+      this.later(5, () => this.radio.say([{ speaker: "nur", text: "...that tune. Someone's humming it, close by." }]));
+    }
   }
 
   /** What the creatures have been taught about you, from your strongest habit (see `Enemy.wise`). */

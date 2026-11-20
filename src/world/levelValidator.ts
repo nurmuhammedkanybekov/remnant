@@ -91,13 +91,16 @@ export function validateLevel(level: ParsedLevel): string[] {
     const ns = isSolid(level, col, row - 1) && isSolid(level, col, row + 1);
     if (ew === ns) problems.push(`${id}: door at ${col},${row} is not in a doorway (needs walls on exactly two opposite sides)`);
   }
+  // Kessler's trail must lead to a note that's on the map.
+  if (level.def.hum && !s.notes.some((n) => n.key === `${id}:${level.def.hum}`))
+    problems.push(`${id}: hum leads to note "${level.def.hum}", which isn't on the map`);
   // Script actions that happen somewhere: on the map, and figures on open floor you can reach.
   const def = level.def;
   // Every action, including those inside a question's reward and both branches of an ifTold.
   const nested = (a: ScriptAction): ScriptAction[] =>
     a.type === "ask"
       ? [a, ...a.reward.flatMap(nested)]
-      : a.type === "ifTold"
+      : a.type === "ifTold" || a.type === "ifTrail"
         ? [a, ...a.then.flatMap(nested), ...a.otherwise.flatMap(nested)]
         : [a];
   const scripts: ScriptAction[] = [

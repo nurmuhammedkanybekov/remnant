@@ -56,7 +56,7 @@ const CENTER: Spatial = { pan: 0, distance: 0, muffled: false };
 export type Soundscape = "facility" | "valley" | "lab" | "cavern";
 
 /** Sounds a level script can place in the world (see `game/script.ts`). */
-export type Stinger = "knock" | "hum" | "choir" | "steps" | "breath" | "scream" | "radio" | "power";
+export type Stinger = "knock" | "hum" | "hummer" | "choir" | "steps" | "breath" | "scream" | "radio" | "power";
 
 /** Kessler's four notes, in Hz: the tune the drill crew hummed, and the Remnant still does. */
 export const KESSLER_NOTES = [293.66, 349.23, 329.63, 220.0];
@@ -1472,6 +1472,39 @@ export class SoundManager {
           this.tone(o, "sine", 150, 82, at, 0.22, 0.9);
           this.burst(o, "lowpass", 700, 1, at, 0.12, 0.7);
           this.burst(o, "bandpass", 2400, 6, at, 0.35, 0.08); // the steel ringing after
+        });
+        return;
+      }
+      case "hummer": {
+        // One man, low, under his breath, somewhere behind the walls: Kessler's four notes, slower.
+        const o = this.out(sp, 36, 1.0);
+        if (!o) return;
+        const formant = this.ctx.createBiquadFilter();
+        formant.type = "bandpass";
+        formant.frequency.value = 420;
+        formant.Q.value = 2.2;
+        formant.connect(o);
+        KESSLER_NOTES.forEach((f, n) => {
+          const len = 1.05;
+          const start = t + n * len;
+          const osc = this.ctx!.createOscillator();
+          osc.type = "triangle";
+          osc.frequency.value = f * 0.5 * Math.pow(2, ((Math.random() - 0.5) * 30) / 1200);
+          const vib = this.ctx!.createOscillator();
+          vib.frequency.value = 4.2;
+          const vd = this.ctx!.createGain();
+          vd.gain.value = f * 0.004;
+          vib.connect(vd).connect(osc.frequency);
+          const g = this.ctx!.createGain();
+          g.gain.setValueAtTime(0.0001, start);
+          g.gain.exponentialRampToValueAtTime(0.11, start + 0.25);
+          g.gain.setValueAtTime(0.11, start + len - 0.15);
+          g.gain.exponentialRampToValueAtTime(0.0001, start + len + (n === 3 ? 1.4 : 0.1));
+          osc.connect(g).connect(formant);
+          osc.start(start);
+          vib.start(start);
+          osc.stop(start + len + 1.6);
+          vib.stop(start + len + 1.6);
         });
         return;
       }

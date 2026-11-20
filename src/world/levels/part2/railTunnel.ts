@@ -31,12 +31,15 @@ export const RAIL_TUNNEL: LevelDef = {
     "####.#######.#########.#######.######.########.###",
     "#......#.....B.....#...H..M.....#....%.....#.....#",
     "#..2...D...........D............D....N.....D..X..#",
-    "#......#.....A.....#............#..........#.....#",
+    "#......#.....A.....#............#.M......3.#.....#",
     "##################################################",
   ],
+  hum: "3",
   notes: {
     "1": "Drainage line, maintenance bay 3. Rail cart is dead. Walk the line, stay off the water, and never look up. — work order, 1990",
     "2": "Sadykova. Found my son. He was standing with the others. He smiled at me. I think I'm going to stay with him. Don't come looking. — S.",
+    // Kessler's trail: someone hums his four notes from here until you find it.
+    "3": "SURVEY PHOTOGRAPH, ZENIT DRILL HEAD, 1987, pinned up in the bay. Eleven men at the cavity wall. Third from the left is Kessler: the same face, not a day younger. Pencilled underneath it: humming in this one too.",
   },
   events: {
     start: [
