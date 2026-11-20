@@ -105,7 +105,9 @@ more, and a creature right beside you can hear you breathe, so you hold your
 breath while it walks past. Turn your flashlight on in the dark and anything
 that sees it comes for you. Lockers let you hide and watch through the slats
 while something searches the room, but one that saw you climb in knows where
-you are. A thrown bottle sends them somewhere else.
+you are. A thrown bottle sends them somewhere else. Lean round a corner to look
+without stepping out: a head at the edge of a wall takes them longer to make
+out than a whole person.
 
 **Creatures that hunt.** Eleven kinds, each designed to break a habit the
 previous one taught you: one that only hears, one that freezes in your light,
@@ -120,11 +122,27 @@ something is close that you can't see.
 **A world that reacts.** The flashlight throws real shadows, and a creature
 in your beam throws its own up the wall behind it. Every shot leaves a hole,
 chips of concrete and dust hanging in the light; blood stays on the wall
-behind what you hit; a lamp shot out stays dark, and the crash brings
+behind what you hit, and pools slowly out from under what you killed;
+walk through it, or through water, and your boots leave prints, and out in
+the snow everything leaves tracks, including whatever else is out there; a lamp shot out stays dark, and the crash brings
 company. A gunshot is swallowed by a vent and rolls on and on in the pump
 hall, because each room's echo follows its size.
 
-**Scarce supplies.** Three weapons, silent takedowns from behind, and
+**Your body gives you away.** Fear wears on you: something close that you
+can't see, standing in the dark, a hit, the moments that make you jump. The
+more frightened you are, the more your hands shake and the harder you
+breathe, and the edges of your sight close in; a lamp's light calms you.
+Without a light your eyes slowly get used to the dark. Badly hurt, you limp
+and drip blood, and the creatures follow the drops. In the cold your breath
+shows in your torch, and a gunshot in a small room leaves your ears ringing.
+
+**Things happen once.** Every level has a few moments of its own, in the same
+places every time: the lamps ahead going out one by one, towards you;
+someone standing at the end of the corridor, in your beam, until your torch
+stutters; a door slamming somewhere behind you; something running past on
+the other side of the wall; the radio saying your name.
+
+**Scarce supplies.** Three weapons (the old sidearm sometimes jams), silent takedowns from behind, and
 medkits you carry and use when you choose. Ammunition comes in small caches
 spread across each level, so you find it by exploring.
 
@@ -158,6 +176,7 @@ Headphones help a lot, because most threats are heard before they are seen.
 | Medkit                | H                  | D-pad up |
 | Hold breath           | B (hold)           | L3       |
 | Throw a bottle        | G                  | R3       |
+| Lean left / right     | Z / X (hold)       | —        |
 | Push to talk (co-op)  | T (hold)           | —        |
 | Switch weapon         | 1 2 3, Q or wheel  | Y        |
 | Inventory and journal | Tab or I           | View     |
@@ -499,7 +518,7 @@ The game is then at http://localhost:5173. Other useful commands:
   session: joining with a code, shared doors and pickups, reviving, retrying,
   finishing a level together and leaving.
 
-There are 376 unit tests covering level validation, collision, pathfinding,
+There are 386 unit tests covering level validation, collision, pathfinding,
 movement, breathing, weapons, thrown bottles, creature AI, loot placement,
 room furnishing, co-op, save merging, cloud sync, the leaderboard, settings
 and more. Adding `?debug` to the URL exposes test hooks on `window.game`.
