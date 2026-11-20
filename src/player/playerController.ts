@@ -4,6 +4,7 @@ import { resolveCollision, type LevelGrid } from "../world/grid";
 import type { PlayerCommand } from "./command";
 import { Health } from "./health";
 import { Flashlight } from "./flashlight";
+import { Nerve } from "./nerve";
 
 const WALK_SPEED = 3.3;
 const SPRINT_SPEED = 5.8;
@@ -15,7 +16,10 @@ const CROUCH_HEIGHT = 1.05;
 export const MAX_STAMINA = 100;
 const STAMINA_DRAIN_PER_SEC = 20;
 const STAMINA_REGEN_PER_SEC = 16;
-const EXHAUSTED_UNTIL = 25; // after emptying stamina you can't sprint again until it refills to this
+const EXHAUSTED_UNTIL = 25;
+/** How far your head moves sideways at a full lean, and how far it tilts. */
+const LEAN_DISTANCE = 0.55;
+const LEAN_ROLL = 0.13; // after emptying stamina you can't sprint again until it refills to this
 
 /** How far (world units) enemies can hear each movement mode, before walls muffle it. */
 export const NOISE_RADIUS = { still: 0, crouch: 1.6, walk: 5.5, sprint: 12 } as const;
@@ -39,6 +43,8 @@ export class PlayerController {
   stamina = MAX_STAMINA;
   /** Your breathing: creatures right beside you hear it unless you hold it. */
   readonly breath = new Breath();
+  /** How frightened you are: shaking hands, hard breathing (see `Nerve`). */
+  readonly nerve = new Nerve();
   gait: Gait = "still";
   private exhausted = false;
   private yaw = 0;
@@ -53,6 +59,10 @@ export class PlayerController {
   private trauma = 0; // camera shake 0..1
   private recoil = 0; // extra pitch from firing, recovers over time
   private roll = 0;
+  /** -1..1, smoothed: how far you're leaning (left negative). */
+  private lean = 0;
+  /** Sideways offset of your head this frame, after walls (world units, right positive). */
+  private leanOffset = 0;
   /** Set by the level each frame from the cell under the player. */
   terrain: Terrain = DRY;
   /** Scales camera shake and head bob (the "reduced camera shake" setting). */
@@ -83,7 +93,7 @@ export class PlayerController {
 
   /** How far you can be heard: your movement, or your breathing when that's louder. */
   get noiseRadius(): number {
-    return Math.max(NOISE_RADIUS[this.gait] * this.terrain.noise, this.health.isDead ? 0 : this.breath.noise);
+    return Math.max(NOISE_RADIUS[this.gait] * this.terrain.noise, this.health.isDead ? 0 : this.breath.noise * this.nerve.breathScale);
   }
 
   /** 0..1 — current movement speed relative to sprint, used for weapon sway and spread. */
@@ -98,6 +108,11 @@ export class PlayerController {
   /** Up/down look angle (radians, up positive). */
   get lookPitch(): number {
     return this.pitch;
+  }
+
+  /** -1..1: how far you're leaning round a corner (left negative). */
+  get leaning(): number {
+    return this.lean;
   }
 
   addTrauma(amount: number): void {
@@ -185,6 +200,19 @@ export class PlayerController {
     const strafe = mx * (wantsMove ? 1 : 0);
     this.roll = THREE.MathUtils.lerp(this.roll, -strafe * 0.018, 1 - Math.exp(-6 * dt));
 
+    // --- Lean: peek round a corner without stepping out from it ---
+    // Not while sprinting; and the head stops where a wall would.
+    const wantLean = sprinting || this.health.isDead ? 0 : THREE.MathUtils.clamp(cmd.lean, -1, 1);
+    this.lean = THREE.MathUtils.lerp(this.lean, wantLean, 1 - Math.exp(-9 * dt));
+    const reachWanted = this.lean * LEAN_DISTANCE;
+    if (Math.abs(reachWanted) > 1e-3) {
+      const rxl = Math.cos(this.yaw);
+      const rzl = -Math.sin(this.yaw);
+      const probe = resolveCollision(this.level, this.position.x, this.position.z, rxl * reachWanted, rzl * reachWanted, 0.16);
+      const reach = Math.hypot(probe.x - this.position.x, probe.z - this.position.z);
+      this.leanOffset = Math.sign(reachWanted) * Math.min(Math.abs(reachWanted), reach);
+    } else this.leanOffset = 0;
+
     this.recoil = Math.max(0, this.recoil - dt * this.recoil * 7 - dt * 0.02);
     this.trauma = Math.max(0, this.trauma - dt * 1.6);
 
@@ -202,13 +230,20 @@ export class PlayerController {
     const sx = (Math.sin(time * 37.1) + Math.sin(time * 23.3)) * 0.5 * shake;
     const sy = (Math.sin(time * 41.7) + Math.sin(time * 19.9)) * 0.5 * shake;
 
+    // Frightened hands: a slow, uneven wander, not a buzz.
+    const tremor = this.nerve.tremor * 0.0045;
+    const tx = (Math.sin(time * 5.3) + Math.sin(time * 8.9 + 1.3) * 0.6) * tremor;
+    const ty = (Math.sin(time * 6.1 + 0.7) + Math.sin(time * 11.3) * 0.5) * tremor;
+
     const rx = Math.cos(this.yaw);
     const rz = -Math.sin(this.yaw);
-    this.camera.position.set(this.position.x + rx * bobX, this.position.y + bobY - 0.03 * bob, this.position.z + rz * bobX);
+    const side = bobX + this.leanOffset;
+    const leanDip = Math.abs(this.lean) * 0.07;
+    this.camera.position.set(this.position.x + rx * side, this.position.y + bobY - 0.03 * bob - leanDip, this.position.z + rz * side);
     this.camera.rotation.set(
-      this.pitch + this.recoil + sy * 0.05,
-      this.yaw + sx * 0.05,
-      this.roll + Math.sin(this.bobPhase) * 0.004 * bob + sx * 0.03
+      this.pitch + this.recoil + sy * 0.05 + ty,
+      this.yaw + sx * 0.05 + tx,
+      this.roll - this.lean * LEAN_ROLL + Math.sin(this.bobPhase) * 0.004 * bob + sx * 0.03
     );
   }
 

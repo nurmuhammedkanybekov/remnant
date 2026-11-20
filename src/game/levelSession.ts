@@ -12,6 +12,9 @@ import { wrapAngle, type Enemy, type Perception, type VocalKind } from "../enemi
 import { EnemyManager } from "../enemies/enemyManager";
 import { Projectiles } from "../enemies/projectiles";
 import { Effects } from "../fx/particles";
+import { Footprints, type PrintKind } from "../fx/footprints";
+import { resolveTheme } from "../world/theme";
+import { skyCells } from "../world/outdoors";
 import { Pickup } from "../items/pickup";
 import { SMASH_NOISE, throwFrom, Throwables } from "../items/throwables";
 import { r2, type PlayerState, type SessionMsg } from "../net/protocol";
@@ -59,6 +62,11 @@ interface HideSpot {
 /** No scripted scare in the first this-many seconds of a level, nor within this long of another. */
 const SCARE_FIRST_REST = 25;
 const SCARE_REST = 40;
+/** Steps of wet or bloody prints after wading or walking through a body. */
+const WET_STEPS = 12;
+const BLOOD_STEPS = 9;
+/** Metres between a creature's prints in the snow. */
+const CREATURE_STRIDE = 0.85;
 const BOUNCE_RANGE = 7;
 const BOUNCE_REACH = 20;
 const BOUNCE_STRENGTH = 9;
@@ -223,6 +231,19 @@ export class LevelSession {
   private readonly triggerCells = new Map<number, string>();
   private readonly firedTriggers = new Set<string>();
   private readonly waterCells = new Set<number>();
+  /** Open ground under the sky, where everyone leaves tracks in the snow. */
+  private readonly snowCells = new Set<number>();
+  /** Every cell under the open sky (snow and water): cold air. */
+  private readonly skyAir: Set<number>;
+  private readonly footprints: Footprints;
+  /** What's on your soles, and for how many more steps (see `leavePrint`). */
+  private soles: { kind: PrintKind | null; steps: number } = { kind: null, steps: 0 };
+  private rightFoot = false;
+  /** Where each creature last left a track in the snow, and which foot. */
+  private readonly tracks = new Map<Enemy, { at: THREE.Vector2; right: boolean }>();
+  /** Cold enough to see your breath everywhere (the cold store); outdoors always is. */
+  private readonly coldLevel: boolean;
+  private breathTimer = 1;
   private readonly radio: RadioChannel;
   private readonly muzzleLight: THREE.PointLight;
   /** The flashlight's light coming back off the surface it's on (always present: a light added mid-level would stutter). */
@@ -301,6 +322,8 @@ export class LevelSession {
       .props.filter((pr) => pr.kind === "hideLocker")
       .map((pr) => ({ pos: new THREE.Vector2(pr.x, pr.z), out: new THREE.Vector2(-Math.sin(pr.rot), -Math.cos(pr.rot)) }));
     this.effects = new Effects(scene, quality.dustMotes);
+    this.footprints = new Footprints(scene);
+    this.coldLevel = !!resolveTheme(def.theme).cold;
     const water = new Set(sp.water.map((w) => `${w.cell.col},${w.cell.row}`));
     this.effects.setWorld({
       solidAt: (x, z) => {
@@ -335,10 +358,19 @@ export class LevelSession {
     this.player.flashlight.drainMultiplier = difficulty.batteryDrain;
     this.player.health.onDeath = () => this.handleDeath();
     this.player.health.onDamage = (amount, source) => this.handleDamage(amount, source);
-    this.player.onFootstep = (gait, wet) => (wet ? sound.playSplash(gait) : sound.playFootstep(gait));
+    this.player.onFootstep = (gait, wet) => {
+      if (wet) sound.playSplash(gait);
+      else sound.playFootstep(gait);
+      this.leavePrint();
+    };
     this.player.flashlight.onToggle = (on) => sound.playFlashlight(on);
     this.player.onBreath = (e) => {
       sound.playBreath(e);
+      // Letting a held breath go, in the cold, you see it.
+      if (e !== "hold" && this.isColdHere()) {
+        this.breathe(e === "gasp" ? 1 : 0.5);
+        this.breathTimer = 2.5;
+      }
       if (e === "gasp") this.playerNoise(this.player.position2D, GASP_NOISE);
       else if (e === "release") this.playerNoise(this.player.position2D, EXHALE_NOISE);
     };
@@ -419,6 +451,8 @@ export class LevelSession {
     this.markers = sp.checkpoints.map((c) => new CheckpointMarker(scene, c));
     for (const t of sp.triggers) this.triggerCells.set(cellIndex(t.cell), t.key);
     for (const w of sp.water) this.waterCells.add(cellIndex(w.cell));
+    this.skyAir = skyCells(this.level);
+    for (const k of this.skyAir) if (!this.waterCells.has(k)) this.snowCells.add(k);
 
     for (const id of WEAPON_ORDER) {
       const ammo = start.weapons[id];
@@ -587,11 +621,17 @@ export class LevelSession {
 
     const hp = this.player.health.fraction;
     this.damageFx = Math.max(0, this.damageFx - dt * 2.2);
-    engine.setPostFx(this.damageFx, THREE.MathUtils.clamp((0.4 - hp) / 0.4, 0, 1), this.time);
     this.updateDread(dt);
-    sound.updateHeartbeat(dt, hp, this.dread);
+    this.updateNerve(dt);
+    this.updateTracks();
+    this.updateBreathFog(dt);
+    this.footprints.update(this.time);
+    engine.setPostFx(this.damageFx, THREE.MathUtils.clamp((0.4 - hp) / 0.4, 0, 1), this.time, this.player.nerve.level * 0.8);
+    // After a fright your heart and lungs take a while to settle, even with nothing near.
+    const shaken = Math.max(this.dread, this.player.nerve.level * 0.65);
+    sound.updateHeartbeat(dt, hp, shaken);
     const winded = THREE.MathUtils.clamp((60 - this.player.stamina) / 60, 0, 1);
-    sound.updateBreathing(dt, this.dread, winded, this.player.breath.held);
+    sound.updateBreathing(dt, shaken, winded, this.player.breath.held);
     sound.updateAmbient(dt);
     this.roomTimer -= dt;
     if (this.roomTimer <= 0) {
@@ -610,6 +650,115 @@ export class LevelSession {
    * and breathing. One you're looking at in your light counts for less; one
    * that's hunting you counts for more. Smoothed, so it swells and fades.
    */
+  /** Moving, and shaking with fear, both throw your aim off (a full fright is like walking). */
+  private get aimUnsteadiness(): number {
+    return this.player.moveFactor + this.player.nerve.tremor * 0.35;
+  }
+
+  private cellOf(x: number, z: number): number {
+    const c = worldToCell(x, z);
+    return c.row * this.level.cols + c.col;
+  }
+
+  /**
+   * A step: if there's something on your soles (water from wading, blood
+   * from walking through what you killed), it goes down on the floor,
+   * fainter each step; out in the snow every step leaves a print.
+   */
+  private leavePrint(): void {
+    const p = this.player;
+    const here = this.cellOf(p.position.x, p.position.z);
+    const me = p.position2D;
+    if (this.waterCells.has(here)) {
+      this.soles = { kind: "wet", steps: WET_STEPS };
+      return;
+    }
+    if (this.enemies.enemies.some((e) => e.isDead && e.position2D.distanceTo(me) < 1.1)) this.soles = { kind: "blood", steps: BLOOD_STEPS };
+    const snow = this.snowCells.has(here);
+    if (!snow && this.soles.steps <= 0) return;
+    const kind: PrintKind = snow ? "snow" : this.soles.kind!;
+    const strength = snow ? 1 : this.soles.steps / (kind === "wet" ? WET_STEPS : BLOOD_STEPS);
+    if (!snow) this.soles.steps--;
+    else this.soles.steps = 0; // snow scrubs your boots
+    this.rightFoot = !this.rightFoot;
+    const yaw = p.facing;
+    const side = this.rightFoot ? 0.12 : -0.12;
+    this.footprints.place(
+      me.x + Math.cos(yaw) * side,
+      me.y - Math.sin(yaw) * side,
+      yaw,
+      kind,
+      this.rightFoot,
+      false,
+      0.35 + strength * 0.65,
+      this.time
+    );
+  }
+
+  /** Creatures walking in the snow leave tracks too: bare, long-toed, and going somewhere. */
+  private updateTracks(): void {
+    if (this.snowCells.size === 0) return;
+    for (const e of this.enemies.enemies) {
+      if (e.isDead || e.stats.look.rig !== "humanoid") continue;
+      const at = e.position2D;
+      const t = this.tracks.get(e);
+      if (!t) {
+        this.tracks.set(e, { at, right: false });
+        continue;
+      }
+      const moved = at.distanceTo(t.at);
+      if (moved < CREATURE_STRIDE) continue;
+      const dir = at.clone().sub(t.at);
+      t.at = at;
+      if (!this.snowCells.has(this.cellOf(at.x, at.y))) continue;
+      t.right = !t.right;
+      const yaw = Math.atan2(-dir.x, -dir.y);
+      const side = t.right ? 0.14 : -0.14;
+      this.footprints.place(at.x + Math.cos(yaw) * side, at.y - Math.sin(yaw) * side, yaw, "snow", t.right, true, 0.9, this.time);
+    }
+  }
+
+  /** In the cold your breath shows in your light: faster and harder when you're winded or frightened. */
+  private updateBreathFog(dt: number): void {
+    const p = this.player;
+    if (p.health.isDead || this.downed || p.breath.held) return;
+    if (!this.isColdHere()) return;
+    const winded = THREE.MathUtils.clamp((60 - p.stamina) / 60, 0, 1);
+    const hard = Math.max(winded, p.nerve.level);
+    this.breathTimer -= dt;
+    if (this.breathTimer > 0) return;
+    this.breathTimer = 3.4 - hard * 2.2 + Math.random() * 0.6;
+    this.breathe(hard);
+  }
+
+  private isColdHere(): boolean {
+    const p = this.player.position;
+    return this.coldLevel || this.skyAir.has(this.cellOf(p.x, p.z));
+  }
+
+  private breathe(hard: number): void {
+    const cam = this.services.engine.camera;
+    const fwd = cam.getWorldDirection(new THREE.Vector3());
+    fwd.y = Math.min(fwd.y, 0) - 0.15;
+    fwd.normalize();
+    const mouth = cam.position.clone().addScaledVector(fwd, 0.4);
+    mouth.y -= 0.14;
+    const light = Math.max(this.player.flashlight.level, this.lamps.lightAt(cam.position.x, cam.position.z));
+    this.effects.breathPuff(mouth, fwd, Math.min(1, light), hard);
+  }
+
+  /** Your nerve (see `Nerve`): dread, the dark and the lamps feed it. */
+  private updateNerve(dt: number): void {
+    const p = this.player;
+    const lamp = this.lamps.lightAt(p.position.x, p.position.z);
+    const torch = p.flashlight.on && p.flashlight.level > 0.3;
+    p.nerve.update(dt, {
+      dread: this.downed || p.health.isDead ? 0 : this.dread,
+      dark: !torch && lamp < 0.15,
+      lamplit: lamp > 0.35,
+    });
+  }
+
   private updateDread(dt: number): void {
     const cam = this.services.engine.camera;
     const me = this.player.position2D;
@@ -683,6 +832,8 @@ export class LevelSession {
     }
     if (s.kind === "whisper" && this.radio.busy) return;
     if (!this.startScare(s)) return;
+    // It makes you jump: a glimpse most of all.
+    this.player.nerve.shock(s.kind === "glimpse" ? 0.4 : s.kind === "whisper" ? 0.3 : 0.22);
     this.scares.splice(i, 1);
     this.scareRest = SCARE_REST;
   }
@@ -1360,7 +1511,7 @@ export class LevelSession {
     if (this.player.isSprinting || this.busy) return;
     const cam = engine.camera;
     const w = this.weapon;
-    const shot = w.tryFire(cam.getWorldPosition(new THREE.Vector3()), cam.getWorldDirection(new THREE.Vector3()), this.player.moveFactor);
+    const shot = w.tryFire(cam.getWorldPosition(new THREE.Vector3()), cam.getWorldDirection(new THREE.Vector3()), this.aimUnsteadiness);
     if (!shot) return;
 
     const cfg = w.config;
@@ -1674,7 +1825,7 @@ export class LevelSession {
   private checkExit(): void {
     const exit = this.level.spawns.exit;
     const reason = this.exitLockReason();
-    this.level.exitSignMat.color.set(reason ? 0xff3a2a : 0xffffff);
+    this.level.exitSignMat.color.set(reason ? 0xff3a2a : 0xffffff).multiplyScalar(3.4);
     this.level.exitLight.color.set(reason ? 0xff3a2a : 0x4dff7a);
     if (Math.hypot(this.player.position.x - exit.x, this.player.position.z - exit.y) > EXIT_RADIUS) return;
     if (reason) {
@@ -1705,6 +1856,7 @@ export class LevelSession {
     this.stats.damageTaken += amount;
     this.damageFx = Math.min(1, this.damageFx + 0.6 + amount / 60);
     this.player.addTrauma(0.35 + amount / 80);
+    this.player.nerve.shock(0.12 + amount / 150);
     this.services.sound.playPlayerHurt();
     if (source) this.services.hud.damageFrom(this.relativeAngle(source));
   }
@@ -1812,6 +1964,7 @@ export class LevelSession {
     const { hud, sound, viewmodel } = this.services;
     this.downed = true;
     this.player.breath.reset();
+    this.player.nerve.reset();
     this.bleed = BLEED_TIME;
     this.healTimer = 0;
     this.weapon.cancelReload();
@@ -2074,7 +2227,7 @@ export class LevelSession {
     const { engine, hud } = this.services;
     hud.setHealKey(this.services.keyFor("heal"), this.services.keyFor("throw"));
     const noiseBars = Math.min(5, Math.round((this.player.noiseRadius / NOISE_RADIUS.sprint) * 5));
-    const spread = this.weapon.currentSpread(this.player.moveFactor);
+    const spread = this.weapon.currentSpread(this.aimUnsteadiness);
     const halfFov = Math.tan(THREE.MathUtils.degToRad(engine.camera.fov / 2));
     hud.update({
       health: this.player.health.fraction,

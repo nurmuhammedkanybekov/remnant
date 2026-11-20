@@ -47,6 +47,8 @@ export const PAD_BINDINGS: Record<Action, number[]> = {
   holdBreath: [PAD.L3],
   throw: [PAD.R3],
   talk: [],
+  leanLeft: [],
+  leanRight: [],
 };
 
 const BUTTON_NAMES: Record<number, string> = {

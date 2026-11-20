@@ -10,7 +10,8 @@ export function castShadows(root: THREE.Object3D): void {
     if (!m.isMesh) return;
     const mats = Array.isArray(m.material) ? m.material : [m.material];
     const see = mats.every((mat) => !mat.transparent && !(mat as THREE.MeshBasicMaterial).isMeshBasicMaterial);
-    m.castShadow = see;
+    // Flat on the floor (footprints): catches shadows, never casts one.
+    m.castShadow = see && !m.userData.noShadowCast;
     m.receiveShadow = see;
     // Shadows from the faces turned towards the light only: a light inside
     // something (you walked into a cabinet; props don't block you) isn't

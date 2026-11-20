@@ -30,6 +30,10 @@ interface Lamp {
 
 /** Lamps within this distance (world units) of a creature stutter. */
 const DISTURB_RADIUS = 7;
+/** Within this distance (world units) of a lamp you're standing in its light. */
+const LAMPLIT_RADIUS = 5;
+/** How far past white a lit tube is (see `paint`). */
+const TUBE_GLOW = 3.2;
 
 /**
  * Levels can have many lamps, but every extra real-time light makes every
@@ -153,6 +157,21 @@ export class LampSystem {
 
   private clock = 0;
 
+  /**
+   * How much lamp light falls where you stand (0 = none, 1 = right under a
+   * working lamp): the nearest lamps, by distance and how bright they are now.
+   */
+  lightAt(x: number, z: number): number {
+    let best = 0;
+    for (const l of this.lamps) {
+      if (l.broken) continue;
+      const d = Math.hypot(l.spawn.pos.x - x, l.spawn.pos.y - z);
+      if (d > LAMPLIT_RADIUS) continue;
+      best = Math.max(best, l.brightness * (1 - d / LAMPLIT_RADIUS));
+    }
+    return best;
+  }
+
   /** The lamps (by index) within `radius` of the segment from `a` to `b`, nearest `a` first. */
   lampsAlong(a: THREE.Vector2, b: THREE.Vector2, radius: number): number[] {
     const ab = b.clone().sub(a);
@@ -214,7 +233,8 @@ export class LampSystem {
 
   private paint(lamp: Lamp): void {
     if (!lamp.fixture) return;
-    (lamp.fixture.mesh.material as THREE.MeshBasicMaterial).color.copy(lamp.baseColor).multiplyScalar(0.15 + lamp.brightness);
+    // Brighter than any lit wall (past white, before tone mapping), so it's the tubes that bloom and not the surfaces they light.
+    (lamp.fixture.mesh.material as THREE.MeshBasicMaterial).color.copy(lamp.baseColor).multiplyScalar((0.15 + lamp.brightness) * TUBE_GLOW);
     lamp.fixture.halo.material.opacity = (lamp.spawn.emergency ? 0.5 : 0.35) * lamp.brightness;
     if (lamp.beam) lamp.beam.uniforms.uStrength.value = (lamp.spawn.emergency ? 0.07 : 0.09) * lamp.brightness;
   }

@@ -244,6 +244,8 @@ function buildGeometry(
     const snowTex = snowGroundTexture();
     const snowMat = new THREE.MeshStandardMaterial({
       map: snowTex,
+      // Old snow under a night sky isn't paper white: a torch on it shouldn't white out the screen.
+      color: 0xa9b0ba,
       transparent: true,
       depthWrite: false,
       roughness: 0.95,
@@ -549,7 +551,8 @@ function buildExit(scene: THREE.Scene, level: ParsedLevel, cell: Cell): { signMa
   bar.position.set(0, 1.1, 0.08);
   group.add(bar);
 
-  const signMat = new THREE.MeshBasicMaterial({ map: tex.exitSign, color: 0xffffff });
+  // Lit from inside: past white, so the sign blooms.
+  const signMat = new THREE.MeshBasicMaterial({ map: tex.exitSign, color: new THREE.Color(3.4, 3.4, 3.4) });
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.34), signMat);
   sign.position.set(0, 2.9, 0.12);
   group.add(sign);
