@@ -72,6 +72,8 @@ const CREATURE_STRIDE = 0.85;
 const WOUNDED = 0.35;
 /** Metres between drops of your blood (fewer when it's not so bad). */
 const DRIP_EVERY = 1.6;
+/** How far (world units) a creature smells a fresh drop of your blood. */
+const BLOOD_SCENT = 3.5;
 /** Rates (per second) your eyes adjust at: to the dark, slowly; to light, at once. */
 const DARK_ADAPT = 0.22;
 const LIGHT_ADAPT = 3;
@@ -730,7 +732,10 @@ export class LevelSession {
     if (this.waterCells.has(this.cellOf(me.x, me.y))) return;
     const a = Math.random() * Math.PI * 2;
     const r = 0.1 + Math.random() * 0.25;
-    this.drips.spill(me.x + Math.cos(a) * r, me.y + Math.sin(a) * r, 0.14 + Math.random() * 0.14 + target * 0.08, this.time);
+    const drop = new THREE.Vector2(me.x + Math.cos(a) * r, me.y + Math.sin(a) * r);
+    this.drips.spill(drop.x, drop.y, 0.14 + Math.random() * 0.14 + target * 0.08, this.time);
+    // Fresh blood: anything close enough to smell it comes to see (and finds the next drop).
+    this.playerNoise(drop, BLOOD_SCENT);
   }
 
   /** A creature that's died bleeds out where it fell: the pool starts once the body's down. */
