@@ -1330,6 +1330,46 @@ export function footprintTexture(): THREE.CanvasTexture {
   );
 }
 
+/**
+ * A pool of blood seen from above (white on black mask): a body's worth,
+ * spreading unevenly along the floor, with a few lobes where it found a
+ * dip and a darker, thicker middle (in the green channel's falloff).
+ */
+export function bloodPoolTexture(): THREE.CanvasTexture {
+  return canvasTexture(
+    128,
+    128,
+    51,
+    (ctx, w, h, rand) => {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = "#fff";
+      ctx.filter = "blur(2px)";
+      ctx.beginPath();
+      const n = 28;
+      for (let i = 0; i <= n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const r = 34 + Math.sin(a * 3 + 1) * 6 + Math.sin(a * 5) * 4 + rand() * 7;
+        const x = w / 2 + Math.cos(a) * r;
+        const y = h / 2 + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.fill();
+      // Lobes where it ran off.
+      for (let i = 0; i < 4; i++) {
+        const a = rand() * Math.PI * 2;
+        const d = 30 + rand() * 12;
+        ctx.beginPath();
+        ctx.ellipse(w / 2 + Math.cos(a) * d, h / 2 + Math.sin(a) * d, 8 + rand() * 10, 5 + rand() * 7, a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.filter = "none";
+    },
+    false
+  );
+}
+
 function buildAll() {
   return {
     wall: wallSurface(),
@@ -1350,6 +1390,7 @@ function buildAll() {
     bulletHole: bulletHoleTexture(),
     bloodSplat: bloodSplatTexture(),
     footprint: footprintTexture(),
+    bloodPool: bloodPoolTexture(),
     medkit: medkitTexture(),
     paper: paperTexture(),
     veins: veinTexture(),
