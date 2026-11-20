@@ -296,3 +296,51 @@ finds them; footsteps keeping pace behind you on the rails, then your light
 going. New notes: the clinic's duty log, the dam's gate log, the
 observatory cook's night shift, Arkadin's second log (the first time it
 answered), and Mara's last note at the Source.
+
+## The voice, as a character
+
+The Operator, the ??? on the radio, the Choir: one thing, assembled from
+everyone it has listened to. These are the rules for writing it.
+
+**What it wants.** To be carried up into the sky it has only ever heard
+described, by someone unchanged (Part One). Then, when that fails, to be
+heard: to keep someone talking to it (Part Two). It needs Nur alive and
+still Nur. So its help is real, most of the time.
+
+**How it speaks.** Calm, polite, patient. Short sentences. It borrows
+phrases from the people it has taken ("Walk. Don't run." is the shift
+supervisor's). It never shouts. It says "we" when it forgets itself.
+
+**What it does with you.** It helps (put your light out: something really is
+coming). It tests (leave the medkit: there's no right answer). It lies once,
+to see if you'll still go (the armory). And afterwards it tells you which
+one it was doing, and it isn't always telling the truth then either (the
+village: "there was nothing behind you", or "there was something, and I
+asked it to let you go"). The player should never be sure.
+
+**What it keeps.** Everything. At the end of each part it says what it kept
+of you, as moments, not a score: what you told it, what you did when it
+told you to, Ruslan, the humming, how many times you died. Never more than
+four moments under the stars; it could go on, and doesn't.
+
+**Silence.** It doesn't comment on everything. Most of what you do, it
+watches without a word, and brings up much later, if at all.
+
+### What it tells you to do
+
+| Where              | It says                                               | Later                                                                                                           |
+| ------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 2 Maintenance Wing | "Put your light out. Something's coming."             | Under the stars: "Before you even knew what I was." Or: "You wanted to see."                                    |
+| 4 Pumping Station  | "Leave the medkit. Ruslan needs it more than you do." | Ruslan on the radio at the power plant, standing again, or dying where the kit was. At the end, from inside it. |
+| 6 Ventilation      | "Don't go towards the humming."                       | The Hive: "What did he tell you, the man with the nail?" Or: "You're a good listener."                          |
+| 8 Armory           | "The store, top left. Get in and keep still."         | A lie. Go and they come. "I wanted to know if you'd still go where I sent you."                                 |
+| 12 The Village     | "Don't move. It's right behind you."                  | At the end, one of two answers, and neither may be true.                                                        |
+
+**Ruslan**, turbine crew, broken leg, in the power plant. He talks to the
+radio every night because it's the only thing that talks back. Leave him
+the medkit and he can stand; he says he'll wait by the radio. Take it and he
+crawls to pump two and finds nothing; it says it'll keep him company. Either
+way he's in the Choir at the end.
+
+Every ending's last line now says where you stood with it over the whole
+run: you trusted it, you resisted it, or you were torn.
