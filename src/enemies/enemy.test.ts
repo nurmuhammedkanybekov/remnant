@@ -369,4 +369,25 @@ describe("co-op", () => {
     expect(guest.awake).toBe(true);
     expect(guest.phase).toBe(host.phase);
   });
+
+  it("leaning round a corner: only your head shows, and it takes longer to make you out", () => {
+    // A wall at cell (3, 2). The body stands in its shadow; the head is out where it can be seen.
+    const grid = room();
+    grid.solid[2][3] = true;
+    const body = new THREE.Vector2(13.5, 10);
+    const head = new THREE.Vector2(11.8, 13.5);
+    const watch = (p: Perception) => {
+      const e = spawn("husk", 2);
+      (e as unknown as { facing: number }).facing = 1.0; // between the two: both in view
+      for (let t = 0; t < 0.3; t += 1 / 30) e.update(1 / 30, grid, p, [e]);
+      return e.suspicion;
+    };
+    const base = { ...perceive(3), playerPos: body };
+    const hidden = watch(base);
+    const peeking = watch({ ...base, head });
+    const open = watch({ ...base, playerPos: head });
+    expect(hidden).toBe(0);
+    expect(peeking).toBeGreaterThan(0);
+    expect(peeking).toBeLessThan(open * 0.6);
+  });
 });

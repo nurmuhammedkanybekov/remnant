@@ -53,7 +53,11 @@ export const INFIRMARY: LevelDef = {
   triggers: {
     a: [hint("Press {flashlight} for your flashlight — it drains fast")],
     b: [hint("Hold {crouch} to crouch. Crouching is nearly silent")],
-    c: [radio(op("Something is moving in the east ward. Stay low. Don't run."), nur("Is that... Kessler? From drilling?")), checkpoint()],
+    c: [
+      radio(op("Something is moving in the east ward. Stay low. Don't run."), nur("Is that... Kessler? From drilling?")),
+      hint("Hold {leanLeft} or {leanRight} to lean and look round a corner without stepping out"),
+      checkpoint(),
+    ],
     d: [radio(op("The stairwell. Nine is the old maintenance wing. Stay off the main corridors."))],
   },
 };

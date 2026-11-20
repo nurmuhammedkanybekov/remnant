@@ -98,7 +98,16 @@ export interface Perception {
   /** Eye position and view direction (for "is the beam on me?"). */
   eye: THREE.Vector3;
   look: THREE.Vector3;
+  /**
+   * Leaning round a corner: where your head is (world X/Z). With your body
+   * in cover only your head shows, and a head at the edge of a wall takes
+   * longer to make out than a person.
+   */
+  head?: THREE.Vector2;
 }
+
+/** How much slower suspicion builds when all it can see is your head round a corner. */
+const PEEK_SIGHT = 0.4;
 
 export class Enemy {
   readonly kind: EnemyKind;
@@ -446,7 +455,9 @@ export class Enemy {
       const sightRange = (lit ? SIGHT_LIT : SIGHT_DARK) * this.mods.perception * s.sight;
       const inCone = Math.abs(wrapAngle(angleTo - this.facing)) < VISION_HALF_ANGLE;
       // Once hunting, they track you all round (they know roughly where you are).
-      canSee = !p.hidden && los && dist < sightRange && (inCone || hunting || dist < 2);
+      // Body in cover, head out round the corner: it can see that much.
+      const headOnly = !los && !!p.head && hasLineOfSight(level, me, p.head);
+      canSee = !p.hidden && (los || headOnly) && dist < sightRange && (inCone || hunting || dist < 2);
       if (canSee) {
         // Close = instant; far = suspicion builds over time (gives you a moment to duck away).
         // A light in the dark is different: it knows at once what that is.
@@ -455,7 +466,7 @@ export class Enemy {
           : dist < sightRange * 0.4
             ? 10
             : 1.6 + (1 - dist / sightRange) * 2;
-        this.suspicion = Math.min(1, this.suspicion + rate * dt);
+        this.suspicion = Math.min(1, this.suspicion + rate * (headOnly && !lit ? PEEK_SIGHT : 1) * dt);
       }
       // Your beam on it: it sees the light coming from you, from as far as the beam reaches.
       if (!canSee && s.light === "sees" && this.inBeam(p, los)) this.suspicion = Math.min(1, this.suspicion + LIT_SUSPICION_RATE * dt);

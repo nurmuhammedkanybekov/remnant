@@ -13,6 +13,7 @@ import { EnemyManager } from "../enemies/enemyManager";
 import { Projectiles } from "../enemies/projectiles";
 import { Effects } from "../fx/particles";
 import { Footprints, type PrintKind } from "../fx/footprints";
+import { BloodPools } from "../fx/pools";
 import { resolveTheme } from "../world/theme";
 import { skyCells } from "../world/outdoors";
 import { Pickup } from "../items/pickup";
@@ -236,6 +237,9 @@ export class LevelSession {
   /** Every cell under the open sky (snow and water): cold air. */
   private readonly skyAir: Set<number>;
   private readonly footprints: Footprints;
+  private readonly pools: BloodPools;
+  /** Creatures already bleeding out on the floor. */
+  private readonly bled = new Set<Enemy>();
   /** What's on your soles, and for how many more steps (see `leavePrint`). */
   private soles: { kind: PrintKind | null; steps: number } = { kind: null, steps: 0 };
   private rightFoot = false;
@@ -323,6 +327,7 @@ export class LevelSession {
       .map((pr) => ({ pos: new THREE.Vector2(pr.x, pr.z), out: new THREE.Vector2(-Math.sin(pr.rot), -Math.cos(pr.rot)) }));
     this.effects = new Effects(scene, quality.dustMotes);
     this.footprints = new Footprints(scene);
+    this.pools = new BloodPools(scene);
     this.coldLevel = !!resolveTheme(def.theme).cold;
     const water = new Set(sp.water.map((w) => `${w.cell.col},${w.cell.row}`));
     this.effects.setWorld({
@@ -626,6 +631,7 @@ export class LevelSession {
     this.updateTracks();
     this.updateBreathFog(dt);
     this.footprints.update(this.time);
+    this.updatePools();
     engine.setPostFx(this.damageFx, THREE.MathUtils.clamp((0.4 - hp) / 0.4, 0, 1), this.time, this.player.nerve.level * 0.8);
     // After a fright your heart and lungs take a while to settle, even with nothing near.
     const shaken = Math.max(this.dread, this.player.nerve.level * 0.65);
@@ -693,6 +699,24 @@ export class LevelSession {
       0.35 + strength * 0.65,
       this.time
     );
+  }
+
+  /** A creature that's died bleeds out where it fell: the pool starts once the body's down. */
+  private updatePools(): void {
+    this.pools.update(this.time);
+    for (const e of this.enemies.enemies) {
+      if (!e.isDead || this.bled.has(e) || !e.root.visible) continue;
+      this.bled.add(e);
+      const rig = e.stats.look.rig;
+      const size = rig === "rat" ? 0.55 : rig === "mass" ? 3.2 : 1.5 + Math.random() * 0.5;
+      this.later(0.9, () => {
+        // Under the chest: it fell on its back, away from the way it was facing.
+        const rot = e.root.rotation.y;
+        const at = e.position2D.add(new THREE.Vector2(-Math.sin(rot), -Math.cos(rot)).multiplyScalar(rig === "humanoid" ? 1.25 : 0));
+        if (this.waterCells.has(this.cellOf(at.x, at.y))) return; // it washes away
+        this.pools.spill(at.x, at.y, size, this.time);
+      });
+    }
   }
 
   /** Creatures walking in the snow leave tracks too: bare, long-toed, and going somewhere. */
@@ -1008,6 +1032,7 @@ export class LevelSession {
       hidden: !!this.hiding,
       eye: cam.getWorldPosition(new THREE.Vector3()),
       look: cam.getWorldDirection(new THREE.Vector3()),
+      head: Math.abs(this.player.leaning) > 0.2 ? new THREE.Vector2(cam.position.x, cam.position.z) : undefined,
     };
   }
 
