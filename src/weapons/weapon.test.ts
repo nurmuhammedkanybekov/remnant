@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { beforeEach, describe, expect, it } from "vitest";
 import { WEAPONS } from "../content/weapons";
-import { Weapon } from "./weapon";
+import { CLEAR_TIME, Weapon } from "./weapon";
 
 const origin = new THREE.Vector3();
 const aim = new THREE.Vector3(0, 0, -1);
@@ -11,6 +11,7 @@ describe("Weapon", () => {
   let w: Weapon;
   beforeEach(() => {
     w = new Weapon(pistol, 16);
+    w.jamScale = 0; // jams have their own tests
   });
 
   it("fires, spends a round and respects the cooldown", () => {
@@ -106,5 +107,52 @@ describe("weapon balance", () => {
   it("slots are unique", () => {
     const slots = Object.values(WEAPONS).map((w) => w.slot);
     expect(new Set(slots).size).toBe(slots.length);
+  });
+});
+
+describe("Jams", () => {
+  const jamNow = () => 0; // a random() that always rolls a jam (and centres the spread)
+  const never = () => 1;
+
+  it("a jam lets that shot go but stops the next one until it's cleared, and costs a round", () => {
+    const w = new Weapon(pistol, 16);
+    let jams = 0;
+    let clicks = 0;
+    w.onJam = () => jams++;
+    w.onJammedFire = () => clicks++;
+    expect(w.tryFire(origin, aim, 0, jamNow)).not.toBeNull();
+    expect(w.jammed).toBe(true);
+    expect(jams).toBe(1);
+    w.update(1);
+    expect(w.tryFire(origin, aim, 0, never)).toBeNull();
+    expect(clicks).toBe(1);
+    const before = w.ammoInMag;
+    expect(w.tryReload()).toBe(true);
+    w.update(CLEAR_TIME / 2);
+    expect(w.reloadProgress).toBeCloseTo(0.5);
+    w.update(CLEAR_TIME);
+    expect(w.jammed).toBe(false);
+    expect(w.ammoInMag).toBe(before - 1);
+    expect(w.reserveAmmo).toBe(16); // clearing isn't reloading
+    expect(w.tryFire(origin, aim, 0, never)).not.toBeNull();
+  });
+
+  it("never jams with jams switched off (Story), or on the last round", () => {
+    const off = new Weapon(pistol, 16);
+    off.jamScale = 0;
+    off.tryFire(origin, aim, 0, jamNow);
+    expect(off.jammed).toBe(false);
+    const last = new Weapon(pistol, 0, 1);
+    last.tryFire(origin, aim, 0, jamNow);
+    expect(last.jammed).toBe(false);
+  });
+
+  it("only the old sidearm jams", () => {
+    for (const def of Object.values(WEAPONS)) {
+      if (def.id === "pistol") continue;
+      const w = new Weapon(def, 10);
+      w.tryFire(origin, aim, 0, jamNow);
+      expect(w.jammed).toBe(false);
+    }
   });
 });

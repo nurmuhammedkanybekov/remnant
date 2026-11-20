@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import type { WeaponDef } from "../content/weapons";
 
+/** Seconds to clear a jam: rack the slide, the dud flies out. */
+export const CLEAR_TIME = 0.7;
+
 export interface Shot {
   origin: THREE.Vector3;
   /** One direction per pellet. */
@@ -20,6 +23,12 @@ export class Weapon {
   private reloadRemaining = 0;
   /** Accumulated spread from rapid fire, decays quickly. */
   bloom = 0;
+  /** A round failed to feed: it won't fire until it's cleared (the reload key). */
+  jammed = false;
+  /** Scales the weapon's jam chance (difficulty: none on Story). */
+  jamScale = 1;
+  /** Clearing a jam, not reloading: the slide racked, the dud thrown out. */
+  private clearing = false;
 
   onFire: (() => void) | null = null;
   onEmptyFire: (() => void) | null = null;
@@ -27,6 +36,13 @@ export class Weapon {
   onReloadEnd: (() => void) | null = null;
   /** Single-loading weapons: each round going in. */
   onRoundLoaded: (() => void) | null = null;
+  /** The trigger pulled on a jammed gun. */
+  onJammedFire: (() => void) | null = null;
+  /** A jam just happened (the shot went; the next one won't). */
+  onJam: (() => void) | null = null;
+  /** Clearing a jam: started, and done. */
+  onClearStart: (() => void) | null = null;
+  onClearEnd: (() => void) | null = null;
 
   constructor(
     readonly config: WeaponDef,
@@ -43,7 +59,8 @@ export class Weapon {
 
   /** 0..1 progress of the current reload (per round for single loading), for the viewmodel animation. */
   get reloadProgress(): number {
-    return this.reloading ? 1 - Math.max(0, this.reloadRemaining) / this.config.reloadTime : 0;
+    const total = this.clearing ? CLEAR_TIME : this.config.reloadTime;
+    return this.reloading ? 1 - Math.max(0, this.reloadRemaining) / total : 0;
   }
 
   addReserveAmmo(amount: number): number {
@@ -58,6 +75,15 @@ export class Weapon {
     if (!this.reloading) return;
     this.reloadRemaining -= dt;
     if (this.reloadRemaining > 0) return;
+    if (this.clearing) {
+      // The slide racked: the dud round goes out on the floor, the next one goes in.
+      this.clearing = false;
+      this.reloading = false;
+      this.jammed = false;
+      if (this.ammoInMag > 0) this.ammoInMag -= 1;
+      this.onClearEnd?.();
+      return;
+    }
     if (this.config.reload === "single") {
       this.ammoInMag += 1;
       this.reserveAmmo -= 1;
@@ -76,6 +102,13 @@ export class Weapon {
   }
 
   tryReload(): boolean {
+    if (this.jammed && !this.reloading) {
+      this.reloading = true;
+      this.clearing = true;
+      this.reloadRemaining = CLEAR_TIME;
+      this.onClearStart?.();
+      return true;
+    }
     if (this.reloading || this.ammoInMag >= this.config.magSize || this.reserveAmmo <= 0) return false;
     this.reloading = true;
     this.reloadRemaining = this.config.reloadTime;
@@ -86,6 +119,7 @@ export class Weapon {
   /** Stops a reload in progress (switching weapons). Rounds already loaded stay loaded. */
   cancelReload(): void {
     this.reloading = false;
+    this.clearing = false;
   }
 
   /** Current cone half-angle given how fast the player is moving (0..1). */
@@ -102,6 +136,12 @@ export class Weapon {
     // A single-loading weapon can fire mid-reload if there's a round in it.
     if (this.reloading && this.config.reload === "single" && this.ammoInMag > 0) this.reloading = false;
     if (this.reloading || this.cooldownRemaining > 0) return null;
+    if (this.jammed) {
+      // Click. Nothing. Again: nothing.
+      this.cooldownRemaining = 0.3;
+      this.onJammedFire?.();
+      return null;
+    }
     if (this.ammoInMag <= 0) {
       this.cooldownRemaining = 0.25;
       // Pull the trigger on empty: click, then reload automatically if possible.
@@ -116,6 +156,11 @@ export class Weapon {
     const dirs: THREE.Vector3[] = [];
     for (let i = 0; i < this.config.pellets; i++) dirs.push(scatter(aim, spread, random));
     this.onFire?.();
+    // The next round doesn't feed (only with one left to feed).
+    if (this.ammoInMag > 0 && random() < (this.config.jamChance ?? 0) * this.jamScale) {
+      this.jammed = true;
+      this.onJam?.();
+    }
     return { origin: origin.clone(), dirs };
   }
 }

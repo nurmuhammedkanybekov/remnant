@@ -23,7 +23,7 @@ import type { Role } from "../net/link";
 import { emptyCommand, type PlayerCommand } from "../player/command";
 import { MAX_BATTERY } from "../player/flashlight";
 import { BREATH_NOISE, EXHALE_NOISE, GASP_NOISE } from "../player/breath";
-import { DRY, NOISE_RADIUS, PlayerController, WATER } from "../player/playerController";
+import { DRY, NOISE_RADIUS, PlayerController, SNOW, WATER } from "../player/playerController";
 import type { Hud } from "../ui/hud";
 import { Weapon } from "../weapons/weapon";
 import type { Viewmodel } from "../weapons/viewmodel";
@@ -365,6 +365,7 @@ export class LevelSession {
     this.player.health.onDamage = (amount, source) => this.handleDamage(amount, source);
     this.player.onFootstep = (gait, wet) => {
       if (wet) sound.playSplash(gait);
+      else if (this.player.terrain === SNOW) sound.playSnowStep(gait);
       else sound.playFootstep(gait);
       this.leavePrint();
     };
@@ -578,7 +579,7 @@ export class LevelSession {
 
     const cell = worldToCell(this.player.position.x, this.player.position.z);
     const cellI = cell.row * this.level.cols + cell.col;
-    this.player.terrain = this.waterCells.has(cellI) ? WATER : DRY;
+    this.player.terrain = this.waterCells.has(cellI) ? WATER : this.snowCells.has(cellI) ? SNOW : DRY;
     // Down: you can look around, and that's all.
     // Down: you can look around, and that's all. In a locker: look, breathe, keep still.
     const still = { ...emptyCommand(), turn: cmd.turn, tilt: cmd.tilt };
@@ -1432,6 +1433,13 @@ export class LevelSession {
     w.onEmptyFire = () => sound.playEmptyClick();
     w.onReloadStart = () => (w.config.reload === "single" ? undefined : sound.playReload(w.config.reloadTime));
     w.onRoundLoaded = () => sound.playShellLoad();
+    // Story mode is for the story: guns that work.
+    w.jamScale = this.difficulty.id === "story" ? 0 : 1;
+    w.onJammedFire = () => {
+      sound.playEmptyClick();
+      this.services.hud.prompt(`Jammed. ${this.keyLabel("reload") ?? "R"} to clear it`, 2);
+    };
+    w.onClearStart = () => sound.playSlideRack();
     this.weapons.set(id, w);
     return w;
   }
