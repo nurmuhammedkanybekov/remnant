@@ -1,4 +1,4 @@
-import { alarm, apparition, checkpoint, hint, nur, objective, op, radio, silence, unknown } from "../../../game/script";
+import { alarm, apparition, checkpoint, habitLine, hint, nur, objective, op, radio, silence, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 12 — the village. Houses, a square, two ways round. The Howler: if it sees you, everything hears. */
@@ -51,6 +51,7 @@ export const VILLAGE: LevelDef = {
   events: {
     start: [
       radio(op("The bus in the garage still runs. The dam road goes up the valley. That's where everyone is."), nur("Everyone. Right.")),
+      habitLine(),
     ],
     keycard: [radio(nur("The garage key. Now let's hope the bus starts quietly.")), objective("Get to the bus garage."), checkpoint()],
   },

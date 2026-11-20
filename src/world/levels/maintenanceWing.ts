@@ -1,4 +1,4 @@
-import { nur, op, radio } from "../../game/script";
+import { ask, nur, op, ping, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 2 — stealth against a pack of husks. */
@@ -35,7 +35,17 @@ export const MAINTENANCE_WING: LevelDef = {
     "4": "ZENIT MAINTENANCE, 1988. Crawlspace sealed after the 'noise incident': three fitters spent a night listening at this vent, and in the morning they could not stop smiling. Do not reopen. Do not listen.",
   },
   events: {
-    start: [radio(op("Nine. The tunnels loop back on themselves. The next stairwell is in the far south-east corner."))],
+    start: [
+      radio(op("Nine. The tunnels loop back on themselves. The next stairwell is in the far south-east corner.")),
+      // The first time it asks you anything. Mara's note said never to tell it.
+      ask(
+        "alone",
+        [op("Before you go on, Nur. Is anyone with you down there? Are you alone?")],
+        [nur("...Just me."), op("Then I'll look after you. Listen: I'll make the stairwell call to you.")],
+        [ping()],
+        [op("...You can tell me, you know. It's what I'm here for.")]
+      ),
+    ],
   },
   triggers: {
     a: [radio(nur("Three of them, at least. I can hear them clicking."), op("Then they can hear you too. Walk. Don't run."))],

@@ -49,7 +49,24 @@ export type ScriptAction =
    * A figure standing at a cell that isn't really there: it vanishes when
    * you put your light on it or come close. See `world/apparition.ts`.
    */
-  | { type: "apparition"; kind: EnemyKind; at: CellRef; facing: "toward" | "away" };
+  | { type: "apparition"; kind: EnemyKind; at: CellRef; facing: "toward" | "away" }
+  /**
+   * The voice asks you something. After the question you have a few seconds
+   * to answer (push to talk) or say nothing. Answer and you hear `answer`,
+   * and `reward` runs: it helps you, with something true. Say nothing and
+   * `silent` plays. Either way it remembers (`VoiceMemory`, by `id`), and
+   * never asks the same thing twice in a run.
+   */
+  | { type: "ask"; id: string; question: RadioLine[]; answer: RadioLine[]; reward: ScriptAction[]; silent: RadioLine[] }
+  /** What you told it comes back: `then` if you answered question `id`, `otherwise` if not (or it never asked). */
+  | { type: "ifTold"; id: string; then: ScriptAction[]; otherwise: ScriptAction[] }
+  /**
+   * It shows you the way, by sound: a radio chirp from where the keycard is
+   * (until you have it), else the nearest machine still to do, else the exit.
+   */
+  | { type: "ping" }
+  /** It tells you what it's noticed about how you play, if anything stands out yet (see `habitOf`). */
+  | { type: "habitLine" };
 
 // Small constructors so level files read like a script.
 export const op = (text: string): RadioLine => ({ speaker: "operator", text });
@@ -58,6 +75,28 @@ export const unknown = (text: string): RadioLine => ({ speaker: "unknown", text 
 export const radio = (...lines: RadioLine[]): ScriptAction => ({ type: "radio", lines });
 export const objective = (text: string): ScriptAction => ({ type: "objective", text });
 export const hint = (text: string): ScriptAction => ({ type: "hint", text });
+export const ask = (
+  id: string,
+  question: RadioLine[],
+  answer: RadioLine[],
+  reward: ScriptAction[] = [],
+  silent: RadioLine[] = []
+): ScriptAction => ({
+  type: "ask",
+  id,
+  question,
+  answer,
+  reward,
+  silent,
+});
+export const ifTold = (id: string, then: ScriptAction[], otherwise: ScriptAction[] = []): ScriptAction => ({
+  type: "ifTold",
+  id,
+  then,
+  otherwise,
+});
+export const ping = (): ScriptAction => ({ type: "ping" });
+export const habitLine = (): ScriptAction => ({ type: "habitLine" });
 export const checkpoint = (): ScriptAction => ({ type: "checkpoint" });
 export const alarm = (radius: number): ScriptAction => ({ type: "alarm", radius });
 export const blackout = (seconds: number): ScriptAction => ({ type: "blackout", seconds });

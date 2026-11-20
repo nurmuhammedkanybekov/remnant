@@ -1,4 +1,4 @@
-import { nur, checkpoint, hint, objective, op, radio } from "../../game/script";
+import { checkpoint, habitLine, hint, nur, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 4 — flooded halls: wading is loud, and the first Listener hears every step. */
@@ -45,6 +45,7 @@ export const PUMPING_STATION: LevelDef = {
         nur("Everything's under water. Great."),
         op("The east stairwell is behind a security door. You'll need the pump control card.")
       ),
+      habitLine(),
     ],
     keycard: [radio(nur("Mara left it here. She's alive. She's ahead of me.")), objective("Open the security door to the east stairwell.")],
   },

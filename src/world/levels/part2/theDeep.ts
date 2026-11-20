@@ -1,4 +1,17 @@
-import { apparition, blackout, checkpoint, hint, nur, objective, op, radio, sound, torchFails, unknown } from "../../../game/script";
+import {
+  apparition,
+  blackout,
+  checkpoint,
+  habitLine,
+  hint,
+  nur,
+  objective,
+  op,
+  radio,
+  sound,
+  torchFails,
+  unknown,
+} from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 16 — Laboratory Zero, beneath Sublevel 10: Arkadin's first laboratory and the original drill site. Everything the mountain has, and two generators. */
@@ -52,6 +65,7 @@ export const THE_DEEP: LevelDef = {
         op("Laboratory Zero. Where Arkadin first heard us. You're nearly home."),
         nur("Tiles and drains. They hosed this place down every night. It didn't help.")
       ),
+      habitLine(),
     ],
     keycard: [radio(nur("The drill-site card. The lower gate is open now.")), checkpoint()],
     power: [

@@ -1,4 +1,4 @@
-import { blackout, nur, hint, objective, op, radio, silence, sound, torchFails } from "../../game/script";
+import { blackout, hint, ifTold, nur, objective, op, radio, silence, sound, torchFails, unknown } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 5 — the original Zenit laboratories, and the Watchers: light is now a weapon and a risk. */
@@ -53,6 +53,8 @@ export const CONTAINMENT_LABS: LevelDef = {
       radio(nur("Something big in here. Breathing slow.")),
       blackout(9),
       torchFails(3),
+      // You told it you were afraid of the dark. It listened.
+      ifTold("fear", [torchFails(6), radio(unknown("...you said the dark, Nur. You said it out loud..."))]),
       silence(7),
       sound("breath"),
       radio(nur("No. No, no — come on...")),

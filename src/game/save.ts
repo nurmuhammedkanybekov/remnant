@@ -3,6 +3,7 @@ import { isEndingId, type EndingId } from "../content/story";
 import { parseCheckpoint, type CheckpointState } from "./checkpoint";
 import { cloneLoadout, parseLoadout, upgradeLegacyLoadout, type Loadout } from "./loadout";
 import { freshStats, type RunStats } from "./stats";
+import { cloneVoice, parseVoice, type VoiceMemory } from "./voiceMemory";
 import { readJson, removeKey, writeJson } from "../core/storage";
 
 /**
@@ -28,6 +29,8 @@ export interface CampaignSave {
   stats: RunStats;
   /** Mid-level progress in `levelIndex`, if a checkpoint was reached. */
   checkpoint: CheckpointState | null;
+  /** What the voice has learned about you so far this run (absent: nothing yet). */
+  voice?: VoiceMemory;
   /** Epoch milliseconds. */
   updatedAt: number;
 }
@@ -103,6 +106,7 @@ export function parseSave(raw: unknown, levelCount: number): SaveData {
         loadout,
         stats,
         checkpoint: parseCheckpoint(c.checkpoint),
+        voice: parseVoice(c.voice),
         updatedAt: num(c.updatedAt, Date.now()),
       };
       save.progress.unlockedLevel = Math.max(save.progress.unlockedLevel, levelIndex);
@@ -212,6 +216,7 @@ export class SaveStore {
       stats: { ...campaign.stats },
       loadout: cloneLoadout(campaign.loadout),
       checkpoint: campaign.checkpoint ? structuredClone(campaign.checkpoint) : null,
+      voice: campaign.voice ? cloneVoice(campaign.voice) : undefined,
       updatedAt: Date.now(),
     };
     this.data.progress.unlockedLevel = Math.max(this.data.progress.unlockedLevel, campaign.levelIndex);

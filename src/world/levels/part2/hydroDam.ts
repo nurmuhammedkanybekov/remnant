@@ -1,4 +1,4 @@
-import { checkpoint, hint, nur, objective, op, radio, unknown } from "../../../game/script";
+import { alarm, checkpoint, hint, ifTold, nur, objective, op, radio, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 13 — the hydro dam: flooded channels and three generators for the spillway gate. */
@@ -55,6 +55,8 @@ export const HYDRO_DAM: LevelDef = {
         nur("Home is where you are. That's the mountain."),
         op("That's right, Nur. That's exactly right.")
       ),
+      // You told it where you were going. They're waiting.
+      ifTold("where", [radio(unknown("...we waited at the water, Nur, like you said. All of us...")), alarm(24)]),
     ],
     power: [
       radio(nur("The gate's opening. Loud enough to wake the whole reservoir.")),

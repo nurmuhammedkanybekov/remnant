@@ -8,12 +8,13 @@ import { ACTIONS, type Action } from "../core/actions";
 import type { Engine } from "../core/engine";
 import type { QualityPreset } from "../core/quality";
 import { RemnantBoss } from "../enemies/boss";
-import { wrapAngle, type Enemy, type Perception, type VocalKind } from "../enemies/enemy";
+import { NO_WISDOM, wrapAngle, type Enemy, type Perception, type VocalKind, type Wisdom } from "../enemies/enemy";
 import { EnemyManager } from "../enemies/enemyManager";
 import { Projectiles } from "../enemies/projectiles";
 import { Effects } from "../fx/particles";
 import { Footprints, type PrintKind } from "../fx/footprints";
 import { BloodPools } from "../fx/pools";
+import { freshVoice, habitOf, remember, type Habit, type VoiceMemory } from "./voiceMemory";
 import { Pickup } from "../items/pickup";
 import { SMASH_NOISE, throwFrom, Throwables } from "../items/throwables";
 import { r2, type PlayerState, type SessionMsg } from "../net/protocol";
@@ -46,7 +47,7 @@ import { reinforcements } from "../world/reinforcements";
 import { CHECKPOINT_LAYOUT, type CheckpointState } from "./checkpoint";
 import { withAmmoFloor, type Loadout, type WeaponAmmo } from "./loadout";
 import { RadioChannel } from "./radio";
-import type { RadioLine, ScriptAction } from "./script";
+import { op, type RadioLine, type ScriptAction } from "./script";
 import { isCharacterLook, LOOKS, personalise, type CharacterLook } from "../content/characters";
 import { RemotePlayer } from "./remotePlayer";
 import { freshStats, type RunStats } from "./stats";
@@ -73,6 +74,19 @@ const CREATURE_STRIDE = 0.85;
 const WOUNDED = 0.35;
 /** Metres between drops of your blood (fewer when it's not so bad). */
 const DRIP_EVERY = 1.6;
+/** Seconds you have to answer the voice, once it's finished asking. */
+const ANSWER_WINDOW = 7;
+/** What it says when it has noticed how you play (see `habitOf`). */
+const HABIT_LINES: Record<Habit, RadioLine[]> = {
+  hider: [
+    op("You like the lockers, Nur. Small dark boxes, and you so still inside them."),
+    op("They've noticed. They look in the lockers now."),
+  ],
+  torch: [op("Your light is always on, Nur. I can see it from the bottom of the shaft."), op("So can they. From further than you think.")],
+  dark: [op("You've learned to keep to the dark. Good. That's where we are."), op("We see better there than you do, Nur. We always have.")],
+  gun: [op("So much shooting. Every shot is a knock at the door, Nur."), op("And they always answer. From further away, now.")],
+  knife: [op("You've learned to do it quietly. From behind. Like us."), op("They've learned too. They look over their shoulders now.")],
+};
 /** How far (world units) a creature smells a fresh drop of your blood. */
 const BLOOD_SCENT = 3.5;
 /** Rates (per second) your eyes adjust at: to the dark, slowly; to light, at once. */
@@ -261,6 +275,11 @@ export class LevelSession {
   /** Cold enough to see your breath everywhere (the cold store); outdoors always is. */
   private readonly coldLevel: boolean;
   private breathTimer = 1;
+  /** A question the voice is waiting on an answer to (see `updateAsking`). */
+  private asking: { a: Extract<ScriptAction, { type: "ask" }>; open: boolean; until: number } | null = null;
+  private talkWas = false;
+  /** What it had learned about how you play when this level began (see `habitOf`). */
+  private readonly learned: Habit | null;
   /** How used to the dark your eyes are (see `updateEyes`). */
   private eyes = 0;
   /** Cells open to the sky: snow underfoot, wind in your ears. */
@@ -330,7 +349,9 @@ export class LevelSession {
     /** The link to the other player, in co-op. */
     private readonly coop: CoopLink | null = null,
     /** Another go after a death: the pistol is topped up to the difficulty's floor. */
-    retry = false
+    retry = false,
+    /** What the voice knows about you so far (see `game/voiceMemory.ts`); this level adds to it. */
+    readonly voice: VoiceMemory = freshVoice()
   ) {
     const { engine, sound, hud, viewmodel } = services;
     const { scene, camera } = engine;
@@ -350,6 +371,7 @@ export class LevelSession {
     this.pools = new BloodPools(scene);
     this.drips = new BloodPools(scene, 90, 0.8);
     this.coldLevel = !!resolveTheme(def.theme).cold;
+    this.learned = habitOf(this.voice);
     const water = new Set(sp.water.map((w) => `${w.cell.col},${w.cell.row}`));
     this.effects.setWorld({
       solidAt: (x, z) => {
@@ -411,6 +433,8 @@ export class LevelSession {
       perception: difficulty.enemyPerception,
       speed: difficulty.enemySpeed,
     });
+    // What the voice has learned about you, it has taught them.
+    for (const e of this.enemies.enemies) e.wise = this.wisdom;
     this.projectiles = new Projectiles(scene, this.level);
     this.projectiles.onHitPlayer = (dmg, from) => this.player.health.takeDamage(dmg, from);
     this.projectiles.onSplash = (at) => {
@@ -654,6 +678,7 @@ export class LevelSession {
     this.muzzleLight.intensity = this.muzzleTime > 0 ? 40 : 0;
     this.updateBounce();
     this.updateScares(dt);
+    this.updateAsking(cmd.talk, cmd.interact);
     viewmodel.update(
       dt,
       this.player.lookDelta.x,
@@ -851,6 +876,12 @@ export class LevelSession {
     const lamp = this.lamps.lightAt(p.position.x, p.position.z);
     const torch = p.flashlight.on && p.flashlight.level > 0.3;
     this.updateEyes(dt, torch, lamp);
+    // It's listening: how long, and how much of it with your light on or in the dark.
+    if (!this.downed && !p.health.isDead) {
+      this.voice.seconds += dt;
+      if (torch) this.voice.litSeconds += dt;
+      else if (lamp < 0.15) this.voice.darkSeconds += dt;
+    }
     p.nerve.update(dt, {
       dread: this.downed || p.health.isDead ? 0 : this.dread,
       dark: !torch && lamp < 0.15,
@@ -1227,6 +1258,7 @@ export class LevelSession {
     const c = worldToCell(p.x, p.y);
     if (isSolid(this.level, c.col, c.row)) return;
     const e = this.enemies.spawn(kind, p);
+    e.wise = this.wisdom;
     e.alertTo(this.player.position2D);
     this.brood.add(e);
     this.coop?.send({ t: "spawn", kind, x: r2(p.x), z: r2(p.y) });
@@ -1277,8 +1309,99 @@ export class LevelSession {
         case "apparition":
           this.apparitions.push(new Apparition(this.services.engine.scene, a.kind, this.cellCentre(a.at.col, a.at.row), a.facing));
           break;
+        case "ask":
+          // It never asks the same thing twice in a run.
+          if (this.voice.told.includes(a.id) || this.voice.withheld.includes(a.id) || this.asking) break;
+          this.radio.say(a.question);
+          this.asking = { a, open: false, until: Infinity };
+          break;
+        case "ifTold":
+          this.run(this.voice.told.includes(a.id) ? a.then : a.otherwise);
+          break;
+        case "ping": {
+          const at = this.wayPoint();
+          // Three times, a second apart, so you can turn towards it.
+          for (let k = 0; k < 3; k++) this.later(k * 1.4, () => sound.playPing(this.spatial(at)));
+          break;
+        }
+        case "habitLine": {
+          const lines = this.learned ? HABIT_LINES[this.learned] : null;
+          if (lines) this.radio.say(lines);
+          break;
+        }
       }
     }
+  }
+
+  /**
+   * The voice asked something and is waiting: after the question, a few
+   * seconds to answer (push to talk) or let it pass. Interrupted (down,
+   * dead) it counts as not answered.
+   */
+  private updateAsking(talk: boolean, use: boolean): void {
+    const q = this.asking;
+    // Push to talk answers; so does Use (a gamepad has no talk button).
+    const pressed = (talk && !this.talkWas) || (use && !!q?.open);
+    this.talkWas = talk;
+    if (!q) return;
+    const { hud } = this.services;
+    if (this.downed || this.player.health.isDead) {
+      remember(this.voice, q.a.id, false);
+      this.asking = null;
+      return;
+    }
+    if (!q.open) {
+      if (this.radio.busy) return;
+      q.open = true;
+      q.until = this.time + ANSWER_WINDOW;
+    }
+    const key = [this.keyLabel("talk"), this.keyLabel("interact")].filter(Boolean).join(" or ") || "T";
+    if (pressed) {
+      remember(this.voice, q.a.id, true);
+      this.asking = null;
+      hud.prompt("", 0.01);
+      this.radio.say(q.a.answer);
+      this.run(q.a.reward);
+      return;
+    }
+    if (this.time >= q.until) {
+      remember(this.voice, q.a.id, false);
+      this.asking = null;
+      if (q.a.silent.length) this.radio.say(q.a.silent);
+      return;
+    }
+    // The question stays in front of you while it waits, and so does how long it'll wait.
+    const asked = (q.a.question[q.a.question.length - 1]?.text ?? "").split(/(?<=[.?!])\s+/).pop() ?? "";
+    hud.prompt(`“${personalise(asked)}”   ${key}: answer  ·  say nothing  (${Math.ceil(q.until - this.time)})`, 0.25);
+  }
+
+  /** What the creatures have been taught about you, from your strongest habit (see `Enemy.wise`). */
+  private get wisdom(): Wisdom {
+    switch (this.learned) {
+      case "hider":
+        return { ...NO_WISDOM, lockers: true };
+      case "torch":
+        return { ...NO_WISDOM, light: 1.25 };
+      case "dark":
+        return { ...NO_WISDOM, dark: 1.35 };
+      case "knife":
+        return { ...NO_WISDOM, wary: true };
+      default:
+        return NO_WISDOM;
+    }
+  }
+
+  /** Where the voice would send you now: the keycard you haven't got, a machine still to do, or the way out. */
+  private wayPoint(): THREE.Vector2 {
+    const me = this.player.position2D;
+    const nearest = (ps: THREE.Vector2[]) => ps.reduce((a, b) => (b.distanceTo(me) < a.distanceTo(me) ? b : a));
+    const card = this.pickups
+      .filter((p) => p.type === "keycard" && !p.collected)
+      .map((p) => new THREE.Vector2(p.group.position.x, p.group.position.z));
+    if (card.length && !this.hasKeycard) return nearest(card);
+    const machines = this.generators.filter((g) => !g.running).map((g) => g.pos);
+    if (machines.length) return nearest(machines);
+    return this.level.spawns.exit.clone();
   }
 
   private keyLabel(name: string): string | null {
@@ -1434,6 +1557,7 @@ export class LevelSession {
    */
   private enterLocker(spot: HideSpot): void {
     this.hiding = spot;
+    this.voice.hides++;
     this.hideHp = this.player.health.current;
     const fl = this.player.flashlight;
     if (fl.on) fl.toggle();
@@ -1650,12 +1774,14 @@ export class LevelSession {
 
     const cfg = w.config;
     this.stats.shots++;
+    this.voice.shots++;
     viewmodel.fire();
     this.player.addRecoil(cfg.recoil * (1 + Math.random() * 0.3));
     this.player.addTrauma(0.04 + cfg.recoil * 2.5);
     // The rivet gun has no muzzle blast to light the room.
     if (this.currentWeapon !== "rivet") this.muzzleTime = MUZZLE_FLASH_TIME;
-    this.playerNoise(this.player.position2D, cfg.noiseRadius);
+    // One that's learned you shoot hears it from further (see `HABIT_LINES.gun`).
+    this.playerNoise(this.player.position2D, cfg.noiseRadius * (this.learned === "gun" ? 1.25 : 1));
 
     let anyHit = false;
     let anyHead = false;
@@ -1784,6 +1910,7 @@ export class LevelSession {
     const chest = new THREE.Vector3(target.root.position.x, 1.1 * target.stats.scale, target.root.position.z);
     if (target.canBeTakenDown(me)) {
       this.stats.takedowns++;
+      this.voice.takedowns++;
       if (this.coop?.role === "guest") this.coop.send({ t: "takedown", i: this.enemies.enemies.indexOf(target), x: r2(me.x), z: r2(me.y) });
       else {
         target.takedown();

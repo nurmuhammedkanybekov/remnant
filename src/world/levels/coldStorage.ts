@@ -1,4 +1,4 @@
-import { nur, objective, op, radio } from "../../game/script";
+import { ask, nur, objective, op, ping, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 3 — the keycard, and the first Brute. */
@@ -45,6 +45,16 @@ export const COLD_STORAGE: LevelDef = {
       radio(
         op("Eight. The exit up is locked. Consortium security took the keycard into the freezers."),
         nur("Hendricks. Head of security. He was the one who said it was safe.")
+      ),
+      ask(
+        "fear",
+        [op("Tell me what you're afraid of, Nur. Down here. It helps to say it out loud.")],
+        [
+          nur("The dark. Being in the dark when something's close."),
+          op("Thank you. Then let me help: listen. The keycard is calling you."),
+        ],
+        [ping()],
+        [op("Keep it to yourself, then. I'll find out.")]
       ),
     ],
     keycard: [radio(nur("It's still warm. Where is he?"), op("Don't look for him. Just go.")), objective("Reach the exit.")],
