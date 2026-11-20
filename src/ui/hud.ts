@@ -1,3 +1,4 @@
+import { notePageHtml } from "./notePage";
 import { HOLD_TIME } from "../player/breath";
 import { esc } from "./inventory";
 import { currentCharacter } from "../content/characters";
@@ -334,7 +335,12 @@ export class Hud {
   }
 
   showNote(text: string): void {
-    this.el.noteTxt.textContent = text;
+    const page = notePageHtml(text);
+    this.el.noteTxt.innerHTML = page.html;
+    this.el.note.className = `note ${page.className}`;
+    this.el.note.setAttribute("style", page.style);
+    // Restart the transition from hidden, then show.
+    void this.el.note.offsetWidth;
     this.el.note.classList.add("show");
     window.clearTimeout(this.noteTimeout);
     this.noteTimeout = window.setTimeout(() => this.el.note.classList.remove("show"), 7000);

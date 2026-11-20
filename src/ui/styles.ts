@@ -11,6 +11,7 @@ const CSS = /* css */ `
   --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
   --font-mono: "PT Mono", "Courier New", monospace;
   --font-type: "PT Mono", "Courier New", monospace;
+  --font-hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
 }
 
 .hud { position: absolute; inset: 0; pointer-events: none; user-select: none;
@@ -149,11 +150,34 @@ button, input, output, kbd { font-variant-numeric: lining-nums; }
 .prompt.show { opacity: 1; }
 
 /* ---- note ---- */
-.note { position: absolute; left: 50%; bottom: 150px; transform: translate(-50%, 20px) rotate(-1deg); width: min(460px, 80vw);
-  padding: 22px 26px 20px; background: #e4dcc4; color: #2a2620; font-family: var(--font-type); font-size: 16px; line-height: 1.55;
-  text-shadow: none; box-shadow: 0 10px 40px rgba(0,0,0,.7); opacity: 0; transition: opacity .4s, transform .4s; }
-.note.show { opacity: .96; transform: translate(-50%, 0) rotate(-1deg); }
-.note .hdr { font-size: 11px; letter-spacing: 3px; opacity: .6; margin-bottom: 8px; }
+.note { position: absolute; left: 50%; bottom: 196px; transform: translate(-50%, 20px) rotate(var(--tilt, -1deg)); width: min(460px, 80vw);
+  padding: 22px 26px 20px; text-shadow: none; opacity: 0; transition: opacity .4s, transform .4s; }
+.note.show { opacity: .97; transform: translate(-50%, 0) rotate(var(--tilt, -1deg)); }
+.note .hdr { font-family: var(--font-mono); font-size: 10px; letter-spacing: 3px; opacity: .55; margin-bottom: 8px; }
+
+/* ---- a note as a page (see ui/notePage.ts): typed records, handwritten letters ---- */
+.page { position: relative; color: #2a241a; background-color: #e3d8bc;
+  background-image:
+    radial-gradient(circle at var(--stain-x, 50%) var(--stain-y, 50%), transparent calc(var(--stain-r) * .5), rgba(125,84,38,.16) calc(var(--stain-r) * .56), rgba(125,84,38,.3) calc(var(--stain-r) * .6), transparent calc(var(--stain-r) * .63)),
+    linear-gradient(to bottom, transparent calc(var(--fold, 50%) - 2px), rgba(60,40,10,.12) var(--fold, 50%), rgba(255,252,240,.35) calc(var(--fold, 50%) + 1px), transparent calc(var(--fold, 50%) + 4px)),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .32  0 0 0 0 .24  0 0 0 0 .12  0 0 0 .2 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    radial-gradient(ellipse at 45% 35%, rgba(255,250,232,.55), transparent 72%),
+    linear-gradient(#ebe1c7, #d3c29b);
+  box-shadow: 0 10px 40px rgba(0,0,0,.7), inset 0 0 46px rgba(105,72,28,.3); transform: rotate(var(--tilt, -1deg)); }
+.page p { margin: 0; white-space: pre-line; position: relative; }
+.page .where { position: relative; }
+.page.typed { font-family: var(--font-type); font-size: 15px; line-height: 1.62; color: #221d16; }
+.page.typed p { text-shadow: 0 0 .6px rgba(30,20,10,.55); }
+.page.typed .head { position: relative; display: inline-block; font-weight: 700; font-size: 12.5px; letter-spacing: 2px;
+  border: 1.5px solid rgba(40,30,18,.6); padding: 4px 9px; margin-bottom: 12px; }
+.page.letter, .page.scrawl { font-family: var(--font-hand); font-size: 23px; line-height: 30px; color: #1f2b4c; }
+.page.scrawl { color: #35322c; }
+.page.letter::before, .page.scrawl::before { content: ""; position: absolute; inset: 14px 0 10px; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 29px, rgba(72,100,150,.2) 29px 30px); }
+/* The pickup card: a page, but placed and shown like the HUD's other cards. */
+.note.page { position: absolute; transform: translate(-50%, 20px) rotate(var(--tilt, -1deg)); }
+.note.page.show { transform: translate(-50%, 0) rotate(var(--tilt, -1deg)); }
+.page .sig { position: relative; text-align: right; font-size: 27px; margin-top: 4px; transform: rotate(-2deg); }
 
 /* ---- level intro ---- */
 .intro { position: absolute; left: 0; right: 0; top: 34%; text-align: center; opacity: 0; transition: opacity 1.2s; }
@@ -381,10 +405,9 @@ button, input, output, kbd { font-variant-numeric: lining-nums; }
 .inv-note small { display: block; font-size: 10px; letter-spacing: 2px; margin-top: 3px; opacity: .7; text-transform: uppercase; }
 .inv-note:hover, .inv-note:focus-visible { color: #fff; outline: none; }
 .inv-note.open { color: var(--ui-fg); border-left-color: var(--ui-amber); }
-.inv-paper { font-family: var(--font-type); color: #2a241a; background: linear-gradient(#e9dfc6, #d9cba8); padding: 22px 26px;
-  box-shadow: 0 8px 30px rgba(0,0,0,.6); transform: rotate(-.6deg); line-height: 1.75; font-size: 15px; }
+.inv-paper { padding: 22px 26px; }
 .inv-paper .where { font-family: var(--font-mono); font-size: 10px; letter-spacing: 3px; color: #6a5a3a; margin-bottom: 10px; }
-.inv-paper p { margin: 0; white-space: pre-line; }
+
 .inv-radio { max-height: 56vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.5; }
 .inv-radio .line { display: grid; grid-template-columns: 190px 1fr; gap: 12px; }
 .inv-radio .who { font-size: 10px; letter-spacing: 3px; color: var(--ui-amber); padding-top: 3px; }
