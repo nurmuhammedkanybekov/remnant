@@ -1,3 +1,5 @@
+import { notePageHtml } from "./notePage";
+
 /**
  * The inventory: what Nur is carrying, the notes found so far, and what's
  * been said on the radio this level. Plain data in, HTML out — `Screens`
@@ -115,6 +117,12 @@ export function gearHtml(v: InventoryView): string {
     </div>`;
 }
 
+/** The open note, as a page (see ui/notePage.ts). */
+function paper(text: string, place: string): string {
+  const p = notePageHtml(text, place);
+  return `<article class="inv-paper ${p.className}" style="${p.style}">${p.html}</article>`;
+}
+
 export function journalHtml(v: InventoryView, open: number): string {
   if (v.notes.length === 0)
     return `<div class="inv-empty">Nothing yet. Notes glow faintly where they lie — walk over one to pick it up.</div>`;
@@ -129,7 +137,7 @@ export function journalHtml(v: InventoryView, open: number): string {
     .join("");
   const n = v.notes[i];
   return `<div class="inv-journal"><div class="inv-notes">${list}</div>
-    <article class="inv-paper"><div class="where">${esc(n.place.toUpperCase())}</div><p>${esc(n.text)}</p></article></div>`;
+    ${paper(n.text, n.place)}</div>`;
 }
 
 export function radioHtml(v: InventoryView): string {
