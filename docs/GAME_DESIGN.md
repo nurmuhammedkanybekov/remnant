@@ -230,9 +230,10 @@ or the exit.
   are drawn from the faces turned towards the light, so walking into a prop
   (they don't block you) doesn't snuff your light out.
 - **Post-processing** (`engine.ts`): world pass → ambient occlusion (GTAO,
-  High only: corners and contact darken) → bloom (Medium and High: a soft
-  halo on lamps, exit signs and eyes, threshold high enough that walls never
-  glow) → viewmodel pass (depth cleared, so
+  High only: corners and contact darken) → bloom (Medium and High; threshold
+  2.4, radius 0.3: only things brighter than any lit wall bloom, so lamp
+  tubes are drawn at 3.2× and exit signs at 3.4× their colour, past white;
+  lit snow and walls no longer glow and wash out what's on them) → viewmodel pass (depth cleared, so
   the gun never clips into walls) → output pass → a custom shader: a grade
   (colour drained, blacks crushed, shadows cold and green, highlights a dirty
   warm), film grain, vignette, chromatic aberration that spikes when you're
@@ -492,6 +493,15 @@ voice), `objective`, `hint` (with `{action}` placeholders replaced by the
 player's current key binding), `checkpoint` and `alarm`. The radio plays one
 line at a time on the simulation clock, so pausing pauses the conversation.
 
+### Blood (`fx/pools.ts`)
+
+A creature that dies bleeds out where it fell: 0.9 s after it goes down a
+glossy pool (roughness 0.3, so the torch shows in it) spreads from under the
+chest to 1.5–2 m (a rat's 0.55, the Remnant's 3.2) over about 9 s, the
+growth done in the vertex shader. Not in water. Walk through it and your
+boots leave prints. Your own blood, when you're badly hurt, uses the same
+pools, small and quick.
+
 ### Scares (`world/scares.ts`)
 
 Each level gets up to three scripted one-off scares, planned from a seed of
@@ -590,6 +600,45 @@ or ceiling. The smash carries 16 units: creatures that hear it go to look.
 You start a run with one and carry up to three; in co-op each throw is
 flown on every copy (`toss`) but only the thrower's makes the noise.
 
+**Leaning** (Z / X, `PlayerController`). Your head moves up to 0.55 units
+sideways and tilts 0.13 rad while your feet stay put, so you can look round a
+corner from cover. A short collision probe stops the head at walls; there's
+no leaning while sprinting. Creatures then see your head (`Perception.head`)
+rather than nothing: with your body in cover and only your head showing,
+suspicion builds at 40% of the rate (unless your light is on, which gives you
+away as ever). The first level teaches it.
+
+**Nerve** (`player/nerve.ts`). How frightened you are, 0 to 1, and what dread
+leaves behind. It climbs at 0.22/s at full dread, slowly in the dark with no
+light of your own (but darkness alone stops at 0.45), and in jolts: a hit
+(0.12 plus damage/150) and every scripted scare (0.22–0.4). It settles at
+0.045/s once it's quiet, 2.6× faster in a lamp's light. Above 0.35 your hands
+shake (a slow camera wander) and your aim spreads as if you were walking;
+your breathing carries up to 1.8× further; the post shader closes the
+vignette in and drains colour; heartbeat and breathing audio follow
+`max(dread, nerve × 0.65)`.
+
+**Eyes in the dark.** Without a light (torch or lamp) your eyes adjust at
+0.22/s, back at 3/s when one comes on. The post shader lifts dark pixels
+(`pow(c, 0.5)`), desaturated and a little blue, the way night vision is.
+It can't make light from nothing: it brings out shapes in the dim, not the
+pitch black.
+
+**Wounds.** Below 35% health you limp (up to 18% slower, an uneven bob and
+roll) and drip blood every couple of metres. Each fresh drop is a 3.5-unit
+"noise" at the drop: creatures that come across it go to look, and find
+the next one.
+
+**The ground.** Snow (open ground under the sky) is 10% slower and 20%
+louder, and crunches. **Footprints** (`fx/footprints.ts`): water leaves 12
+fading wet prints after you wade, walking within 1.1 of a body 9 bloody
+ones, and in the snow every step leaves one, creatures' too (humanoids,
+bare and long-toed, every 0.85 m). Prints are small lit, alpha-hashed quads
+(a lit surface of their own, so they show under the brightest torch), with
+their fade done in the shader. In the cold (the cold store, anywhere
+outdoors) **your breath shows**: a puff every 1.2–3.4 s, quicker when you're
+winded or frightened, lit by whatever light is on it.
+
 **Flashlight** (F): spotlight held low-right with beam sway that lags your
 aim. Battery 100, drains 0.55/s (about three minutes; it was a minute,
 which turned the game into battery-watching). While off it trickles back to at
@@ -617,6 +666,18 @@ pellet is its own ray; a shot counts as one hit for accuracy if any pellet
 lands. Ammo pickups are per weapon (`A` rounds, `T` shells, `J` rivets); you
 can't pick up ammo for a weapon you don't have yet, and a test checks no
 level asks you to.
+
+**Jams.** The sidearm (older than its owner, fed on whatever was left in the
+store) jams on about 1.2% of shots: that shot goes, the next doesn't (a dry
+click, and a prompt). The reload key clears it in 0.7 s, racking the dud
+round out on the floor; it costs that round, not a reload. Never on Story,
+never on the last round, and the other guns don't jam.
+
+**Ringing ears.** Your own gunshot in a tight space dulls everything behind a
+low-pass filter (down to about 0.9 kHz) under a thin 3.5–4.4 kHz whine, for a
+second or two: the pistol 0.26, the shotgun 0.55, times `1 − openness × 0.75`
+from the room measurement. Shots close together stack; the rivet gun is only
+a hiss.
 
 **Switching** (1–3, Q to cycle, mouse wheel) takes 0.45 s: the weapon drops
 out of view and the next comes up. Switching cancels a reload.
