@@ -28,6 +28,11 @@ export interface WeaponDef {
   ammoPickup: number;
   /** Level where it is found; chapter select starts later levels with it. Null = carried from the start. */
   foundIn: string | null;
+  /**
+   * Chance per shot that the next round fails to feed (old guns, bad
+   * ammunition, cold). Cleared with the reload key, losing the round.
+   */
+  jamChance?: number;
 }
 
 export const WEAPONS = {
@@ -49,6 +54,8 @@ export const WEAPONS = {
     recoil: 0.03,
     ammoPickup: 4,
     foundIn: null,
+    // A service pistol older than you are, fed on whatever ammunition was left in the store.
+    jamChance: 0.012,
   },
   /**
    * A consortium pneumatic rivet gun. Weak and short-ranged, but it barely

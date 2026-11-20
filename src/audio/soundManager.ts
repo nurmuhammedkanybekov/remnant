@@ -520,6 +520,21 @@ export class SoundManager {
     this.burst(o, "highpass", 3000, 1, t, 0.03, 0.15);
   }
 
+  /** Clearing a jam: the slide yanked back hard, the dud round rattling out, the slide slamming home. */
+  playSlideRack(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (this.sample("slideRack", t + 0.18)) return;
+    const o = this.out(CENTER, 1, 0.15)!;
+    this.tone(o, "square", 1200, 600, t + 0.15, 0.025, 0.22);
+    this.burst(o, "bandpass", 1800, 2, t + 0.15, 0.04, 0.2);
+    // The round on the floor.
+    this.tone(o, "triangle", 3800, 3600, t + 0.45, 0.05, 0.06);
+    this.tone(o, "triangle", 4100, 3900, t + 0.53, 0.04, 0.04);
+    this.tone(o, "square", 1500, 750, t + 0.36, 0.025, 0.26);
+    this.burst(o, "bandpass", 2200, 2, t + 0.36, 0.04, 0.22);
+  }
+
   /** Timed to match the viewmodel's reload animation (1.5s). */
   playReload(duration: number): void {
     if (!this.ctx) return;
@@ -597,6 +612,31 @@ export class SoundManager {
     const o = this.out(CENTER, 1, 0.25)!;
     this.burst(o, "lowpass", this.stepFlip ? 420 : 520, 1, t, 0.09, vol);
     this.burst(o, "bandpass", this.stepFlip ? 2200 : 2600, 2, t + 0.01, 0.04, vol * 0.25); // grit
+  }
+
+  /** A step in old snow: weight going down, then the crust crunching under it, crystal by crystal. */
+  playSnowStep(gait: "crouch" | "walk" | "sprint" | "still"): void {
+    if (!this.ctx || gait === "still") return;
+    const t = this.ctx.currentTime;
+    this.stepFlip = !this.stepFlip;
+    const vol = gait === "sprint" ? 0.42 : gait === "crouch" ? 0.09 : 0.24;
+    const o = this.out(CENTER, 1, 0.2)!;
+    this.burst(o, "lowpass", this.stepFlip ? 280 : 340, 1, t, 0.12, vol * 0.7);
+    const n = gait === "sprint" ? 8 : gait === "crouch" ? 3 : 6;
+    let at = t + 0.012;
+    for (let i = 0; i < n; i++) {
+      this.burst(
+        o,
+        "bandpass",
+        1600 + Math.random() * 2800,
+        4,
+        at,
+        0.02 + Math.random() * 0.025,
+        vol * (0.45 + Math.random() * 0.55),
+        0.002
+      );
+      at += 0.012 + Math.random() * 0.022;
+    }
   }
 
   playFlashlight(on: boolean): void {
