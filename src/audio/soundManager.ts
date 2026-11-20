@@ -37,6 +37,11 @@ export interface Spatial {
 /** How the world sounds around you: a cramped duct or a pump hall. */
 export type RoomSize = number;
 
+/** The ear filter's cutoff with nothing ringing (Hz). */
+const OPEN_EARS = 20000;
+/** How hard each of your guns hits your ears, in a tight space. The rivet gun is a hiss. */
+const DEAFEN = { pistol: 0.26, shotgun: 0.55, rivet: 0 } as const;
+
 const CENTER: Spatial = { pan: 0, distance: 0, muffled: false };
 
 export class SoundManager {
@@ -64,6 +69,13 @@ export class SoundManager {
   private ambientTimer = 4;
   private volume = 0.8;
   private stepFlip = false;
+  /** The ear filter (see `deafen`) and what's after it; how open the room is (0 tight .. 1 a hall). */
+  private ears!: BiquadFilterNode;
+  private earsOut!: AudioNode;
+  private openness = 0.4;
+  /** How deafened you are, as of `ringAt`. */
+  private ringing = 0;
+  private ringAt = 0;
 
   get ready(): boolean {
     return this.ctx !== null;
@@ -82,7 +94,13 @@ export class SoundManager {
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14;
     comp.ratio.value = 4;
-    this.master.connect(comp).connect(ctx.destination);
+    // Your ears: wide open, until a gunshot in a small room shuts them for a moment (see `deafen`).
+    this.ears = ctx.createBiquadFilter();
+    this.ears.type = "lowpass";
+    this.ears.frequency.value = OPEN_EARS;
+    this.ears.Q.value = 0.5;
+    this.master.connect(this.ears).connect(comp).connect(ctx.destination);
+    this.earsOut = comp;
 
     this.dry = ctx.createGain();
     this.dry.connect(this.master);
@@ -174,9 +192,41 @@ export class SoundManager {
   }
 
   /** How open the space around you is, 0 (a duct) to 1 (a hall): the reverb follows it smoothly. */
+  /**
+   * Ringing ears: the world goes dull and far away under a thin, high whine,
+   * and comes back over a second or two (longer, the more it's been hit).
+   * Shots close together stack. `amount` 0..1.
+   */
+  deafen(amount: number): void {
+    const ctx = this.ctx;
+    if (!ctx || amount <= 0.02) return;
+    const t = ctx.currentTime;
+    // What's left of the last one, plus this.
+    this.ringing = Math.min(1, this.ringing * Math.exp(-(t - this.ringAt) / 2.2) + amount);
+    this.ringAt = t;
+    const a = this.ringing;
+    const f = this.ears.frequency;
+    f.cancelScheduledValues(t);
+    f.setValueAtTime(f.value, t);
+    // The bang itself gets through; then everything closes up.
+    f.setTargetAtTime(Math.max(900, OPEN_EARS * Math.pow(1 - a * 0.9, 2.2)), t + 0.06, 0.04);
+    f.setTargetAtTime(OPEN_EARS, t + 0.35 + a * 0.8, 0.6 + a * 1.4);
+    const ring = ctx.createOscillator();
+    ring.type = "sine";
+    ring.frequency.value = 3500 + Math.random() * 900;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.03 * a * this.volume, t + 0.12);
+    g.gain.setTargetAtTime(0, t + 0.5, 0.7 + a * 1.3);
+    ring.connect(g).connect(this.earsOut);
+    ring.start(t);
+    ring.stop(t + 8);
+  }
+
   setRoom(openness: RoomSize): void {
     if (!this.ctx) return;
     const o = Math.max(0, Math.min(1, openness));
+    this.openness = o;
     const t = this.ctx.currentTime;
     this.smallWet.gain.setTargetAtTime(0.32 * (1 - o) + 0.06, t, 0.6);
     this.largeWet.gain.setTargetAtTime(0.42 * o, t, 0.6);
@@ -324,6 +374,8 @@ export class SoundManager {
   playGunshot(weapon: "pistol" | "shotgun" | "rivet" = "pistol"): void {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
+    // Your own gun, next to your head: in a tight space it leaves your ears ringing.
+    this.deafen(DEAFEN[weapon] * (1 - this.openness * 0.75));
     const recorded: Record<typeof weapon, SampleId> = { pistol: "pistolShot", shotgun: "shotgunShot", rivet: "rivetShot" };
     if (this.sample(recorded[weapon], t, CENTER, 1, weapon === "rivet" ? 0.3 : 0.9)) {
       if (weapon !== "rivet") {
