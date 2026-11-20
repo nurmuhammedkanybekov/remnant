@@ -35,6 +35,8 @@ export interface Settings {
   reducedShake: boolean;
   /** Swaps the HUD's red/green signals for a colour-blind safe palette. */
   colorBlind: boolean;
+  /** A gunshot in a small room leaves your ears ringing (a high whine, the world muffled). */
+  ringingEars: boolean;
   /** How you look to your co-op partner, and your own hands. */
   look: CharacterLook;
   voice: VoiceMode;
@@ -59,6 +61,7 @@ export function defaultSettings(): Settings {
     hudScale: 1,
     reducedShake: false,
     colorBlind: false,
+    ringingEars: true,
     look: "light",
     voice: "ptt",
     bindings: normalizeBindings(null),
@@ -89,6 +92,7 @@ export function normalizeSettings(raw: unknown): Settings {
     hudScale: clamp(s.hudScale, 0.8, 1.4, d.hudScale),
     reducedShake: bool(s.reducedShake, d.reducedShake),
     colorBlind: bool(s.colorBlind, d.colorBlind),
+    ringingEars: bool(s.ringingEars, d.ringingEars),
     look: isCharacterLook(s.look) ? s.look : d.look,
     voice: VOICE_MODES.includes(s.voice as VoiceMode) ? (s.voice as VoiceMode) : d.voice,
     bindings: normalizeBindings(s.bindings),

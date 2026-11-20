@@ -102,6 +102,8 @@ export class SoundManager {
   private ambientTimer = 4;
   private volume = 0.8;
   private stepFlip = false;
+  /** The "ringing ears" setting: off, a gunshot is only a gunshot. */
+  ringingEars = true;
   /** The ear filter (see `deafen`) and what's after it; how open the room is (0 tight .. 1 a hall). */
   private ears!: BiquadFilterNode;
   private earsOut!: AudioNode;
@@ -234,7 +236,7 @@ export class SoundManager {
    */
   deafen(amount: number): void {
     const ctx = this.ctx;
-    if (!ctx || amount <= 0.02) return;
+    if (!ctx || amount <= 0.02 || !this.ringingEars) return;
     const t = ctx.currentTime;
     // What's left of the last one, plus this.
     this.ringing = Math.min(1, this.ringing * Math.exp(-(t - this.ringAt) / 2.2) + amount);

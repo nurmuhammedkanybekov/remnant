@@ -227,6 +227,7 @@ export class Game {
     this.viewmodel.setSkin(LOOKS[this.settings.look].skin);
     this.hud.applyDisplay(this.settings.hudScale, this.settings.subtitleSize);
     this.container.classList.toggle("cb", this.settings.colorBlind);
+    this.sound.ringingEars = this.settings.ringingEars;
     this.session?.applySettings();
   }
 

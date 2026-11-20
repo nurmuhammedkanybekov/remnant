@@ -68,7 +68,7 @@ function esc(s: string): string {
 }
 
 type NumericKey = "sensitivity" | "padSensitivity" | "fov" | "volume" | "musicVolume" | "hudScale" | "brightness";
-type ToggleKey = "invertY" | "reducedShake" | "colorBlind" | "autoQuality";
+type ToggleKey = "invertY" | "reducedShake" | "colorBlind" | "autoQuality" | "ringingEars";
 type CycleKey = "quality" | "subtitleSize" | "look" | "voice";
 
 /** Full-screen menus. Each method replaces whatever screen is showing. */
@@ -587,6 +587,7 @@ export class Screens {
            ${cycle("SUBTITLE SIZE", "subtitleSize")}
            ${toggle("REDUCED CAMERA SHAKE", "reducedShake")}
            ${toggle("COLOUR-BLIND FRIENDLY HUD", "colorBlind")}
+           ${toggle("RINGING EARS AFTER GUNSHOTS", "ringingEars")}
          </section>
        </div>
        <div class="note-line">Graphics quality fully applies from the next level you load. The radio calls you by your character's name, and your co-op partners see them. In co-op, creatures can hear you talk.</div>`,
