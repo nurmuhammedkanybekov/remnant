@@ -1,4 +1,4 @@
-import { checkpoint, hint, nur, objective, op, radio, silence, unknown } from "../../../game/script";
+import { checkpoint, hint, ifTrail, nur, objective, op, radio, silence, sound, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /**
@@ -81,6 +81,13 @@ export const OBSERVATORY: LevelDef = {
     power: [
       silence(6),
       radio(nur("...Nothing. The whole valley, and nothing on the channel."), nur("Now the ridge, and the drainage portal.")),
+      // The relay is dead. The radio on your belt isn't: four notes, very quiet. The tune is how it talks.
+      sound("hummer"),
+      ifTrail(
+        1,
+        [radio(nur("...My radio. It's humming. His four notes."), nur("It's not on any channel. It's not on at all."))],
+        [radio(nur("...Something's humming. On my radio. It isn't even switched on."))]
+      ),
       objective("Out along the ridge to the drainage portal."),
       checkpoint(),
     ],

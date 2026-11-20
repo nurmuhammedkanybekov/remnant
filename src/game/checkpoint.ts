@@ -1,5 +1,6 @@
 import { parseLoadout, type Loadout } from "./loadout";
 import { freshStats, type RunStats } from "./stats";
+import { parseVoice, type VoiceMemory } from "./voiceMemory";
 
 /**
  * Everything needed to resume a level mid-way. Indices refer to the order
@@ -31,6 +32,8 @@ export interface CheckpointState {
   firedTriggers: string[];
   hasKeycard: boolean;
   objective: string;
+  /** What the voice knew of you at the checkpoint: what you told it and did on this level so far is kept. */
+  voice?: VoiceMemory;
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -62,5 +65,6 @@ export function parseCheckpoint(raw: unknown): CheckpointState | null {
     firedTriggers: Array.isArray(c.firedTriggers) ? c.firedTriggers.filter((t): t is string => typeof t === "string") : [],
     hasKeycard: c.hasKeycard === true,
     objective: c.objective,
+    ...(c.voice ? { voice: parseVoice(c.voice) } : {}),
   };
 }

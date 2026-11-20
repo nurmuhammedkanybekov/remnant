@@ -14,7 +14,8 @@ import { Projectiles } from "../enemies/projectiles";
 import { Effects } from "../fx/particles";
 import { Footprints, type PrintKind } from "../fx/footprints";
 import { BloodPools } from "../fx/pools";
-import { freshVoice, habitOf, remember, type Habit, type VoiceMemory } from "./voiceMemory";
+import { cloneVoice, freshVoice, habitOf, heed, remember, remembered, type Habit, type VoiceMemory } from "./voiceMemory";
+import { recountLines } from "../content/story";
 import { Pickup } from "../items/pickup";
 import { SMASH_NOISE, throwFrom, Throwables } from "../items/throwables";
 import { r2, type PlayerState, type SessionMsg } from "../net/protocol";
@@ -75,7 +76,11 @@ const WOUNDED = 0.35;
 /** Metres between drops of your blood (fewer when it's not so bad). */
 const DRIP_EVERY = 1.6;
 /** Seconds you have to answer the voice, once it's finished asking. */
-const ANSWER_WINDOW = 7;
+const ANSWER_WINDOW = 10;
+/** How long your light has to stay off, running, to have done as it said. */
+const BID_DARK = 2.5;
+/** How far you can drift (world units) and still have kept still. */
+const BID_STILL = 0.7;
 /** How far (world units) Kessler's tune carries to you. */
 const HUM_EARSHOT = 34;
 /** What it says when it has noticed how you play (see `habitOf`). */
@@ -284,6 +289,9 @@ export class LevelSession {
   /** A question the voice is waiting on an answer to (see `updateAsking`). */
   private asking: { a: Extract<ScriptAction, { type: "ask" }>; open: boolean; until: number } | null = null;
   private talkWas = false;
+  /** Something it told you to do, and is watching to see if you do (see `updateBid`). */
+  private bidding: { a: Extract<ScriptAction, { type: "bid" }>; open: boolean; until: number; from: THREE.Vector2; dark: number } | null =
+    null;
   /** What it had learned about how you play when this level began (see `habitOf`). */
   private readonly learned: Habit | null;
   /** How used to the dark your eyes are (see `updateEyes`). */
@@ -338,6 +346,13 @@ export class LevelSession {
   /** The lockers you can hide in, and the one you're in (if any). */
   private readonly hideSpots: HideSpot[];
   private hiding: HideSpot | null = null;
+  /**
+   * Once it knows you hide (see `habitOf`), one locker on each level is
+   * already taken: you hear breathing from it when you come close, and what's
+   * inside comes out if you open it.
+   */
+  private takenLocker: HideSpot | null = null;
+  private takenHeard = false;
   /** Health when you got in: hurt in there means something pulled you out. */
   private hideHp = 0;
   private bleed = 0;
@@ -377,7 +392,21 @@ export class LevelSession {
     this.pools = new BloodPools(scene);
     this.drips = new BloodPools(scene, 90, 0.8);
     this.coldLevel = !!resolveTheme(def.theme).cold;
+    // Back at a checkpoint, it still knows what you told it and did before it, on this level too.
+    if (restore?.voice) {
+      const deaths = this.voice.deaths;
+      Object.assign(this.voice, cloneVoice(restore.voice));
+      this.voice.deaths = Math.max(deaths, restore.voice.deaths);
+    }
     this.learned = habitOf(this.voice);
+    if (this.learned === "hider") {
+      // Not by the start, and the same one every time you play the level.
+      const start = sp.playerStart;
+      const far = this.hideSpots.filter((h) => h.pos.distanceTo(start) > 12);
+      let h = 0;
+      for (const ch of def.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      this.takenLocker = far.length ? far[h % far.length] : null;
+    }
     const water = new Set(sp.water.map((w) => `${w.cell.col},${w.cell.row}`));
     this.effects.setWorld({
       solidAt: (x, z) => {
@@ -686,6 +715,8 @@ export class LevelSession {
     this.updateBounce();
     this.updateScares(dt);
     this.updateAsking(cmd.talk, cmd.interact);
+    this.updateBid(dt);
+    this.updateTakenLocker();
     this.updateHum(dt);
     viewmodel.update(
       dt,
@@ -1335,6 +1366,21 @@ export class LevelSession {
         case "ifTrail":
           this.run(this.voice.trail.length >= a.count ? a.then : a.otherwise);
           break;
+        case "bid":
+          // It never tells you the same thing twice in a run, and one thing at a time.
+          if (this.voice.obeyed.includes(a.id) || this.voice.defied.includes(a.id) || this.bidding) break;
+          this.radio.say(a.say);
+          this.bidding = { a, open: false, until: Infinity, from: this.player.position2D.clone(), dark: 0 };
+          break;
+        case "ifHeeded":
+          this.run(this.voice.obeyed.includes(a.id) ? a.obeyed : this.voice.defied.includes(a.id) ? a.defied : a.never);
+          break;
+        case "recount": {
+          const part = this.def.endings?.exit === "dawn" || this.def.endings?.exit === "silence" ? 2 : 1;
+          const lines = recountLines(remembered(this.voice), part);
+          if (lines.length) this.radio.say(lines);
+          break;
+        }
         case "habitLine": {
           const lines = this.learned ? HABIT_LINES[this.learned] : null;
           if (lines) this.radio.say(lines);
@@ -1387,6 +1433,82 @@ export class LevelSession {
   }
 
   /**
+   * It told you to do something and is watching: once it has finished
+   * speaking, the clock runs, and what you do (not what you say) answers.
+   * Some answers come at once (you moved; you went in; you took it); the
+   * rest when the time is up, or when you leave the level (`settleBid`).
+   * Down or dead, it's forgotten, and it'll tell you again next time.
+   */
+  private updateBid(dt: number): void {
+    const b = this.bidding;
+    if (!b) return;
+    if (this.downed || this.player.health.isDead) {
+      this.bidding = null;
+      return;
+    }
+    if (!b.open) {
+      if (this.radio.busy) return;
+      b.open = true;
+      b.until = b.a.seconds === null ? Infinity : this.time + b.a.seconds;
+      b.from.copy(this.player.position2D);
+    }
+    const t = b.a.test;
+    const cell = worldToCell(this.player.position.x, this.player.position.z);
+    const zone = this.triggerCells.get(cell.row * this.level.cols + cell.col);
+    switch (t.kind) {
+      case "dark": {
+        const lit = !this.hiding && this.player.flashlight.on && this.player.flashlight.level > 0.05;
+        b.dark = lit ? 0 : b.dark + dt;
+        if (b.dark >= BID_DARK) return this.settleBid(true);
+        break;
+      }
+      case "still":
+        if (this.player.position2D.distanceTo(b.from) > BID_STILL) return this.settleBid(false);
+        break;
+      case "avoid":
+        if (zone === t.zone) return this.settleBid(false);
+        break;
+      case "go":
+        if (zone === t.zone) return this.settleBid(true);
+        break;
+      case "leave": {
+        const p = this.pickupAt(t.at.col, t.at.row);
+        if (!p || p.collected) return this.settleBid(false);
+        break;
+      }
+    }
+    if (this.time >= b.until) this.settleBid(t.kind === "still" || t.kind === "avoid" || t.kind === "leave");
+  }
+
+  /** It saw what you did. With no answer yet when you leave the level: if it asked you not to, you didn't. */
+  private settleBid(obeyed?: boolean): void {
+    const b = this.bidding;
+    if (!b) return;
+    this.bidding = null;
+    const k = b.a.test.kind;
+    const ok = obeyed ?? (k === "avoid" || k === "leave" || k === "still");
+    heed(this.voice, b.a.id, ok);
+    this.run(ok ? b.a.obeyed : b.a.defied);
+  }
+
+  /** Breathing from the taken locker, once, when you first come near it: fair warning. */
+  private updateTakenLocker(): void {
+    const spot = this.takenLocker;
+    if (!spot || this.takenHeard || spot.pos.distanceTo(this.player.position2D) > 5) return;
+    this.takenHeard = true;
+    this.services.sound.playStinger("breath", this.spatial(spot.pos));
+  }
+
+  /** The pickup lying in a cell, if any. */
+  private pickupAt(col: number, row: number): Pickup | null {
+    const at = this.cellCentre(col, row);
+    return (
+      this.pickups.find((p) => p.type !== "note" && Math.hypot(p.group.position.x - at.x, p.group.position.z - at.y) < CELL_SIZE / 2) ??
+      null
+    );
+  }
+
+  /**
    * Kessler's tune: every ten seconds or so, while you're within earshot, a
    * man hums four notes from where his note lies, muffled through the walls
    * and clearer as you come closer. Found, it stops, and the run remembers.
@@ -1406,7 +1528,10 @@ export class LevelSession {
     this.services.sound.playStinger("hummer", this.spatial(at));
     if (!this.humHeard) {
       this.humHeard = true;
-      this.later(5, () => this.radio.say([{ speaker: "nur", text: "...that tune. Someone's humming it, close by." }]));
+      this.later(5, () => {
+        this.radio.say([{ speaker: "nur", text: "...that tune. Someone's humming it, close by." }]);
+        this.run(this.def.events?.humHeard ?? []);
+      });
     }
   }
 
@@ -1495,6 +1620,7 @@ export class LevelSession {
       firedTriggers: [...this.firedTriggers],
       hasKeycard: this.hasKeycard,
       objective: this.objective,
+      voice: cloneVoice(this.voice),
     };
   }
 
@@ -1591,6 +1717,16 @@ export class LevelSession {
    * has your breathing to go on (muffled; hold it when one comes close).
    */
   private enterLocker(spot: HideSpot): void {
+    // It knows you hide: one of them got here first (you could hear it breathing).
+    if (spot === this.takenLocker) {
+      this.takenLocker = null;
+      this.services.sound.playLocker(false);
+      this.player.addTrauma(0.8);
+      this.player.nerve.shock(0.35);
+      this.spawnNear("husk", spot.pos.clone().addScaledVector(spot.out, 1.1));
+      this.radio.say([{ speaker: "operator", text: "They look in the lockers now, Nur. Sometimes they wait in them." }]);
+      return;
+    }
     this.hiding = spot;
     this.voice.hides++;
     this.hideHp = this.player.health.current;
@@ -2141,6 +2277,7 @@ export class LevelSession {
   private finish(ending: EndingId | null): void {
     if (this.finished) return;
     this.finished = true;
+    this.settleBid();
     if (this.coop?.role === "host") this.coop.send({ t: "finish", ending });
     this.radio.clear();
     if (ending && ending === (this.def.endings?.console ?? "seal")) this.services.sound.playDetonation();

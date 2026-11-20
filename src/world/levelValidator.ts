@@ -102,12 +102,38 @@ export function validateLevel(level: ParsedLevel): string[] {
       ? [a, ...a.reward.flatMap(nested)]
       : a.type === "ifTold" || a.type === "ifTrail"
         ? [a, ...a.then.flatMap(nested), ...a.otherwise.flatMap(nested)]
-        : [a];
+        : a.type === "bid"
+          ? [a, ...a.obeyed.flatMap(nested), ...a.defied.flatMap(nested)]
+          : a.type === "ifHeeded"
+            ? [a, ...a.obeyed.flatMap(nested), ...a.defied.flatMap(nested), ...a.never.flatMap(nested)]
+            : [a];
   const scripts: ScriptAction[] = [
     ...Object.values(def.events ?? {}).flat(2),
     ...Object.values(def.triggers ?? {}).flat(),
     ...(def.intercoms ?? []).flat(),
   ].flatMap(nested);
+  const bidIds = new Set<string>();
+  for (const a of scripts) {
+    if (a.type !== "bid") continue;
+    // A bid answered by where you go needs somewhere to go, and you have to be able to get there.
+    if (bidIds.has(a.id)) problems.push(`${id}: bid "${a.id}" given twice`);
+    bidIds.add(a.id);
+    const t = a.test;
+    if (t.kind === "avoid" || t.kind === "go") {
+      const cells = s.triggers.filter((tr) => tr.key === t.zone);
+      if (!cells.length) problems.push(`${id}: bid "${a.id}" watches zone "${t.zone}", which isn't on the map`);
+      else if (!cells.some((tr) => canReach(tr.cell))) problems.push(`${id}: bid "${a.id}" zone "${t.zone}" can't be reached`);
+    }
+    if (t.kind === "leave") {
+      const there = s.items.some((i) => {
+        const c = worldToCell(i.pos.x, i.pos.y);
+        return c.col === t.at.col && c.row === t.at.row;
+      });
+      if (!there) problems.push(`${id}: bid "${a.id}" asks you to leave what's at ${t.at.col},${t.at.row}, and nothing is`);
+      if (!(def.keep ?? []).some(([c, r]) => c === t.at.col && r === t.at.row))
+        problems.push(`${id}: bid "${a.id}"'s item at ${t.at.col},${t.at.row} must be in \`keep\` (or a difficulty could thin it out)`);
+    }
+  }
   for (const a of scripts) {
     if (a.type !== "sound" && a.type !== "apparition") continue;
     const c = a.at;

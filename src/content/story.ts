@@ -105,19 +105,114 @@ export const TRANSMISSIONS = [
   "…Kosh-Tash relay, broadcasting on all channels. Is anyone there…",
 ];
 
+/** Enough of `VoiceMemory` to write about (kept loose so content doesn't depend on game code). */
+export interface Remembered {
+  told: readonly string[];
+  withheld: readonly string[];
+  obeyed: readonly string[];
+  defied: readonly string[];
+  trail: readonly string[];
+  deaths: number;
+  stance: "trusted" | "resisted" | "torn" | null;
+}
+
 /**
- * The last line of an ending, from what you gave the voice over the run
- * (see `game/voiceMemory.ts`): everything it asked, nothing, or some of it.
- * Null when it never asked you anything (a run started from chapter select).
+ * The last line of an ending: where you stood with it, over the whole run.
+ * Null when it never asked or told you anything (a run started part-way).
  */
-export function voiceCoda(told: readonly string[], withheld: readonly string[]): string | null {
-  const asked = told.length + withheld.length;
-  if (asked === 0) return null;
-  if (told.length === 0)
-    return "It asked you things, down there, and you never told it anything. Mara would have been proud. Some nights the radio still asks.";
-  if (withheld.length === 0)
-    return "You answered everything it asked. Some nights, under the static on the clinic radio, someone is still answering its questions. They sound a lot like you.";
-  return "You told it some of what it asked. It kept every word. Some nights the radio says them back to you, in your own voice, one at a time.";
+export function voiceCoda(m: Remembered): string | null {
+  switch (m.stance) {
+    case "trusted":
+      return "You answered what it asked, and did what it told you. Some nights the clinic radio asks how you're sleeping, and you hear yourself start to answer.";
+    case "resisted":
+      return "It asked you things, and told you things, and you gave it nothing. Mara would have been proud. Some nights the radio still asks. You let it.";
+    case "torn":
+      return "You gave it some of yourself, and kept the rest. Some nights the radio says the part you gave it, in your own voice, as if it's trying to remember the rest.";
+    default:
+      return null;
+  }
+}
+
+export interface RecountLine {
+  speaker: "unknown";
+  text: string;
+}
+
+const say = (text: string): RecountLine => ({ speaker: "unknown", text });
+/** How many moments it brings up under the stars. It could go on; it doesn't. */
+const RECOUNT_MOMENTS = 4;
+
+/**
+ * What it says it remembers of you, at the end of a part: not a score, the
+ * moments themselves, in the order they happened, and then where that
+ * leaves the two of you. Part One's is said under the stars; Part Two's
+ * when the Choir is dead. Empty if there's nothing (a run started part-way).
+ */
+export function recountLines(m: Remembered, part: 1 | 2): RecountLine[] {
+  const told = (id: string) => m.told.includes(id);
+  const held = (id: string) => m.withheld.includes(id);
+  const did = (id: string) => m.obeyed.includes(id);
+  const didnt = (id: string) => m.defied.includes(id);
+  const out: RecountLine[] = [];
+  if (part === 1) {
+    // Each moment it kept, with how much it matters to it: what you did weighs more than what you said.
+    const moments: [number, RecountLine[]][] = [];
+    const add = (weight: number, ...lines: RecountLine[]) => moments.push([weight, lines]);
+    if (told("alone")) add(1, say("In the maintenance wing you told me you were alone. I've thought about that a great deal."));
+    else if (held("alone")) add(1, say("In the maintenance wing I asked if you were alone, and you didn't say. Mara taught you that."));
+    if (did("lights-off"))
+      add(
+        3,
+        say("When I told you to put your light out, you did. In the dark, with one of them walking past. Before you even knew what I was.")
+      );
+    else if (didnt("lights-off")) add(3, say("When I told you to put your light out, you didn't. You wanted to see. We understand that."));
+    if (told("fear")) add(2, say("You told me you were afraid of the dark. So I showed you some."));
+    else if (held("fear")) add(1, say("You never told me what you were afraid of. I had to guess. I think I guessed well."));
+    if (did("kit"))
+      add(
+        5,
+        say("You left the medkit at the pumps, for Ruslan. He lasted four more days. He talked to me the whole time."),
+        say("This is Ruslan. Thank you for the kit, Nur. It's warm here.")
+      );
+    else if (didnt("kit"))
+      add(
+        5,
+        say(
+          "You took the medkit I asked you to leave. Ruslan waited at pump two for a long time. He's with us now. He isn't angry. Nobody here is angry."
+        )
+      );
+    if (did("hum"))
+      add(2, say("In the vents I asked you not to go towards the humming, and you didn't. You never heard what he left for you."));
+    else if (didnt("hum"))
+      add(2, say("In the vents you went towards the humming when I asked you not to. I don't like people listening to him."));
+    if (did("store")) add(4, say("At the armory I sent you into a room full of them, and you went. I wanted to know if you still would."));
+    else if (didnt("store")) add(4, say("At the armory you didn't go where I sent you. That's when I knew you'd come back one day."));
+    if (!moments.length) return [];
+    // The four that matter most to it, told in the order they happened. (A stable sort keeps that order among equals.)
+    const kept = new Set([...moments].sort((a, b) => b[0] - a[0]).slice(0, RECOUNT_MOMENTS));
+    for (const mo of moments) if (kept.has(mo)) out.push(...mo[1]);
+    if (m.stance === "trusted") out.push(say("You always did what I asked. Do this too. Walk us down."));
+    else if (m.stance === "resisted") out.push(say("You never once did what I asked. Do this one thing. Walk us down."));
+    return out;
+  }
+  if (told("where")) out.push(say("At the clinic you told me where you were going. So we were there first."));
+  else if (held("where"))
+    out.push(say("At the clinic you wouldn't say where you were going. It didn't matter. There was only ever one place."));
+  if (did("still"))
+    out.push(say("In the village I told you not to move, and you stood in the snow for me. There was nothing behind you, Nur."));
+  else if (didnt("still"))
+    out.push(say("In the village I told you not to move, and you ran. There was something behind you. I asked it to let you go."));
+  if (m.trail.length >= 4) out.push(say("You followed the man who hummed, all the way to the photograph. Now you know who taught him."));
+  if (m.deaths > 0)
+    out.push(say(`You died ${m.deaths === 1 ? "once" : `${m.deaths} times`} on the way to me. I was there every time. I waited.`));
+  if (!out.length && !m.stance) return [];
+  if (m.stance === "trusted")
+    out.push(say("You listened, Nur. You're the only one who ever listened and stayed yourself. I'll miss that."));
+  else if (m.stance === "resisted")
+    out.push(say("You never listened. Not really. That's why you're still you. I hated that. I envied it."));
+  else if (m.stance === "torn")
+    out.push(say("Sometimes you listened and sometimes you didn't. I never knew which, with you. Nobody else was like that."));
+  return out;
 }
 
 /** Kessler's trail followed to the end (all four of his notes): the tune stays with you. */

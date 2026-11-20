@@ -1,4 +1,19 @@
-import { alarm, apparition, checkpoint, habitLine, hint, nur, objective, op, radio, silence, unknown } from "../../../game/script";
+import {
+  alarm,
+  apparition,
+  bid,
+  checkpoint,
+  habitLine,
+  hint,
+  nur,
+  objective,
+  op,
+  radio,
+  silence,
+  sound,
+  torchFails,
+  unknown,
+} from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 12 — the village. Houses, a square, two ways round. The Howler: if it sees you, everything hears. */
@@ -38,7 +53,7 @@ export const VILLAGE: LevelDef = {
     "#.....#...#..c..#.........#.....%#",
     "#..1..#.E.D.....D....K....D..Q...#",
     "#.....#...#.....#.........#......#",
-    "#######.###.....#####.#####......#",
+    "#######f###.....#####.#####......#",
     "#...........W.....L..........d...#",
     "#..M..B...........E........###D###",
     "#.....A......2.........e...#..X..#",
@@ -75,5 +90,16 @@ export const VILLAGE: LevelDef = {
     c: [radio(nur("The school. The desks are still in rows."))],
     d: [radio(op("The garage is just ahead. Such a long way you've come."))],
     e: [radio(nur("Something big is moving in the square.")), alarm(14)],
+    // Was there anything behind you? It tells you at the end, and it doesn't say the same thing both ways.
+    f: [
+      bid(
+        "still",
+        [op("Stop. Don't move, Nur. Not one step."), op("It's right behind you. If you don't move, it can't see you.")],
+        { kind: "still" },
+        6,
+        [sound("breath"), radio(op("...It's gone. You can breathe."))],
+        [sound("scream"), torchFails(2), radio(op("I told you not to move."))]
+      ),
+    ],
   },
 };

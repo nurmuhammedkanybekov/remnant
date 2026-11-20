@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { voiceCoda } from "../content/story";
-import { HABIT_AFTER, cloneVoice, freshVoice, habitOf, parseVoice, remember } from "./voiceMemory";
+import { recountLines, voiceCoda } from "../content/story";
+import {
+  HABIT_AFTER,
+  cloneVoice,
+  freshVoice,
+  habitOf,
+  heed,
+  parseVoice,
+  remember,
+  remembered,
+  stanceOf,
+  type VoiceMemory,
+} from "./voiceMemory";
+import { parseCheckpoint, CHECKPOINT_LAYOUT } from "./checkpoint";
 
 const played = (minutes: number, extra: Partial<ReturnType<typeof freshVoice>>) => ({
   ...freshVoice(),
@@ -54,11 +66,131 @@ describe("voice memory", () => {
   });
 });
 
+describe("what you did when it told you", () => {
+  it("keeps whether you obeyed, once", () => {
+    const v = freshVoice();
+    heed(v, "kit", false);
+    heed(v, "kit", true);
+    heed(v, "store", true);
+    expect(v.defied).toEqual(["kit"]);
+    expect(v.obeyed).toEqual(["store"]);
+  });
+
+  it("parses obedience and deaths, and keeps them through a clone and a checkpoint", () => {
+    const v = parseVoice({ obeyed: ["kit", "kit"], defied: ["kit", "hum"], deaths: 3.7 });
+    expect(v.obeyed).toEqual(["kit"]);
+    expect(v.defied).toEqual(["hum"]);
+    expect(v.deaths).toBe(3);
+    const c = cloneVoice(v);
+    c.obeyed.push("store");
+    expect(v.obeyed).toEqual(["kit"]);
+    const cp = parseCheckpoint({
+      layout: CHECKPOINT_LAYOUT,
+      x: 1,
+      z: 2,
+      yaw: 0,
+      objective: "o",
+      loadout: { weapons: { pistol: { mag: 1, reserve: 0 } }, current: "pistol" },
+      voice: { told: ["fear"], obeyed: ["kit"] },
+    });
+    expect(cp?.voice?.told).toEqual(["fear"]);
+    expect(cp?.voice?.obeyed).toEqual(["kit"]);
+  });
+
+  it("works out where you stand", () => {
+    expect(stanceOf(freshVoice())).toBeNull();
+    expect(stanceOf({ ...freshVoice(), told: ["alone", "fear"], obeyed: ["kit"], defied: ["store"] })).toBe("trusted");
+    expect(stanceOf({ ...freshVoice(), withheld: ["alone"], defied: ["kit", "hum"], obeyed: ["store"] })).toBe("resisted");
+    expect(stanceOf({ ...freshVoice(), told: ["alone"], defied: ["kit"] })).toBe("torn");
+    expect(stanceOf({ ...freshVoice(), withheld: ["alone"] })).toBe("resisted");
+  });
+});
+
+/**
+ * Four ways to play the whole campaign, as the memory would be at the end
+ * of each part, to check they come out as different stories, not the same
+ * one with a different number in it.
+ */
+const persona = (p: Partial<VoiceMemory>): VoiceMemory => ({ ...freshVoice(), seconds: 3600, litSeconds: 1800, darkSeconds: 600, ...p });
+const PERSONAS: Record<string, VoiceMemory> = {
+  // Answers, obeys, hides.
+  truster: persona({ told: ["alone", "fear", "where"], obeyed: ["lights-off", "kit", "hum", "store", "still"], hides: 60 }),
+  // Mara's rule: never answers, never does what it says, keeps the light off.
+  resister: persona({ withheld: ["alone", "fear", "where"], defied: ["lights-off", "kit", "hum", "store", "still"], darkSeconds: 2400 }),
+  // Goes everywhere the voice says not to; follows the tune; dies a lot.
+  explorer: persona({
+    told: ["alone"],
+    withheld: ["fear"],
+    obeyed: ["lights-off", "kit"],
+    defied: ["hum", "store"],
+    trail: ["a", "b", "c", "d"],
+    deaths: 7,
+  }),
+  // Shoots everything, ignores everything; never even near the trail.
+  aggressive: persona({
+    withheld: ["alone"],
+    told: ["fear"],
+    defied: ["lights-off", "kit", "still"],
+    obeyed: ["store"],
+    shots: 600,
+    deaths: 2,
+  }),
+};
+
+describe("four ways to play", () => {
+  const story = (v: VoiceMemory) => ({
+    habit: habitOf(v),
+    stance: stanceOf(v),
+    one: recountLines(remembered(v), 1).map((l) => l.text),
+    two: recountLines(remembered(v), 2).map((l) => l.text),
+    coda: voiceCoda(remembered(v)),
+  });
+
+  it("each gets its own habit, stance, recount and ending", () => {
+    const s = Object.fromEntries(Object.entries(PERSONAS).map(([k, v]) => [k, story(v)]));
+    expect(s.truster.habit).toBe("hider");
+    expect(s.resister.habit).toBe("dark");
+    expect(s.aggressive.habit).toBe("gun");
+    expect(s.truster.stance).toBe("trusted");
+    expect(s.resister.stance).toBe("resisted");
+    expect(s.aggressive.stance).toBe("resisted");
+    // No two recounts the same.
+    const ones = Object.values(s).map((x) => x.one.join("|"));
+    const twos = Object.values(s).map((x) => x.two.join("|"));
+    expect(new Set(ones).size).toBe(4);
+    expect(new Set(twos).size).toBe(4);
+    // The medkit is remembered as what you did with it, and Ruslan speaks only if you left it.
+    expect(s.truster.one.join(" ")).toMatch(/Thank you for the kit/);
+    expect(s.resister.one.join(" ")).toMatch(/You took the medkit/);
+    // Only the one who followed the tune hears about the photograph; only those who died are told so.
+    expect(s.explorer.two.join(" ")).toMatch(/photograph/);
+    expect(s.explorer.two.join(" ")).toMatch(/7 times/);
+    expect(s.truster.two.join(" ")).not.toMatch(/died/);
+    // In the village it lies one way or the other: nothing behind you if you stood still.
+    expect(s.truster.two.join(" ")).toMatch(/nothing behind you/);
+    expect(s.resister.two.join(" ")).toMatch(/something behind you/);
+    expect(new Set(Object.values(s).map((x) => x.coda)).size).toBe(3);
+  });
+
+  it("is short enough to listen to", () => {
+    for (const v of Object.values(PERSONAS)) {
+      expect(recountLines(remembered(v), 1).length).toBeLessThanOrEqual(6);
+      expect(recountLines(remembered(v), 2).length).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it("says nothing to a run that never met it", () => {
+    expect(recountLines(remembered(freshVoice()), 1)).toEqual([]);
+    expect(recountLines(remembered(freshVoice()), 2)).toEqual([]);
+  });
+});
+
 describe("the ending's last line", () => {
-  it("depends on what you gave it, and is absent if it never asked", () => {
-    expect(voiceCoda([], [])).toBeNull();
-    expect(voiceCoda([], ["alone", "fear"])).toMatch(/never told it anything/);
-    expect(voiceCoda(["alone", "fear", "where"], [])).toMatch(/answered everything/);
-    expect(voiceCoda(["fear"], ["alone"])).toMatch(/some of what it asked/);
+  it("depends on where you stood with it, and is absent if it never asked", () => {
+    const m = (p: Partial<VoiceMemory>) => remembered({ ...freshVoice(), ...p });
+    expect(voiceCoda(m({}))).toBeNull();
+    expect(voiceCoda(m({ withheld: ["alone", "fear"] }))).toMatch(/gave it nothing/);
+    expect(voiceCoda(m({ told: ["alone", "fear", "where"] }))).toMatch(/did what it told you/);
+    expect(voiceCoda(m({ told: ["fear"], withheld: ["alone"] }))).toMatch(/kept the rest/);
   });
 });

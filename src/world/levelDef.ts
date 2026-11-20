@@ -61,6 +61,8 @@ export interface LevelDef {
      * so on. The last runs `power` instead.
      */
     machineDone?: ScriptAction[][];
+    /** When Kessler's tune (`hum`) is first heard on this level. */
+    humHeard?: ScriptAction[];
     /** When the boss reaches phase 2 and phase 3. */
     bossPhase2?: ScriptAction[];
     bossPhase3?: ScriptAction[];
@@ -80,6 +82,8 @@ export interface LevelDef {
    * walls, until you find it. See `docs/STORY.md` → Kessler's trail.
    */
   hum?: string;
+  /** Cells whose supplies the story is about (a bid to leave them): never thinned out by the difficulty. */
+  keep?: [number, number][];
   /** The last level of a part: the exit and the detonator console each end it. */
   finale?: boolean;
   /** Which ending the finale's exit and its detonator console lead to. Default: Part One's ("leave", "seal"). */
