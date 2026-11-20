@@ -84,7 +84,12 @@ export type SceneKind =
   | "drillHead"
   | "addMe"
   // The source
-  | "lastWiring";
+  | "lastWiring"
+  // Kessler's trail (see LevelDef.hum): where the people who heard the tune left something
+  | "underTheTune"
+  | "ductNail"
+  | "washing"
+  | "surveyPhoto";
 
 export interface ScenePlacement {
   kind: SceneKind;
@@ -120,6 +125,7 @@ export const STORY_SCENES: Record<string, Anchor[]> = {
     { note: "1", kind: "pumpsChained" },
     { note: "2", kind: "hendricks" },
     { note: "3", kind: "quietRoom" },
+    { note: "4", kind: "underTheTune" },
   ],
   "containment-labs": [
     { note: "1", kind: "r7cell" },
@@ -133,6 +139,7 @@ export const STORY_SCENES: Record<string, Anchor[]> = {
     { note: "2", kind: "rivetBench" },
     { note: "3", kind: "camp1991" },
     { note: "4", kind: "supervisor" },
+    { note: "5", kind: "ductNail" },
   ],
   "power-plant": [
     { note: "1", kind: "liftBoard" },
@@ -161,6 +168,7 @@ export const STORY_SCENES: Record<string, Anchor[]> = {
   "ak-suu-village": [
     { note: "1", kind: "keyHooks" },
     { note: "2", kind: "theSquare" },
+    { note: "3", kind: "washing" },
   ],
   "kara-suu-dam": [
     { note: "1", kind: "shiftLog" },
@@ -173,6 +181,7 @@ export const STORY_SCENES: Record<string, Anchor[]> = {
   "drainage-line": [
     { note: "1", kind: "deadCart" },
     { note: "2", kind: "sonFound" },
+    { note: "3", kind: "surveyPhoto" },
   ],
   "beneath-ten": [
     { note: "1", kind: "drillHead" },
@@ -856,6 +865,34 @@ export function buildScene(p: Parts, kind: SceneKind, rand: () => number): void 
       ])
         p.cyl("darkMetal", 0.16, 0.08, x, 0.16, z, Math.PI / 2, 0, 10);
       wallText(p, "workOrder", 0.5, 0.65, 1.35, 1.5);
+      break;
+    // ------------------------------------------------ Kessler's trail
+    case "underTheTune":
+      // Omurbek's corner: a mattress, a tin mug, a stub of candle, and the tune written up over it so he'd stop hearing it.
+      p.box("cloth", 1.6, 0.12, 0.75, -0.3, 0.06, 1.55, 0, 0, 0.05).box("cloth", 0.5, 0.14, 0.35, -0.95, 0.17, 1.6);
+      p.cyl("metal", 0.05, 0.1, 0.75, 0.05, 1.55, 0, 0, 10).cyl("paper", 0.025, 0.08, 0.95, 0.04, 1.62, 0, 0, 8);
+      wallText(p, "fourNotes", 1.4, 0.7, -0.2, 1.25, 0.04);
+      break;
+    case "ductNail":
+      // Where Kessler sat scratching it into the steel, before they strapped him down: the tune, everywhere, and the nail.
+      wallText(p, "fourNotes", 1.2, 0.6, -0.9, 1.6, 0.05);
+      wallText(p, "fourNotes", 1.0, 0.5, 0.3, 0.9, -0.08);
+      wallText(p, "fourNotes", 0.9, 0.45, 1.2, 1.85, 0.12);
+      wallText(p, "fourNotes", 0.7, 0.35, -0.3, 0.45, -0.03);
+      p.cyl("metal", 0.006, 0.09, 0.2, 0.01, 1.55, Math.PI / 2, 0, 5, 0.6);
+      break;
+    case "washing":
+      // Granny's washing, left mid-wash: a tub of grey water, a board, the line still up with the shirts on it.
+      p.cyl("metal", 0.38, 0.32, -0.8, 0.16, 1.5, 0, 0, 14).cyl("glass", 0.35, 0.02, -0.8, 0.28, 1.5, 0, 0, 14);
+      p.box("wood", 0.32, 0.55, 0.03, -0.55, 0.3, 1.45, 0.25);
+      p.cyl("darkMetal", 0.008, 2.6, 0.2, 1.75, 1.75, 0, Math.PI / 2, 4);
+      for (let i = 0; i < 3; i++) p.box("cloth", 0.4, 0.5, 0.02, -0.5 + i * 0.6, 1.47, 1.75, 0, 0, (rand() - 0.5) * 0.1);
+      break;
+    case "surveyPhoto":
+      // The bay's pinboard: work orders, a map of the line, and the 1987 survey photograph, one face circled in pencil.
+      p.box("wood", 1.4, 0.9, 0.04, 0.2, 1.55, WALL - 0.02);
+      p.plane("story:photoCrew", 0.62, 0.36, 0.25, 1.6, WALL - 0.05);
+      wallText(p, "workOrder", 0.38, 0.5, -0.3, 1.55, 0.06, WALL - 0.05);
       break;
     case "sonFound":
       // Where Sadykova stopped: her coat folded on a crate, her bag beside it, and her son's knitted hat on top.
@@ -1543,6 +1580,34 @@ Object.assign(STORY_TEX, {
         14,
         22
       );
+    },
+  },
+  photoCrew: {
+    w: 384,
+    h: 224,
+    draw: (g, w, h) => {
+      // A survey crew at the cavity wall, 1987: eleven men in a row, one circled in pencil.
+      g.fillStyle = "#e6e0d0";
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = "#6a6e70";
+      g.fillRect(10, 10, w - 20, h - 46);
+      g.fillStyle = "#3e3a36";
+      g.fillRect(10, 10, w - 20, 40);
+      for (let i = 0; i < 11; i++) {
+        const x = 30 + i * 32;
+        g.fillStyle = "#24201c";
+        g.beginPath();
+        g.arc(x, 92, 10, 0, Math.PI * 2);
+        g.fill();
+        g.fillRect(x - 12, 104, 24, 60);
+      }
+      g.strokeStyle = "rgba(40,40,40,0.8)";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.ellipse(94, 120, 22, 52, 0, 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = "#2a2a2a";
+      lines(g, ["ЗЕНИТ · 1987 · 2610 м"], w / 2, h - 14, 18, 0, "Arial, sans-serif", "center");
     },
   },
   photoBoy: {

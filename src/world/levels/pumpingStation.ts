@@ -14,8 +14,8 @@ export const PUMPING_STATION: LevelDef = {
     "############################",
     "#S...L...#~~~~~~~~#...L....#",
     "#.#####..#~~~~~~~~#.#####..#",
-    "#.#A..#..D~~~U~~~~D.#...#..#",
-    "#.#...#..#~~~~~~~~#.#.2.#..#",
+    "#.#A.B#..D~~~U~~~~D.#...#..#",
+    "#.#.4.#..#~~~~~~~~#.#.2.#..#",
     "#.##.##..####~#####.##.##..#",
     "#....a....L.b~.......L.....#",
     "####.####.###~#####.######=#",
@@ -33,10 +33,13 @@ export const PUMPING_STATION: LevelDef = {
     "#######M.###################",
     "############################",
   ],
+  hum: "4",
   notes: {
     "1": "ARKADIN, LOG 112 (1988). It hears the water. Every drop in this station, it hears. It learns from voices, so we give it none: we have stopped the pumps, and we have stopped talking.",
     "2": "Took the pump control card off what was left of Hendricks. The collapse was him: the detonator was still in his hand. Card's in the east intake for whoever comes next. Wade slowly. — M.",
     "3": "ARKADIN, LOG 98 (1988). We built this room so we could talk without being heard. Tonight the walls answered in Sergei's voice. Sergei has been dead for a month.",
+    // Kessler's trail: someone hums his four notes from here until you find it.
+    "4": "KESSLER'S TUNE, as near as I can write it: D, F, E, low A. I hum it so it stays out of my head. It doesn't stay out. If you can still hear humming down here, it isn't me any more. — Omurbek, drill crew",
   },
   events: {
     start: [

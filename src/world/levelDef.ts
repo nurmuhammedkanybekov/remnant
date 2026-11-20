@@ -74,6 +74,12 @@ export interface LevelDef {
    * them. Either way the exit opens when every one is done.
    */
   machine?: "generator" | "relay";
+  /**
+   * Kessler's trail: the note (its digit on the map) that someone humming
+   * his four notes leads you to. The tune plays from there, through the
+   * walls, until you find it. See `docs/STORY.md` → Kessler's trail.
+   */
+  hum?: string;
   /** The last level of a part: the exit and the detonator console each end it. */
   finale?: boolean;
   /** Which ending the finale's exit and its detonator console lead to. Default: Part One's ("leave", "seal"). */

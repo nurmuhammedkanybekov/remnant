@@ -29,7 +29,7 @@ export const VILLAGE: LevelDef = {
     "##################################",
     "#S...#.......#.......#.....#.....#",
     "#..a.D...E...D...L...D..N..D..A..#",
-    "#....#.......#.......#.....#.....#",
+    "#....#.......#.B...3.#.....#.....#",
     "##D#####A#########D#####D#####D###",
     "#.....................b..........#",
     "#..L......~~~~~.......N.J...L....#",
@@ -44,9 +44,12 @@ export const VILLAGE: LevelDef = {
     "#.....A......2.........e...#..X..#",
     "##################################",
   ],
+  hum: "3",
   notes: {
     "1": "Garage key is on the hook in the teacher's house, like always. If you're reading this, take the bus and don't stop until Karakol. — Asel",
     "2": "One of them stood in the square and screamed and the rest came from every house at once. Don't let the tall one see you. — (no name)",
+    // Kessler's trail: someone hums his four notes from here until you find it.
+    "3": "Granny has hummed it over the washing ever since the well water came up grey. She says it isn't a song, it's the way home, and soon everyone who knows it will go home together. I don't want to go home. — Aibek, 9",
   },
   events: {
     start: [

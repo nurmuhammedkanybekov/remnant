@@ -24,16 +24,19 @@ export const VENTILATION: LevelDef = {
     "#####.#.###.#.#.####.#.#.+.3#",
     "#.....#.#Y#.#.#....#.#...#A.#",
     "#.#####.#.#.#.####.#.###.####",
-    "#.#.....#...#.b..J.#.#.A.####",
+    "#.#.....#.M5#.b..J.#.#.A.####",
     "#.#.#########.######.#.######",
     "#...V....*.......E.#...X.####",
     "#############################",
   ],
+  hum: "5",
   notes: {
     "1": "Count the turns: left, left, right. If the radio tells you a different way, count again. It walks you past them on purpose.",
     "2": "MAINTENANCE: rivet guns are NOT to be used with the interlock removed. They will fire across a room. — Site Safety",
     "3": "Someone lived in here long before us: a bedroll, tins stamped 1991, a child's drawing of the sun. Under it: 'Day 212. Still me. The doors upstairs won't open for me any more.'",
     "4": "Scratched into the duct: THE VOICE IS NOT THE SUPERVISOR. THE SUPERVISOR DIED ON DAY TWO. I WAS THERE.",
+    // Kessler's trail: someone hums his four notes from here until you find it.
+    "5": "Found Kessler up here on day two, before they strapped him down, scratching the four notes into the duct with a nail, over and over. I asked him where he learned it. He said he didn't learn it. He said he remembered it. — B. Asanov, vent crew",
   },
   events: {
     start: [

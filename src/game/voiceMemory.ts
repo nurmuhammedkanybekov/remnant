@@ -24,17 +24,19 @@ export interface VoiceMemory {
   takedowns: number;
   /** Seconds of play it has listened to. */
   seconds: number;
+  /** Levels where you followed Kessler's tune to his note (the voice heard you listening). */
+  trail: string[];
 }
 
 /** What it's noticed most about how you play, if anything stands out yet. */
 export type Habit = "hider" | "torch" | "dark" | "gun" | "knife";
 
 export function freshVoice(): VoiceMemory {
-  return { told: [], withheld: [], hides: 0, litSeconds: 0, darkSeconds: 0, shots: 0, takedowns: 0, seconds: 0 };
+  return { told: [], withheld: [], hides: 0, litSeconds: 0, darkSeconds: 0, shots: 0, takedowns: 0, seconds: 0, trail: [] };
 }
 
 export function cloneVoice(v: VoiceMemory): VoiceMemory {
-  return { ...v, told: [...v.told], withheld: [...v.withheld] };
+  return { ...v, told: [...v.told], withheld: [...v.withheld], trail: [...v.trail] };
 }
 
 /** It needs this much of you (seconds of play) before it claims to know your habits. */
@@ -84,5 +86,6 @@ export function parseVoice(raw: unknown): VoiceMemory {
   v.shots = num(r.shots);
   v.takedowns = num(r.takedowns);
   v.seconds = Math.max(num(r.seconds), v.litSeconds + v.darkSeconds);
+  v.trail = ids(r.trail);
   return v;
 }

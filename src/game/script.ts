@@ -66,7 +66,9 @@ export type ScriptAction =
    */
   | { type: "ping" }
   /** It tells you what it's noticed about how you play, if anything stands out yet (see `habitOf`). */
-  | { type: "habitLine" };
+  | { type: "habitLine" }
+  /** Kessler's trail: `then` if you've followed his tune to at least `count` of his notes this run. */
+  | { type: "ifTrail"; count: number; then: ScriptAction[]; otherwise: ScriptAction[] };
 
 // Small constructors so level files read like a script.
 export const op = (text: string): RadioLine => ({ speaker: "operator", text });
@@ -97,6 +99,12 @@ export const ifTold = (id: string, then: ScriptAction[], otherwise: ScriptAction
 });
 export const ping = (): ScriptAction => ({ type: "ping" });
 export const habitLine = (): ScriptAction => ({ type: "habitLine" });
+export const ifTrail = (count: number, then: ScriptAction[], otherwise: ScriptAction[] = []): ScriptAction => ({
+  type: "ifTrail",
+  count,
+  then,
+  otherwise,
+});
 export const checkpoint = (): ScriptAction => ({ type: "checkpoint" });
 export const alarm = (radius: number): ScriptAction => ({ type: "alarm", radius });
 export const blackout = (seconds: number): ScriptAction => ({ type: "blackout", seconds });

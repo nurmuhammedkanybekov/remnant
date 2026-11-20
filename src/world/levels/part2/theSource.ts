@@ -1,4 +1,4 @@
-import { checkpoint, hint, nur, objective, op, radio, silence, sound, unknown } from "../../../game/script";
+import { checkpoint, hint, ifTrail, nur, objective, op, radio, silence, sound, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 17 — the Source: the Choir's cavern. The last boss, then leave or bring it all down. */
@@ -62,9 +62,18 @@ export const THE_SOURCE: LevelDef = {
     b: [
       silence(8),
       sound("choir", 19, 12),
-      radio(
-        unknown("...listen to us, Nur. Just listen..."),
-        nur("Kessler's four notes. That's where it started. A man humming in a hospital bed.")
+      radio(unknown("...listen to us, Nur. Just listen...")),
+      // Follow the tune all the way and you know what the photograph meant.
+      ifTrail(
+        4,
+        [
+          radio(
+            nur("Kessler's four notes. I thought that's where it started. A man humming in a hospital bed."),
+            nur("It wasn't him. He was in the photograph in 1987, humming. He didn't teach it the tune."),
+            nur("It taught him. It was always down here, humming. He was just the first one who could hear.")
+          ),
+        ],
+        [radio(nur("Kessler's four notes. That's where it started. A man humming in a hospital bed."))]
       ),
     ],
     c: [radio(nur("There. That's the Source.")), objective("Kill the Choir.")],

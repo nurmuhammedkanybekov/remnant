@@ -3,7 +3,7 @@ import { MusicDirector } from "../audio/music";
 import { SoundManager, type VoicePlayer } from "../audio/soundManager";
 import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyDef, type DifficultyId } from "../content/difficulty";
 import { cloneBindings, DEFAULT_BINDINGS, keyLabel, type Action } from "../core/actions";
-import { ENDINGS, type EndingId, PROLOGUE, PROLOGUE_TWO, TRANSMISSIONS, voiceCoda } from "../content/story";
+import { ENDINGS, type EndingId, PROLOGUE, PROLOGUE_TWO, TRAIL_CODA, TRANSMISSIONS, voiceCoda } from "../content/story";
 import { PAD, padLabel } from "../core/gamepad";
 import { QUALITY, QUALITY_ORDER } from "../core/quality";
 import { QualityGuard } from "../core/qualityGuard";
@@ -942,8 +942,11 @@ export class Game {
           ? []
           : [{ label: `Continue to ${next.title}`, primary: true, detail: next.name, action: () => this.continueToPart(next.first) }];
       // What you told the voice is the last thing the ending says.
-      const coda = voiceCoda(run.voice.told, run.voice.withheld);
-      const shown = coda ? { ...ENDINGS[id], lines: [...ENDINGS[id].lines, coda] } : ENDINGS[id];
+      // And if you followed Kessler's tune all the way, it stays with you.
+      const codas = [voiceCoda(run.voice.told, run.voice.withheld), run.voice.trail.length >= 4 ? TRAIL_CODA : null].filter(
+        (l): l is string => !!l
+      );
+      const shown = codas.length ? { ...ENDINGS[id], lines: [...ENDINGS[id].lines, ...codas] } : ENDINGS[id];
       this.screens.ending(shown, run.stats, run.difficulty.name, [
         ...onward,
         ...(this.isGuest && next ? this.waitForHost() : []),
