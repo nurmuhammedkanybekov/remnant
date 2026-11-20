@@ -1,4 +1,4 @@
-import { checkpoint, hint, nur, objective, op, radio, unknown } from "../../../game/script";
+import { checkpoint, hint, nur, objective, op, radio, silence, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /**
@@ -12,7 +12,9 @@ export const OBSERVATORY: LevelDef = {
   subtitle: "Observatory",
   number: 14,
   tagline: "It was never a control room. It was a transmitter.",
-  objective: "Find the security keycard.",
+  objective: "Cut the Zenit relay: three breaker cabinets.",
+  // The relay is the voice's mouth over the valley: its breakers hum on air until you throw them.
+  machine: "relay",
   spawnYaw: -Math.PI / 2,
   theme: {
     fog: 0x131924,
@@ -33,15 +35,15 @@ export const OBSERVATORY: LevelDef = {
     "#.a..D............D.....K..........#",
     "#....#..W.....1...#.......L........#",
     "##D###############=######=##########",
-    "#.......#.......Y......#...........#",
+    "#.......#.......Y......#..........G#",
     "#..E....D..............D.....N.....#",
     "#.......#.....b........#......A....#",
     "#.L..M..#######.########.....C.C...#",
     "#.......#.....#.#......#......A....#",
     "####=####.....#.#..H...###=#########",
-    "#.....A.#..Q..#.#......#...........#",
+    "#G....A.#..Q..#.#......#...........#",
     "#..A....D.....D.D......D.....W.....#",
-    "#.......#.....#.#.c2...#...........#",
+    "#.......#.....#.#.c2...#..........G#",
     "#...N...###########D#######...L....#",
     "#.......L.................E...*....#",
     "#J.B..............d...........B..X.#",
@@ -58,10 +60,27 @@ export const OBSERVATORY: LevelDef = {
         nur("You were never here. You're in the mountain, talking through that dish."),
         nur("Cut the relay, and the valley stops hearing you.")
       ),
+      hint("The relay's breakers hum while they're on air, and creatures come to the noise. Follow it"),
     ],
-    keycard: [
-      radio(nur("Security card. Now the transmitter room. Then the ridge, and the drainage portal.")),
-      objective("Reach the transmitter room, then the exit."),
+    keycard: [radio(nur("Security card. The doors to the relay rooms.")), checkpoint()],
+    // Each breaker thrown, the voice has less of the valley. It bargains, then it begs.
+    machineDone: [
+      [
+        radio(
+          op("Nur. Leave that alone. Two hundred people in the valley are listening to me tonight. I'm all they have."),
+          nur("You're all they hear. That's not the same.")
+        ),
+        checkpoint(),
+      ],
+      [
+        silence(4),
+        radio(unknown("...please... it's so quiet when you do that... we don't like it quiet..."), op("Nur. Please. Not the last one.")),
+      ],
+    ],
+    power: [
+      silence(6),
+      radio(nur("...Nothing. The whole valley, and nothing on the channel."), nur("Now the ridge, and the drainage portal.")),
+      objective("Out along the ridge to the drainage portal."),
       checkpoint(),
     ],
   },
@@ -73,7 +92,7 @@ export const OBSERVATORY: LevelDef = {
         nur("So that's what you are. A recording that learned to talk."),
         op("I'm everyone who ever spoke on this channel, Nur. Now come down and join them.")
       ),
-      objective("Find the security keycard."),
+      objective("Cut the relay. Three breakers; a security card opens the quickest ways to them."),
     ],
   ],
   triggers: {

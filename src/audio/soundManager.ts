@@ -1048,6 +1048,30 @@ export class SoundManager {
     this.tone(o, "square", 60, 60, t + 1.7, 0.8, 0.12, 0.1);
   }
 
+  /** A relay breaker thrown: a heavy clunk, a spit of sparks, and the carrier dying away in a long falling whine. */
+  playRelayCut(sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 40, 1.2);
+    if (!o) return;
+    this.burst(o, "lowpass", 260, 1, t, 0.25, 0.6, 0.002); // the breaker
+    this.tone(o, "square", 140, 60, t, 0.18, 0.25, 0.002);
+    for (let i = 0; i < 6; i++) this.burst(o, "highpass", 3000 + Math.random() * 3000, 1, t + 0.04 + i * 0.05, 0.03, 0.2, 0.001); // sparks
+    this.tone(o, "sine", 2600, 60, t + 0.1, 2.2, 0.12, 0.05); // the carrier going down
+    this.tone(o, "sawtooth", 100, 30, t + 0.1, 1.8, 0.08, 0.05); // the transformer winding down
+  }
+
+  /** A live relay cabinet: mains buzz, and the carrier whining over it with a crackle of static. */
+  playRelayHum(sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 22, 0.5);
+    if (!o) return;
+    this.tone(o, "square", 100, 100, t, 2.4, 0.035, 0.3);
+    this.tone(o, "sine", 2400 + Math.random() * 60, 2400, t, 2.4, 0.012, 0.4);
+    for (let i = 0; i < 4; i++) this.burst(o, "bandpass", 1800 + Math.random() * 2500, 2, t + Math.random() * 2.2, 0.04, 0.06, 0.002);
+  }
+
   /** One low thrum of a running generator. Called every few seconds per generator. */
   playGeneratorHum(sp: Spatial): void {
     if (!this.ctx) return;

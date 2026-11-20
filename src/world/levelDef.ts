@@ -53,8 +53,14 @@ export interface LevelDef {
     start?: ScriptAction[];
     /** When the keycard is picked up. */
     keycard?: ScriptAction[];
-    /** When the last generator comes online. */
+    /** When the last generator comes online (or the last relay breaker is cut). */
     power?: ScriptAction[];
+    /**
+     * As each one before the last is done: the first list after the first
+     * generator starts (or breaker is cut), the second after the second, and
+     * so on. The last runs `power` instead.
+     */
+    machineDone?: ScriptAction[][];
     /** When the boss reaches phase 2 and phase 3. */
     bossPhase2?: ScriptAction[];
     bossPhase3?: ScriptAction[];
@@ -62,6 +68,12 @@ export interface LevelDef {
     bossDefeated?: ScriptAction[];
   };
   theme?: Partial<LevelTheme>;
+  /**
+   * What the level's `G` tiles are: generators to start (the default), or the
+   * breaker cabinets of a transmitter relay, live and humming until you cut
+   * them. Either way the exit opens when every one is done.
+   */
+  machine?: "generator" | "relay";
   /** The last level of a part: the exit and the detonator console each end it. */
   finale?: boolean;
   /** Which ending the finale's exit and its detonator console lead to. Default: Part One's ("leave", "seal"). */
