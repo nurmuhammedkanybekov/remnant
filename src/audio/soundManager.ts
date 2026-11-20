@@ -719,6 +719,37 @@ export class SoundManager {
     this.burst(o, "bandpass", 650 * pitch, 0.8, t + period * 0.42, period * 0.34, v * 1.15, period * 0.06);
   }
 
+  /** A lamp dying: the relay clunks and the ballast's hum cuts out. */
+  playLampOut(sp: Spatial): void {
+    if (!this.ctx) return;
+    const o = this.out(sp, 30, 0.9);
+    if (!o) return;
+    const t = this.ctx.currentTime;
+    this.burst(o, "bandpass", 900, 3, t, 0.08, 0.5, 0.001);
+    this.tone(o, "sine", 160, 90, t, 0.12, 0.4, 0.001);
+    this.tone(o, "sawtooth", 120, 100, t, 0.18, 0.05, 0.005);
+  }
+
+  /**
+   * A heavy steel door slamming somewhere behind you: the boom, the frame
+   * ringing, the corridor carrying it on.
+   */
+  playSlam(sp: Spatial): void {
+    if (!this.ctx) return;
+    const o = this.out(sp, 60, 1.8);
+    if (!o) return;
+    const t = this.ctx.currentTime;
+    this.burst(o, "lowpass", 220, 1, t, 0.6, 1.0, 0.002);
+    this.tone(o, "sine", 78, 34, t, 0.7, 0.9, 0.002);
+    for (const [f, peak] of [
+      [410, 0.18],
+      [690, 0.12],
+      [1130, 0.07],
+    ] as const)
+      this.tone(o, "triangle", f, f * 0.985, t + 0.01, 1.6, peak, 0.002);
+    this.burst(o, "bandpass", 2600, 2, t + 0.02, 0.25, 0.25, 0.002);
+  }
+
   /** A locker door: a hinge creak and the latch, closing (in) or opening (out). Close by, quiet. */
   playLocker(closing: boolean): void {
     if (!this.ctx) return;

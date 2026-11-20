@@ -23,6 +23,9 @@ interface Lamp {
   broken: boolean;
   /** The cone of light it throws down through the dust. */
   beam: THREE.ShaderMaterial | null;
+  /** A scripted blackout (see `blackout`): out between these times, then it stutters back. */
+  outFrom: number;
+  outTo: number;
 }
 
 /** Lamps within this distance (world units) of a creature stutter. */
@@ -51,6 +54,8 @@ export class LampSystem {
       disturbed: false,
       broken: false,
       beam: fixtures[i] ? beamMaterial(spawn.color, 0) : null,
+      outFrom: Infinity,
+      outTo: -Infinity,
     }));
     for (const l of this.lamps) {
       if (!l.beam) continue;
@@ -73,9 +78,16 @@ export class LampSystem {
    * current. A light going wrong is how you know something is close.
    */
   update(dt: number, player: THREE.Vector3, time: number, creatures: readonly THREE.Vector2[] = []): void {
+    this.clock += dt;
     for (const lamp of this.lamps) {
       if (lamp.broken) continue;
       lamp.timer -= dt;
+      if (this.clock >= lamp.outFrom && this.clock < lamp.outTo + 1.2) {
+        // Blacked out; for a second after, it stutters back on.
+        lamp.brightness = this.clock < lamp.outTo ? 0 : Math.random() < 0.5 ? 0.04 : 0.9;
+        this.paint(lamp);
+        continue;
+      }
       const near = creatures.some((c) => Math.hypot(c.x - lamp.spawn.pos.x, c.y - lamp.spawn.pos.y) < DISTURB_RADIUS);
       if (near) {
         lamp.disturbed = true;
@@ -137,6 +149,32 @@ export class LampSystem {
       const fade = THREE.MathUtils.clamp((MAX_LIGHT_DIST - d) / 6, 0, 1);
       light.intensity = (l.spawn.emergency ? 14 : 18) * l.brightness * fade;
     }
+  }
+
+  private clock = 0;
+
+  /** The lamps (by index) within `radius` of the segment from `a` to `b`, nearest `a` first. */
+  lampsAlong(a: THREE.Vector2, b: THREE.Vector2, radius: number): number[] {
+    const ab = b.clone().sub(a);
+    const len2 = Math.max(1e-6, ab.lengthSq());
+    const out: { i: number; t: number }[] = [];
+    this.lamps.forEach((l, i) => {
+      if (l.broken) return;
+      const p = l.spawn.pos;
+      const t = THREE.MathUtils.clamp(((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / len2, 0, 1);
+      const d = Math.hypot(a.x + ab.x * t - p.x, a.y + ab.y * t - p.y);
+      if (d <= radius) out.push({ i, t });
+    });
+    return out.sort((x, y) => x.t - y.t).map((x) => x.i);
+  }
+
+  /** Puts lamp `index` out `delay` seconds from now, for `seconds`. Returns where it is, or null. */
+  blackout(index: number, delay: number, seconds: number): THREE.Vector2 | null {
+    const l = this.lamps[index];
+    if (!l || l.broken) return null;
+    l.outFrom = this.clock + delay;
+    l.outTo = this.clock + delay + seconds;
+    return l.spawn.pos.clone();
   }
 
   /**

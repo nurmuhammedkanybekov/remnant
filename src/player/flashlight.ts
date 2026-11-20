@@ -16,6 +16,10 @@ export class Flashlight {
   private flickerTimer = 0;
   private flickerValue = 1;
   private sway = new THREE.Vector2();
+  /** A scripted stutter (see `stutter`): seconds left. */
+  private stutterTime = 0;
+  /** Scales the light's intensity to make up for its cookie (which only ever darkens). */
+  cookieGain = 1;
   /** Scales battery drain (difficulty). */
   drainMultiplier = 1;
   onToggle: ((on: boolean) => void) | null = null;
@@ -33,7 +37,7 @@ export class Flashlight {
 
   /** 0..1 — how lit the scene in front of the player is (for dust visibility etc). */
   get level(): number {
-    return this.light.intensity / FULL_INTENSITY;
+    return this.light.intensity / (FULL_INTENSITY * this.cookieGain);
   }
 
   addBattery(amount: number): void {
@@ -81,6 +85,20 @@ export class Flashlight {
         intensity *= this.flickerValue * (0.55 + 0.45 * (this.battery / LOW_BATTERY_THRESHOLD));
       }
     }
-    this.light.intensity = intensity;
+    if (this.stutterTime > 0 && this.on) {
+      this.stutterTime -= dt;
+      this.flickerTimer -= dt;
+      if (this.flickerTimer <= 0) {
+        this.flickerTimer = 0.03 + Math.random() * 0.09;
+        this.flickerValue = Math.random() < 0.55 ? 0.02 : 0.6 + Math.random() * 0.4;
+      }
+      intensity *= this.flickerValue;
+    }
+    this.light.intensity = intensity * this.cookieGain;
+  }
+
+  /** The torch stutters for `seconds`, whatever the battery: a loose contact, or something else. */
+  stutter(seconds: number): void {
+    this.stutterTime = Math.max(this.stutterTime, seconds);
   }
 }
