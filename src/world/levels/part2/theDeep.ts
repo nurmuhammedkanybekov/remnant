@@ -1,4 +1,4 @@
-import { checkpoint, hint, nur, objective, op, radio, unknown } from "../../../game/script";
+import { apparition, blackout, checkpoint, hint, nur, objective, op, radio, sound, torchFails, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 16 — Laboratory Zero, beneath Sublevel 10: Arkadin's first laboratory and the original drill site. Everything the mountain has, and two generators. */
@@ -18,26 +18,27 @@ export const THE_DEEP: LevelDef = {
     lampColor: 0xd8f2ff,
     skyLight: 0x3c5258,
     groundLight: 0x081010,
+    fillIntensity: 1.35,
     walls: "tile",
   },
   map: [
     "############################################",
-    "#S....#..........R.......#.........%.......#",
+    "#S....#.....L....R.......#.......L.%.......#",
     "#..a..D....W.............D....V........B...#",
     "#.....#......~~~~~~......#.........P.......#",
     "###.######...~~~~~~...######.#########.#####",
-    "#.......#....~~~~~~...#....#.#.......#.....#",
+    "#...L...#....~~~~~~...#....#.#.......#.....#",
     "#..G....#......N......#..1.#.#...U...D..H..#",
-    "#.......D.............D....#.#.......#.....#",
+    "#.......D........L....D....#.#.......#.....#",
     "####.####....b.....J..######.####=####.....#",
-    "#.......#.............#......#.......#..A..#",
+    "#...L...#.............#......#...L...#..AL.#",
     "#..P....#######.#######..H...D...K...#.....#",
-    "#.......#.....#.#.....#......#.......###.###",
+    "#.......#.....#.#..L..#......#.......###.###",
     "#...M...D..Q..#.D..2..#####.##########.....#",
-    "#.......#..T..#.#.....#.....c.......W......#",
+    "#.......#..TL.#.#.....#.....c.......W......#",
     "####D#########.#########.....R......#..N...#",
     "#.......R....................~~~~...#......#",
-    "#..%........U.........*......~~~~...D...G..#",
+    "#..%........U.....L...*......~~~~...D...G..#",
     "#.......L.A.....A...........d...A...#..X...#",
     "############################################",
   ],
@@ -62,7 +63,16 @@ export const THE_DEEP: LevelDef = {
   triggers: {
     a: [hint("Every creature the mountain has is down here. Pick your fights, and count your bullets")],
     b: [radio(unknown("...we remember you, Nur. You walked past us in the infirmary. You were so quiet...")), checkpoint()],
-    c: [radio(nur("The drill site. The shaft goes straight down into the dark.")), objective("Start both generators for the cavity lift.")],
+    // The drill site goes dark the moment you reach it. Only the red lamps, the tune coming up the shaft, and someone standing there.
+    c: [
+      radio(nur("The drill site. The shaft goes straight down into the dark.")),
+      blackout(11),
+      torchFails(2),
+      sound("hum", 31, 16),
+      apparition("husk", 28, 15),
+      radio(nur("Kessler's tune. Coming up the shaft.")),
+      objective("Start both generators for the cavity lift."),
+    ],
     d: [radio(op("Lower. Lower. We're singing for you."))],
   },
 };

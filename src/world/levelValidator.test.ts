@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LevelDef } from "./levelDef";
 import { parseLevel } from "./levelParser";
 import { validateLevel } from "./levelValidator";
+import { apparition, sound } from "../game/script";
 
 const check = (map: string[], extra: Partial<LevelDef> = {}) =>
   validateLevel(
@@ -50,5 +51,12 @@ describe("validateLevel", () => {
 
   it("the finale needs a detonator", () => {
     expect(check(["######", "#S..X#", "######"], { finale: true }).join()).toMatch(/needs a detonator console/);
+  });
+
+  it("places script sounds on the map and figures on floor you can reach", () => {
+    const map = ["#######", "#S...X#", "#######"];
+    expect(check(map, { events: { start: [sound("knock", 0, 1), apparition("husk", 4, 1)] } })).toEqual([]);
+    expect(check(map, { events: { start: [sound("knock", 9, 1)] } }).join()).toMatch(/sound at 9,1 is off the map/);
+    expect(check(map, { triggers: {}, events: { start: [apparition("husk", 0, 1)] } }).join()).toMatch(/apparition at 0,1 is not on floor/);
   });
 });

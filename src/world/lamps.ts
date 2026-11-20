@@ -23,9 +23,9 @@ interface Lamp {
   broken: boolean;
   /** The cone of light it throws down through the dust. */
   beam: THREE.ShaderMaterial | null;
-  /** A scripted blackout (see `blackout`): out between these times, then it stutters back. */
-  outFrom: number;
-  outTo: number;
+  /** A scripted blackout: dark from `outAt` until `backAt` (session time). */
+  outAt: number;
+  backAt: number;
 }
 
 /** Lamps within this distance (world units) of a creature stutter. */
@@ -58,8 +58,8 @@ export class LampSystem {
       disturbed: false,
       broken: false,
       beam: fixtures[i] ? beamMaterial(spawn.color, 0) : null,
-      outFrom: Infinity,
-      outTo: -Infinity,
+      outAt: Infinity,
+      backAt: -Infinity,
     }));
     for (const l of this.lamps) {
       if (!l.beam) continue;
@@ -82,13 +82,20 @@ export class LampSystem {
    * current. A light going wrong is how you know something is close.
    */
   update(dt: number, player: THREE.Vector3, time: number, creatures: readonly THREE.Vector2[] = []): void {
-    this.clock += dt;
+    this.now = time;
     for (const lamp of this.lamps) {
       if (lamp.broken) continue;
       lamp.timer -= dt;
-      if (this.clock >= lamp.outFrom && this.clock < lamp.outTo + 1.2) {
-        // Blacked out; for a second after, it stutters back on.
-        lamp.brightness = this.clock < lamp.outTo ? 0 : Math.random() < 0.5 ? 0.04 : 0.9;
+      if (time >= lamp.outAt && time < lamp.backAt + 0.5) {
+        // Blacked out: a last stutter as it goes, dark, then a stutter as it catches again.
+        const going = time - lamp.outAt < 0.3;
+        const coming = time >= lamp.backAt;
+        if (going || coming) {
+          if (lamp.timer <= 0) {
+            lamp.timer = 0.03 + Math.random() * 0.07;
+            lamp.brightness = Math.random() < 0.45 ? 0.3 + Math.random() * 0.7 : 0.02;
+          }
+        } else lamp.brightness = 0;
         this.paint(lamp);
         continue;
       }
@@ -155,7 +162,8 @@ export class LampSystem {
     }
   }
 
-  private clock = 0;
+  /** The session time as of the last `update` (blackouts are timed in it). */
+  private now = 0;
 
   /**
    * How much lamp light falls where you stand (0 = none, 1 = right under a
@@ -187,12 +195,17 @@ export class LampSystem {
     return out.sort((x, y) => x.t - y.t).map((x) => x.i);
   }
 
-  /** Puts lamp `index` out `delay` seconds from now, for `seconds`. Returns where it is, or null. */
-  blackout(index: number, delay: number, seconds: number): THREE.Vector2 | null {
+  /**
+   * Puts one lamp out `delay` seconds from now, for `seconds` (a scare: see
+   * `world/scares.ts`), stuttering as it goes and as it comes back. Returns
+   * where it is, or null if it's already shot out.
+   */
+  blackoutLamp(index: number, delay: number, seconds: number): THREE.Vector2 | null {
     const l = this.lamps[index];
     if (!l || l.broken) return null;
-    l.outFrom = this.clock + delay;
-    l.outTo = this.clock + delay + seconds;
+    l.outAt = this.now + delay;
+    l.backAt = l.outAt + seconds;
+    l.timer = 0;
     return l.spawn.pos.clone();
   }
 
@@ -215,6 +228,24 @@ export class LampSystem {
       if (distance <= maxDist && (!best || distance < best.distance)) best = { index, point: hit.clone(), distance };
     });
     return best;
+  }
+
+  /**
+   * The power fails. The lamps go out in a wave that starts at the far end
+   * of the level and arrives at `origin` (the player) last, about a second
+   * and a half later, as if the dark were coming towards you. They come back
+   * after `seconds`, nearest first. Emergency lamps run on their own
+   * batteries and stay on: in a blackout they're all the light there is.
+   */
+  blackout(time: number, seconds: number, origin: THREE.Vector2): void {
+    const reach = Math.max(1, ...this.lamps.map((l) => Math.hypot(l.spawn.pos.x - origin.x, l.spawn.pos.y - origin.y)));
+    for (const l of this.lamps) {
+      if (l.spawn.emergency) continue;
+      const d = Math.hypot(l.spawn.pos.x - origin.x, l.spawn.pos.y - origin.y);
+      l.outAt = time + (1 - d / reach) * 1.5;
+      l.backAt = time + 1.5 + seconds + (d / reach) * 1.2;
+      l.timer = 0;
+    }
   }
 
   /** Shoots a lamp out: the tube goes dark for the rest of the level. Returns where it was, or null if it already was. */

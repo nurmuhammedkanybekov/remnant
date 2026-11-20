@@ -22,6 +22,8 @@ export class Flashlight {
   cookieGain = 1;
   /** Scales battery drain (difficulty). */
   drainMultiplier = 1;
+  /** Seconds of interference left: something near is doing something to the current. */
+  private interference = 0;
   onToggle: ((on: boolean) => void) | null = null;
 
   constructor(camera: THREE.Camera) {
@@ -38,6 +40,15 @@ export class Flashlight {
   /** 0..1 — how lit the scene in front of the player is (for dust visibility etc). */
   get level(): number {
     return this.light.intensity / (FULL_INTENSITY * this.cookieGain);
+  }
+
+  /**
+   * The torch stutters and dies for `seconds`, whatever its battery, then
+   * comes back on its own. Not a fault the player can fix: it's the Remnant.
+   */
+  interfere(seconds: number): void {
+    this.interference = Math.max(this.interference, seconds);
+    this.flickerTimer = 0;
   }
 
   addBattery(amount: number): void {
@@ -91,6 +102,16 @@ export class Flashlight {
       if (this.flickerTimer <= 0) {
         this.flickerTimer = 0.03 + Math.random() * 0.09;
         this.flickerValue = Math.random() < 0.55 ? 0.02 : 0.6 + Math.random() * 0.4;
+      }
+      intensity *= this.flickerValue;
+    }
+    if (this.interference > 0) {
+      this.interference = Math.max(0, this.interference - dt);
+      this.flickerTimer -= dt;
+      if (this.flickerTimer <= 0) {
+        // Mostly out, with a few desperate stutters, and at the very end it catches.
+        this.flickerTimer = 0.03 + Math.random() * 0.18;
+        this.flickerValue = this.interference < 0.25 ? 1 : Math.random() < 0.18 ? 0.2 + Math.random() * 0.6 : 0;
       }
       intensity *= this.flickerValue;
     }

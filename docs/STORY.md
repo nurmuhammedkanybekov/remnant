@@ -131,6 +131,24 @@ scenes the notes never mention. Built in `world/storyScenes.ts`.
 | 9 The Hive         | Three of the crew grown into the wall, boots still on. Mara's jacket half taken in, and a radio grown into the wall beside it. Her pack and the photograph of the valley.                                                                                                         |
 | 10 Surface         | The roster in the hatch: forty-one names, forty crossed out. Arkadin's charges up the shaft wall, linked by det cord.                                                                                                                                                             |
 
+## The moments
+
+A handful of scripted moments, one per level at most, each on a story beat
+and each doing a different job. None of them is a jump scare with nothing
+behind it. They share one thread: **Kessler's four notes**, the tune the
+drill crew hummed before they changed, which is heard four times and only
+named at the end.
+
+| Level              | Moment                                                                                                                                                                                                        | What it does                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 1 Infirmary        | Somewhere east, through the walls, someone is humming four notes. A minute later you meet Kessler, and his chart says he hums the same four notes all night.                                                  | Foreshadowing. Plants the motif before it means anything.                          |
+| 5 Containment      | "Something big in here. Breathing slow." The power dies in a wave that reaches you last, your torch fails, the world goes silent, and something breathes right behind you. Only the red emergency lamps stay. | Teaches what this level is about: light is everything, and it can be taken away.   |
+| 9 The Hive         | "We are in every room." The tune again, from inside the walls.                                                                                                                                                | The motif returns, now from the Remnant itself.                                    |
+| 10 Surface         | You step out under the stars and everything stops: no drone, no machines, no wind. Then, near the road, three knocks on the inside of the blast door behind you.                                              | Relief, then doubt. The choice (walk down or go back past that door) gets heavier. |
+| 12 The Village     | The people of Ak-Suu stand in the snow with their backs to you. Put your light on them and they're gone. A real Howler is in the same street.                                                                 | Shows what happened to the village without a word. You can't trust your eyes.      |
+| 16 Laboratory Zero | The drill site blacks out the moment you reach it. Red lamps only, the tune coming up the shaft, and someone pale standing by the water.                                                                      | Escalation before the end; the motif is now coming from below.                     |
+| 17 The Source      | Silence, then every voice it ever took sings the four notes as a choir, and Nur finally names them: "That's where it started. A man humming in a hospital bed."                                               | Closes the loop the first level opened.                                            |
+
 ## Weapons
 
 | Weapon        | Where                  | Notes                                                                                                                                                  |
