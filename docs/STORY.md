@@ -250,3 +250,49 @@ and in spring the meltwater runs clear.
 - The facility is Soviet-era concrete refitted with modern consortium
   equipment: Cyrillic stencils next to corporate safety signs.
 - Horror comes from sound and scarcity, not gore.
+
+---
+
+## The voice asks
+
+Mara's first note says: never tell the radio anything about yourself. Three
+times, the voice asks anyway, and you can answer (push to talk) or not.
+
+| Where              | It asks                   | Answer, and it helps       | What it does with it later                                                                    |
+| ------------------ | ------------------------- | -------------------------- | --------------------------------------------------------------------------------------------- |
+| 2 Maintenance Wing | "Are you alone?"          | The stairwell calls to you | In the vents: "Nobody else is coming. You told me so yourself." In the valley: you still are. |
+| 3 Cold Storage     | "What are you afraid of?" | The keycard calls to you   | The containment blackout takes your torch twice as long: "You said the dark."                 |
+| 11 Clinic          | "Where are you going?"    | The way out calls to you   | At the dam, they're waiting for you, and they come for you from the start.                    |
+
+Every ending's last line says how much you gave it. It also listens to how
+you play (see `DIRECTION.md`), and at the pumping station, the armory, the
+village and Laboratory Zero it tells you what it has noticed.
+
+## Kessler's trail
+
+Kessler's four notes, hummed by one man somewhere behind the walls, in four
+places. Follow the sound and you find what someone who heard it left
+behind, and a few supplies.
+
+| Where             | Who                  | What it says                                                                                    |
+| ----------------- | -------------------- | ----------------------------------------------------------------------------------------------- |
+| 4 Pumping Station | Omurbek, drill crew  | He wrote the tune down to keep it out of his head. If you can still hear humming, it isn't him. |
+| 6 Ventilation     | B. Asanov, vent crew | Kessler scratching the notes into the duct: he didn't learn it, he _remembered_ it.             |
+| 12 The Village    | Aibek, 9             | Granny hums it over the washing: it's the way home, and soon everyone who knows it will go.     |
+| 15 Rail Tunnel    | (a photograph)       | The 1987 survey crew at the cavity wall. Kessler is in it, not a day younger, humming.          |
+
+The last one turns the story: the tune didn't start with a man in a hospital
+bed. It was always down there; Kessler was only the first who could hear
+it. Follow all four and Nur says so at the Source, and the ending keeps the
+tune with you.
+
+## Part Two, filled in
+
+Each Part Two level now has three or four notes (Part One has three to
+five), and the clinic, the dam and the drainage line each have a moment of
+their own: the waiting-room radio switching itself on in the silence; three
+figures standing in the reservoir under the shore lamp, gone when your torch
+finds them; footsteps keeping pace behind you on the rails, then your light
+going. New notes: the clinic's duty log, the dam's gate log, the
+observatory cook's night shift, Arkadin's second log (the first time it
+answered), and Mara's last note at the Source.

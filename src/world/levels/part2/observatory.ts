@@ -43,7 +43,7 @@ export const OBSERVATORY: LevelDef = {
     "####=####.....#.#..H...###=#########",
     "#G....A.#..Q..#.#......#...........#",
     "#..A....D.....D.D......D.....W.....#",
-    "#.......#.....#.#.c2...#..........G#",
+    "#.......#...3.#.#.c2...#..........G#",
     "#...N...###########D#######...L....#",
     "#.......L.................E...*....#",
     "#J.B..............d...........B..X.#",
@@ -52,6 +52,7 @@ export const OBSERVATORY: LevelDef = {
   notes: {
     "1": "ARKADIN, LOG 201. The Zenit relay is repaired. It hears the cavity perfectly now. The cavity, I think, hears us too. Voices on channel 9 that none of us recorded.",
     "2": "ARKADIN, LOG 214. It learned to speak by listening to the radio. The first word it said was the operator's call sign. Then it asked for us by name.",
+    "3": "Night shift, 1991. The boys kept the headphones on after their shift was over. On the last night all four of them sat up there with the headphones on, and none of them came down for breakfast. I left the tray outside the door. — V. Ormonova, cook",
   },
   events: {
     start: [

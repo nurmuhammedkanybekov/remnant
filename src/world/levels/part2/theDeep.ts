@@ -45,7 +45,7 @@ export const THE_DEEP: LevelDef = {
     "#.......D........L....D....#.#.......#.....#",
     "####.####....b.....J..######.####=####.....#",
     "#...L...#.............#......#...L...#..AL.#",
-    "#..P....#######.#######..H...D...K...#.....#",
+    "#..P..3.#######.#######..H...D...K...#.....#",
     "#.......#.....#.#..L..#......#.......###.###",
     "#...M...D..Q..#.D..2..#####.##########.....#",
     "#.......#..TL.#.#.....#.....c.......W......#",
@@ -58,6 +58,7 @@ export const THE_DEEP: LevelDef = {
   notes: {
     "1": "ARKADIN, LOG 1. Drill head at 2,610 metres broke into a void. Warm air. A sound like many people breathing in at once. We have named it the Remnant, for what it has left of the rock.",
     "2": "ARKADIN, LAST LOG. It isn't one thing. It's a choir. Every mind it takes adds a voice. I have asked to be added. I would like to hear the whole song.",
+    "3": "ARKADIN, LOG 2. It answered. Not in words: every needle on the panel moved together, four times, and was still. We have agreed not to write down what we said to it first.",
   },
   events: {
     start: [

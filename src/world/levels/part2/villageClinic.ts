@@ -1,4 +1,4 @@
-import { ask, checkpoint, hint, ifTold, nur, objective, op, ping, radio, unknown } from "../../../game/script";
+import { ask, checkpoint, hint, ifTold, nur, objective, op, ping, radio, silence, sound, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 11 — Part Two begins. The clinic at Ak-Suu, three weeks later. The valley is infected. */
@@ -33,13 +33,14 @@ export const VILLAGE_CLINIC: LevelDef = {
     "###D########.#######D#######",
     "#......#.....E.....#.......#",
     "#..A...D.....U.....#...M...#",
-    "#......#...........D.......#",
+    "#......#........3..D.......#",
     "#..2...#.c...LA....#..A..X.#",
     "############################",
   ],
   notes: {
     "1": "Patient in bed 3 (the engineer from the mountain) woke twice in the night and asked us to turn the radio off. There is no radio in bed 3's room. — Dr. Sadykova",
     "2": "Nur — the well water came up grey this morning. Everyone who drank it went quiet and walked toward the dam. Don't drink anything. I'm going after my son. — Sadykova",
+    "3": "DUTY LOG, AK-SUU CLINIC. 02:10, the radio in the waiting room switched itself on. 02:40, every patient on the ward was awake and listening. 03:15, they asked me to turn it up. I did. I don't remember the rest of the night. — Nurse Ainura",
   },
   events: {
     start: [
@@ -69,6 +70,9 @@ export const VILLAGE_CLINIC: LevelDef = {
         op("The village is empty because they're all at the dam. They were thirsty. Come and see."),
         nur("I'm not going anywhere you want me to go.")
       ),
+      // The waiting-room radio: off at the wall, and it comes on anyway.
+      silence(5),
+      sound("radio", 15, 10),
       objective("Get out of the clinic and into the village."),
     ],
     c: [radio(nur("They're from the village. I knew her. She sold bread by the bus stop.")), checkpoint()],

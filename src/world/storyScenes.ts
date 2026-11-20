@@ -89,7 +89,9 @@ export type SceneKind =
   | "underTheTune"
   | "ductNail"
   | "washing"
-  | "surveyPhoto";
+  | "surveyPhoto"
+  // The Source
+  | "maraLast";
 
 export interface ScenePlacement {
   kind: SceneKind;
@@ -164,6 +166,7 @@ export const STORY_SCENES: Record<string, Anchor[]> = {
   "ak-suu-clinic": [
     { note: "1", kind: "bed3" },
     { note: "2", kind: "greyWater" },
+    { note: "3", kind: "listening" },
   ],
   "ak-suu-village": [
     { note: "1", kind: "keyHooks" },
@@ -173,10 +176,12 @@ export const STORY_SCENES: Record<string, Anchor[]> = {
   "kara-suu-dam": [
     { note: "1", kind: "shiftLog" },
     { note: "2", kind: "reservoirWatch" },
+    { note: "3", kind: "stash" },
   ],
   "kosh-tash-observatory": [
     { note: "1", kind: "channel9" },
     { note: "2", kind: "callSign" },
+    { note: "3", kind: "radioTable" },
   ],
   "drainage-line": [
     { note: "1", kind: "deadCart" },
@@ -186,8 +191,12 @@ export const STORY_SCENES: Record<string, Anchor[]> = {
   "beneath-ten": [
     { note: "1", kind: "drillHead" },
     { note: "2", kind: "addMe" },
+    { note: "3", kind: "sampleCrates" },
   ],
-  "the-cavity": [{ note: "1", kind: "lastWiring" }],
+  "the-cavity": [
+    { note: "1", kind: "lastWiring" },
+    { note: "2", kind: "maraLast" },
+  ],
 };
 
 const SIDES = [
@@ -893,6 +902,23 @@ export function buildScene(p: Parts, kind: SceneKind, rand: () => number): void 
       p.box("wood", 1.4, 0.9, 0.04, 0.2, 1.55, WALL - 0.02);
       p.plane("story:photoCrew", 0.62, 0.36, 0.25, 1.6, WALL - 0.05);
       wallText(p, "workOrder", 0.38, 0.5, -0.3, 1.55, 0.06, WALL - 0.05);
+      break;
+    case "maraLast":
+      // Where Mara stopped: her pack set down neatly, her torch on the rock still switched on, pointing at the wall.
+      p.box("tarp", 0.5, 0.55, 0.3, -0.7, 0.28, 1.6, 0, 0, 0.1).box("darkMetal", 0.42, 0.1, 0.32, -0.7, 0.6, 1.6);
+      p.cyl("darkMetal", 0.035, 0.22, 0.6, 0.04, 1.4, Math.PI / 2, 0, 8, 0.5).cyl(
+        "panelLight",
+        0.03,
+        0.01,
+        0.68,
+        0.04,
+        1.47,
+        Math.PI / 2,
+        0,
+        8,
+        0.5
+      );
+      p.box("cloth", 0.5, 0.06, 0.4, 0.1, 0.03, 1.7, 0, 0, -0.3);
       break;
     case "sonFound":
       // Where Sadykova stopped: her coat folded on a crate, her bag beside it, and her son's knitted hat on top.

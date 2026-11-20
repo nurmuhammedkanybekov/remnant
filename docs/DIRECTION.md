@@ -84,8 +84,8 @@ aside.
 | The voice can be silenced: Kosh-Tash's relay (idea 3)               | Implemented, play-tested |
 | The voice asks: answer or stay silent (idea 1)                      | Implemented, play-tested |
 | The voice listens: habits remembered and used (idea 2)              | Implemented, play-tested |
-| Kessler's tune leads somewhere (idea 4)                             | Proposed                 |
-| Part Two: notes and moments brought up to Part One's (finding 4, 5) | Proposed                 |
+| Kessler's tune leads somewhere (idea 4)                             | Implemented, play-tested |
+| Part Two: notes and moments brought up to Part One's (finding 4, 5) | Implemented, play-tested |
 
 ## 6. How the voice works now
 

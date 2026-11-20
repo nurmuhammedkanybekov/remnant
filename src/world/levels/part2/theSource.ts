@@ -27,7 +27,7 @@ export const THE_SOURCE: LevelDef = {
     "########################################",
     "#S....#.....R........#.......R.........#",
     "#..a..D.....L.A..N...D...............B.#",
-    "#.....#...W..........#....H......M.....#",
+    "#.....#...W..........#....H......M..2..#",
     "###.#######.######.######.##############",
     "#.....R......#....b....#......R........#",
     "#..A......L..D.........D......L..N.....#",
@@ -45,6 +45,7 @@ export const THE_SOURCE: LevelDef = {
   ],
   notes: {
     "1": "The Soviet charges are still wired to the cavity walls. The console by the lift triggers all of them. Whoever presses it will not have time to leave. — B. Toktogulov",
+    "2": "Nur — I came down to see where it began. It isn't angry. It's lonely, and it's so old, and everything it ever heard is still in here, talking all at once. Don't come after me. Don't answer it. — Mara",
   },
   events: {
     start: [radio(op("You came. You really came."), nur("I came to finish it."))],
