@@ -230,15 +230,25 @@ or the exit.
   are drawn from the faces turned towards the light, so walking into a prop
   (they don't block you) doesn't snuff your light out.
 - **Post-processing** (`engine.ts`): world pass → ambient occlusion (GTAO,
-  High only: corners and contact darken) → viewmodel pass (depth cleared, so
+  High only: corners and contact darken) → bloom (Medium and High: a soft
+  halo on lamps, exit signs and eyes, threshold high enough that walls never
+  glow) → viewmodel pass (depth cleared, so
   the gun never clips into walls) → output pass → a custom shader: a grade
   (colour drained, blacks crushed, shadows cold and green, highlights a dirty
   warm), film grain, vignette, chromatic aberration that spikes when you're
   hit, red-tinted desaturation as health drops below 40%, and cinema bars
   behind the menu.
 - **Light budget is fixed** so shaders never recompile mid-level: 1 hemisphere
-  fill, 6 pooled lamp lights, 1 exit light, the flashlight, and a muzzle-flash
-  light that is always present (intensity 0 when idle).
+  fill, 6 pooled lamp lights, 1 exit light, the flashlight, a muzzle-flash
+  light and a bounce light, the last two always present (intensity 0 when idle).
+- **The torch beam** is shaped by a light cookie (`flashlightCookie` in
+  `fx/textures.ts`, the spotlight's `.map`): a hot spot, the reflector's
+  rings, a soft spill and a couple of lens smudges, instead of a flat disc.
+  The cookie only darkens, so the light runs at 1.7× to make up for it.
+- **Bounce light** (fake one-bounce GI): each frame a ray goes down the beam;
+  where it hits, a dim neutral point light sits just off the surface, so a
+  wall you light lifts the room around it out of the black. Stronger the
+  closer the wall, off with the torch.
 - **Textures** are built once on a canvas (`fx/textures.ts`). The surfaces
   — walls, floor, ceiling, crates, barrels, door plate and hazard paint —
   start from CC0 photo-scanned materials in `public/textures/` (colour,
@@ -481,6 +491,26 @@ actions: `radio` (subtitled lines from the Operator, Nur or an unknown
 voice), `objective`, `hint` (with `{action}` placeholders replaced by the
 player's current key binding), `checkpoint` and `alarm`. The radio plays one
 line at a time on the simulation clock, so pausing pauses the conversation.
+
+### Scares (`world/scares.ts`)
+
+Each level gets up to three scripted one-off scares, planned from a seed of
+the level id (the same places every attempt), at least a fifth of the way
+along the route and five cells apart. None of them can hurt you.
+
+| Kind        | Needs                               | What happens                                                             |
+| ----------- | ----------------------------------- | ------------------------------------------------------------------------ |
+| `lightsOut` | a straight run with 2+ lamps ahead  | the lamps go out one by one towards you, relay clunks, then stutter back |
+| `glimpse`   | 4+ cells of straight corridor ahead | a figure stands 5–7.5 m down it in your beam; the torch stutters; gone   |
+| `slam`      | anywhere                            | a steel door slams behind you, the camera shakes, grit falls             |
+| `runner`    | a wall beside you with floor beyond | bare feet run past on the other side of the wall, muffled                |
+| `whisper`   | anywhere (waits for a quiet radio)  | an unknown voice on your radio says your character's name                |
+
+`LevelSession.updateScares` fires one when you come within 0.6 cells of it,
+facing along it for a glimpse, and only while nothing is hunting you
+(threat under 0.6): a scare on top of a real fight is just noise. They are
+spaced by a rest timer (25 s before the first, 40 s between). Delayed parts
+(footsteps, lamps) run on the game clock, so pausing pauses them.
 
 ### Collision & raycasts (`world/grid.ts`)
 

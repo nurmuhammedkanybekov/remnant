@@ -4,6 +4,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import type { QualityPreset } from "./quality";
 
 /**
@@ -104,6 +105,8 @@ export class Engine {
   readonly renderer: THREE.WebGLRenderer;
   private readonly composer: EffectComposer;
   private readonly post: ShaderPass;
+  /** The first-person weapon's pass (effects on the world go before it). */
+  private viewPass!: RenderPass;
 
   constructor(container: HTMLElement) {
     this.scene = new THREE.Scene();
@@ -133,6 +136,7 @@ export class Engine {
     vm.clear = false;
     vm.clearDepth = true;
     this.composer.addPass(vm);
+    this.viewPass = vm;
     this.composer.addPass(new OutputPass());
     this.post = new ShaderPass(PostShader);
     this.composer.addPass(this.post);
@@ -187,7 +191,20 @@ export class Engine {
       this.ao.dispose();
       this.ao = null;
     }
+    // Bloom on the world only (before the gun is drawn over it), on the scene's
+    // linear light, so only what's really bright glows: lamps, the exit sign,
+    // a muzzle flash, the hot spot of your own beam on a near wall.
+    if (q.bloom && !this.bloom) {
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.45, 0.55, 0.92);
+      this.composer.insertPass(this.bloom, this.composer.passes.indexOf(this.viewPass));
+    } else if (!q.bloom && this.bloom) {
+      this.composer.removePass(this.bloom);
+      this.bloom.dispose();
+      this.bloom = null;
+    }
   }
+
+  private bloom: UnrealBloomPass | null = null;
 
   /** Flashlight shadow map size for the current quality (0: none). */
   shadowSize = 0;

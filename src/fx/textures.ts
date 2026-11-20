@@ -1223,6 +1223,48 @@ export function fleshTexture(): THREE.CanvasTexture {
 }
 
 let cache: ReturnType<typeof buildAll> | null = null;
+/**
+ * What a real torch throws on a wall: a hot centre, the reflector's rings
+ * round it (a bright one at the edge of the hot spot, fainter ones beyond),
+ * a soft spill, a smudge of dirt on the lens. Used as the flashlight's light
+ * cookie, so the beam stops being a clean disc.
+ */
+export function flashlightCookie(): THREE.CanvasTexture {
+  const tex = canvasTexture(256, 256, 21, (ctx, w, h, rand) => {
+    const img = ctx.createImageData(w, h);
+    const cx = w / 2 + 3;
+    const cy = h / 2 - 2;
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const r = Math.hypot(x - cx, y - cy) / (w / 2);
+        const a = Math.atan2(y - cy, x - cx);
+        // Hot spot, its bright rim, the reflector rings, then the spill dying out.
+        let v = 0.3 + 0.42 * Math.exp(-r * r * 3.2); // spill, brighter towards the middle
+        v += 0.3 * Math.exp(-(r * r) / 0.02); // hot spot
+        v += 0.2 * Math.exp(-((r - 0.22) ** 2) / 0.0009); // its bright rim
+        v += 0.08 * Math.exp(-((r - 0.33) ** 2) / 0.0014) - 0.06 * Math.exp(-((r - 0.25) ** 2) / 0.002); // rings
+        v *= 1 + 0.05 * Math.sin(a * 7 + r * 9); // the reflector isn't perfect
+        v *= THREE.MathUtils.smoothstep(1.0, 0.72, r);
+        const i = (y * w + x) * 4;
+        const c = Math.min(255, v * 255);
+        img.data[i] = c;
+        img.data[i + 1] = c * 0.985;
+        img.data[i + 2] = c * 0.94;
+        img.data[i + 3] = 255;
+      }
+    ctx.putImageData(img, 0, 0);
+    // A smudge on the lens.
+    for (let k = 0; k < 3; k++) {
+      const g = ctx.createRadialGradient(cx + (rand() - 0.5) * 70, cy + (rand() - 0.5) * 70, 0, cx, cy, 30 + rand() * 30);
+      g.addColorStop(0, "rgba(0,0,0,0.12)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+  });
+  return tex;
+}
+
 function buildAll() {
   return {
     wall: wallSurface(),
@@ -1238,6 +1280,7 @@ function buildAll() {
     skin: skinNormal(),
     exitSign: exitSignTexture(),
     glow: glowTexture(),
+    flashlightCookie: flashlightCookie(),
     flash: flashTexture(),
     bulletHole: bulletHoleTexture(),
     bloodSplat: bloodSplatTexture(),

@@ -23,8 +23,13 @@ import { DRY, NOISE_RADIUS, PlayerController, WATER } from "../player/playerCont
 import type { Hud } from "../ui/hud";
 import { Weapon } from "../weapons/weapon";
 import type { Viewmodel } from "../weapons/viewmodel";
-import { circleHitsWall, hasLineOfSight, isSolid, randomFloorNear, raycastWorld, worldToCell } from "../world/grid";
+import { CELL_SIZE, WALL_HEIGHT, circleHitsWall, hasLineOfSight, isSolid, randomFloorNear, raycastWorld, worldToCell } from "../world/grid";
 import { planDressing } from "../world/dressing";
+import { planScares, type ScarePlacement } from "../world/scares";
+import { buildBody, type CreatureBody } from "../enemies/bodies";
+import { currentCharacter } from "../content/characters";
+import { enemyDef } from "../content/enemies";
+import { textures } from "../fx/textures";
 import { castShadows, spotShadows } from "../core/shadows";
 import { CheckpointMarker, DetonatorConsole, Door, Generator, Intercom, type Interactable } from "../world/interactables";
 import { LampSystem } from "../world/lamps";
@@ -50,6 +55,15 @@ interface HideSpot {
 
 /** How far away a creature's footsteps can be heard (world units). */
 /** Levels whose hum is machinery (the rest rumble). */
+/** Bounce light (see `updateBounce`): how far it reaches, how far the beam is followed, how bright at a metre or two. */
+/** No scripted scare in the first this-many seconds of a level, nor within this long of another. */
+const SCARE_FIRST_REST = 25;
+const SCARE_REST = 40;
+const BOUNCE_RANGE = 7;
+const BOUNCE_REACH = 20;
+const BOUNCE_STRENGTH = 9;
+const bounceFrom = new THREE.Vector3();
+const bounceTo = new THREE.Vector3();
 const MACHINE_HUM = new Set(["ventilation", "power-plant", "lift-shaft"]);
 const STEP_HEAR_RANGE = 22;
 /** How far the room probe looks in each direction. */
@@ -189,6 +203,15 @@ export class LevelSession {
 
   private readonly lamps: LampSystem;
   private readonly effects: Effects;
+  /** Scripted scares still to come on this level (see `world/scares.ts`), and the time until another may fire. */
+  private readonly scares: ScarePlacement[];
+  private scareRest = SCARE_FIRST_REST;
+  /** A figure that is never really there (the glimpse), and what it's doing. */
+  private readonly phantom: CreatureBody;
+  private phantomShow = 0;
+  private phantomGone = false;
+  /** Things due a little later in game time (see `later`). */
+  private readonly delayed: { at: number; fn: () => void }[] = [];
   private readonly pickups: Pickup[];
   private readonly doors: Door[];
   private readonly generators: Generator[];
@@ -202,6 +225,8 @@ export class LevelSession {
   private readonly waterCells = new Set<number>();
   private readonly radio: RadioChannel;
   private readonly muzzleLight: THREE.PointLight;
+  /** The flashlight's light coming back off the surface it's on (always present: a light added mid-level would stutter). */
+  private readonly bounce: THREE.PointLight;
   private readonly projectiles: Projectiles;
   private readonly boss: RemnantBoss | null;
   private objective: string;
@@ -408,6 +433,17 @@ export class LevelSession {
     this.muzzleLight.position.set(0.2, -0.1, -0.6);
     camera.add(this.muzzleLight);
 
+    // The torch, like a real one: a lit spot with rings and spill, and the
+    // light it throws back off whatever it's pointed at, so a corridor fills
+    // dimly around the beam instead of staying black (see `updateBounce`).
+    this.player.flashlight.light.map = textures().flashlightCookie;
+    this.player.flashlight.cookieGain = 1.7;
+    // The cookie draws the beam's edge itself: a wider cone, a harder penumbra.
+    this.player.flashlight.light.angle = Math.PI / 5.2;
+    this.player.flashlight.light.penumbra = 0.28;
+    this.bounce = new THREE.PointLight(0xd6d0c4, 0, BOUNCE_RANGE, 1.8);
+    scene.add(this.bounce);
+
     hud.setMagSize(this.weapon.config.magSize);
     hud.setHealKey(services.keyFor("heal"));
     this.refreshWeaponStrip();
@@ -423,6 +459,12 @@ export class LevelSession {
 
     // Shadows: the flashlight throws them, and everything solid casts and catches them.
     spotShadows(this.player.flashlight.light, this.services.engine.shadowSize);
+    // The level's scripted scares, and the figure one of them shows you.
+    this.scares = planScares(this.level);
+    this.phantom = buildBody(enemyDef("husk"));
+    this.phantom.group.visible = false;
+    scene.add(this.phantom.group);
+
     castShadows(this.services.engine.scene);
   }
 
@@ -531,6 +573,8 @@ export class LevelSession {
 
     this.muzzleTime -= dt;
     this.muzzleLight.intensity = this.muzzleTime > 0 ? 40 : 0;
+    this.updateBounce();
+    this.updateScares(dt);
     viewmodel.update(
       dt,
       this.player.lookDelta.x,
@@ -591,6 +635,143 @@ export class LevelSession {
       breathHinted = true;
       this.services.hud.prompt(`Hold ${this.keyLabel("holdBreath") ?? "B"} to hold your breath`, 4);
     }
+  }
+
+  /**
+   * Fake bounce light: find where the beam lands and put a soft light just
+   * in front of it. A wall a metre away fills the space round you; one at
+   * the end of a corridor barely does. It follows the beam's sway and its
+   * flicker on a dying battery.
+   */
+  private updateBounce(): void {
+    const fl = this.player.flashlight;
+    const level = fl.level;
+    if (level < 0.02) {
+      this.bounce.intensity = 0;
+      return;
+    }
+    const from = fl.light.getWorldPosition(bounceFrom);
+    const to = fl.light.target.getWorldPosition(bounceTo);
+    const dir = to.sub(from).normalize();
+    const hit = raycastWorld(this.level, from, dir, BOUNCE_REACH);
+    const d = hit ? hit.distance : BOUNCE_REACH;
+    const at = hit ? hit.point.addScaledVector(hit.normal, 0.45) : from.addScaledVector(dir, BOUNCE_REACH);
+    this.bounce.position.copy(at);
+    this.bounce.intensity = BOUNCE_STRENGTH * level * THREE.MathUtils.clamp(2.2 / Math.max(0.5, d), 0.08, 1.4);
+  }
+
+  // ------------------------------------------------------------------ scripted scares
+
+  /**
+   * Fires a scare when you reach its place, if the moment is right: nothing
+   * hunting you (a scare in the middle of a chase is just noise), not down,
+   * and a while since the last one. Each fires once.
+   */
+  private updateScares(dt: number): void {
+    this.updatePhantom(dt);
+    this.runDelayed();
+    this.scareRest -= dt;
+    if (this.scareRest > 0 || this.downed || this.finished || this.enemies.threat >= 0.6) return;
+    const me = this.player.position2D;
+    const i = this.scares.findIndex((s) => s.at.distanceTo(me) <= s.radius);
+    if (i < 0) return;
+    const s = this.scares[i];
+    if (s.kind === "glimpse") {
+      // Only when you're looking down the corridor it plays out in.
+      const fwd = new THREE.Vector2(-Math.sin(this.player.facing), -Math.cos(this.player.facing));
+      if (fwd.dot(s.dir) < 0.75) return;
+    }
+    if (s.kind === "whisper" && this.radio.busy) return;
+    if (!this.startScare(s)) return;
+    this.scares.splice(i, 1);
+    this.scareRest = SCARE_REST;
+  }
+
+  private startScare(s: ScarePlacement): boolean {
+    const { sound } = this.services;
+    const me = this.player.position2D;
+    const behind = (spread: number): Spatial => {
+      const angle = Math.PI + (Math.random() - 0.5) * spread;
+      return { pan: Math.sin(angle), angle, distance: 9 + Math.random() * 6, muffled: true };
+    };
+    switch (s.kind) {
+      case "lightsOut": {
+        // Far end first, then towards you, a lamp at a time.
+        const end = me.clone().addScaledVector(s.dir, CELL_SIZE * 8);
+        const lamps = this.lamps.lampsAlong(me, end, CELL_SIZE * 0.9).reverse();
+        if (lamps.length < 2) return false;
+        lamps.forEach((idx, k) => {
+          const pos = this.lamps.blackout(idx, 0.35 + k * 0.55, 6 + lamps.length * 0.55 - k * 0.55);
+          if (pos) this.later(0.35 + k * 0.55, () => sound.playLampOut(this.spatial(pos)));
+        });
+        return true;
+      }
+      case "glimpse": {
+        // At the far end of what you can see down the corridor, in your beam.
+        const eye = new THREE.Vector3(me.x, 1.5, me.y);
+        const hit = raycastWorld(this.level, eye, new THREE.Vector3(s.dir.x, 0, s.dir.y), 18);
+        // Close enough that your beam finds it; far enough that you can't reach it before it goes.
+        const d = Math.min((hit?.distance ?? 18) - 1.2, 7.5);
+        if (d < 5) return false;
+        const at = me.clone().addScaledVector(s.dir, d);
+        const g = this.phantom.group;
+        g.position.set(at.x, 0, at.y);
+        g.rotation.y = Math.atan2(me.x - at.x, me.y - at.y);
+        g.visible = true;
+        this.phantomShow = 1.1 + Math.random() * 0.5;
+        this.phantomGone = false;
+        return true;
+      }
+      case "slam":
+        sound.playSlam(behind(0.9));
+        this.player.addTrauma(0.25);
+        // Grit shaken loose from the ceiling over you.
+        this.effects.impact(new THREE.Vector3(me.x + 0.4, WALL_HEIGHT - 0.02, me.y - 0.3), new THREE.Vector3(0, -1, 0), true);
+        return true;
+      case "runner": {
+        // Bare feet, running, on the other side of the wall: left to right or right to left.
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        for (let k = 0; k < 9; k++) {
+          const angle = dir * (-1.5 + (3 * k) / 8);
+          this.later(0.1 + k * 0.19, () =>
+            sound.playCreatureStep(1.1, false, { pan: Math.sin(angle), angle, distance: 4.5, muffled: true })
+          );
+        }
+        return true;
+      }
+      case "whisper": {
+        // Waits for a quiet channel (see updateScares); it knows who you are.
+        const name = currentCharacter().firstName;
+        this.radio.say([{ speaker: "unknown", text: `…${name}. …${name}, I can hear you breathing.` }]);
+        return true;
+      }
+    }
+  }
+
+  /** The glimpse: it stands there a moment, the torch stutters, and in the dark it goes. */
+  private updatePhantom(dt: number): void {
+    const g = this.phantom.group;
+    if (!g.visible) return;
+    this.phantomShow -= dt;
+    this.phantom.pose({ time: this.time, speed: 0, walkPhase: 0, hunting: false, attack: null, stagger: 0, frozen: false });
+    // Half-aware: its eyes catch your light.
+    this.phantom.glow(0, 0.55, this.time);
+    if (this.phantomShow <= 0 && !this.phantomGone) {
+      this.phantomGone = true;
+      this.player.flashlight.stutter(0.7);
+    }
+    // Gone in the middle of the stutter (or straight away if your light is off and you can't see it go).
+    if (this.phantomGone && this.phantomShow < -0.3) g.visible = false;
+  }
+
+  /** Runs `fn` after `seconds` of game time (paused with the game, gone with the level). */
+  private later(seconds: number, fn: () => void): void {
+    this.delayed.push({ at: this.time + seconds, fn });
+    this.delayed.sort((a, b) => a.at - b.at);
+  }
+
+  private runDelayed(): void {
+    while (this.delayed.length && this.delayed[0].at <= this.time) this.delayed.shift()!.fn();
   }
 
   /** Where the living creatures are (lamps near them stutter). */
