@@ -452,7 +452,23 @@ export class LevelSession {
       return door;
     });
     this.generators = sp.generators.map((g) => {
-      const gen = new Generator(scene, g);
+      const gen = new Generator(scene, g, def.machine ?? "generator");
+      // Its front to the open floor: the side with the most room in front of it.
+      const { col, row } = g.cell;
+      const room = (dc: number, dr: number) => {
+        let n = 0;
+        while (n < 4 && !isSolid(this.level, col + dc * (n + 1), row + dr * (n + 1))) n++;
+        return n;
+      };
+      const [fdc, fdr] = (
+        [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const
+      ).reduce((a, b) => (room(b[0], b[1]) > room(a[0], a[1]) ? b : a));
+      gen.face(fdc, fdr);
       gen.onStart = () => {
         this.handleGeneratorStarted(gen);
         this.broadcastUse(gen);
@@ -1466,27 +1482,36 @@ export class LevelSession {
 
   private handleGeneratorStarted(gen: Generator): void {
     const { sound, hud } = this.services;
-    sound.playGeneratorStart(this.spatial(gen.pos));
+    const relay = gen.kind === "relay";
+    if (relay) sound.playRelayCut(this.spatial(gen.pos));
+    else sound.playGeneratorStart(this.spatial(gen.pos));
     this.worldNoise(gen.pos, GENERATOR_START_NOISE);
-    const running = this.generators.filter((g) => g.running).length;
+    const done = this.generators.filter((g) => g.running).length;
     if (this.powerOn) {
-      hud.toast("POWER RESTORED", "var(--ui-green)");
+      hud.toast(relay ? "THE RELAY IS DEAD" : "POWER RESTORED", relay ? "var(--ui-amber)" : "var(--ui-green)");
       this.run(this.def.events?.power ?? []);
     } else {
-      hud.toast(`GENERATOR ${running}/${this.generators.length} ONLINE`, "var(--ui-green)");
+      hud.toast(
+        relay ? `RELAY ${done}/${this.generators.length} CUT` : `GENERATOR ${done}/${this.generators.length} ONLINE`,
+        relay ? "var(--ui-amber)" : "var(--ui-green)"
+      );
+      this.run(this.def.events?.machineDone?.[done - 1] ?? []);
     }
     this.refreshObjective();
   }
 
   /** Running generators thrum every few seconds — and every thrum is a noise creatures can follow. */
   private updateGenerators(dt: number): void {
-    if (!this.generators.some((g) => g.running)) return;
+    // A generator makes noise once it runs; a relay breaker until it's cut. Either way creatures follow it.
+    const loud = (g: Generator) => (g.kind === "relay" ? !g.running : g.running);
+    if (!this.generators.some(loud)) return;
     this.humTimer -= dt;
     if (this.humTimer > 0) return;
     this.humTimer = GENERATOR_HUM_INTERVAL;
     for (const g of this.generators) {
-      if (!g.running) continue;
-      this.services.sound.playGeneratorHum(this.spatial(g.pos));
+      if (!loud(g)) continue;
+      if (g.kind === "relay") this.services.sound.playRelayHum(this.spatial(g.pos));
+      else this.services.sound.playGeneratorHum(this.spatial(g.pos));
       this.worldNoise(g.pos, GENERATOR_HUM_NOISE);
     }
   }
@@ -1927,7 +1952,7 @@ export class LevelSession {
   private exitLockReason(): string | null {
     if (this.boss && !this.boss.isDead) return `SEALED — ${this.boss.stats.name.toUpperCase()} HOLDS THE DOOR`;
     if (this.keycardLocksExit && !this.hasKeycard) return "LOCKED — FIND THE KEYCARD";
-    if (!this.powerOn) return "NO POWER — START THE GENERATORS";
+    if (!this.powerOn) return this.def.machine === "relay" ? "THE RELAY IS STILL ON AIR — CUT IT" : "NO POWER — START THE GENERATORS";
     return null;
   }
 

@@ -270,16 +270,48 @@ export class Generator implements Interactable {
   onStart: ((g: Generator) => void) | null = null;
 
   private readonly body = new THREE.Group();
+  /** The fan (a generator) or the breaker handle (a relay). */
   private readonly fan: THREE.Mesh;
   private readonly lamp: THREE.Sprite;
   private readonly lampMat: THREE.MeshBasicMaterial;
 
   constructor(
     scene: THREE.Scene,
-    readonly spawn: CellSpawn
+    readonly spawn: CellSpawn,
+    /** A generator to start, or a relay breaker cabinet to cut (`LevelDef.machine`). */
+    readonly kind: "generator" | "relay" = "generator"
   ) {
     this.pos = spawn.pos;
     this.body.position.set(spawn.pos.x, 0, spawn.pos.y);
+    if (kind === "relay") {
+      // A tall grey cabinet of valves and relays, a big breaker handle on its face, ON AIR burning red above it.
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.5, 0.9), metal(0x4a4f55, 0.5));
+      cab.position.y = 1.25;
+      this.body.add(cab);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 0.04), metal(0x2a2d31, 0.4));
+      panel.position.set(0, 1.55, 0.47);
+      this.body.add(panel);
+      for (let i = 0; i < 6; i++) {
+        const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.03, 12), metal(0xd8d0b8, 0.3));
+        dial.rotation.x = Math.PI / 2;
+        dial.position.set(-0.35 + (i % 3) * 0.35, 1.85 - Math.floor(i / 3) * 0.32, 0.5);
+        this.body.add(dial);
+      }
+      // The breaker handle: up while it's live, thrown down when cut.
+      this.fan = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 0.1), metal(0x8a1a12, 0.4));
+      this.fan.geometry.translate(0, 0.25, 0);
+      this.fan.position.set(0.42, 0.95, 0.52);
+      this.body.add(this.fan);
+      this.lampMat = new THREE.MeshBasicMaterial({ color: RED });
+      const lampMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.05), this.lampMat);
+      lampMesh.position.set(0, 2.38, 0.47);
+      this.body.add(lampMesh);
+      this.lamp = glow(RED, 1.4);
+      this.lamp.position.copy(lampMesh.position);
+      this.body.add(this.lamp);
+      scene.add(this.body);
+      return;
+    }
 
     const housing = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.7, 2.0), metal(0x3c4a3a, 0.55));
     housing.position.y = 0.95;
@@ -304,8 +336,14 @@ export class Generator implements Interactable {
     scene.add(this.body);
   }
 
+  /** Turns its front (the panel, the handle) towards (dx, dz). */
+  face(dx: number, dz: number): void {
+    this.body.rotation.y = Math.atan2(dx, dz);
+  }
+
   get prompt(): string | null {
-    return this.running ? null : "START GENERATOR";
+    if (this.running) return null;
+    return this.kind === "relay" ? "CUT THE RELAY" : "START GENERATOR";
   }
 
   interact(): void {
@@ -314,13 +352,26 @@ export class Generator implements Interactable {
     this.onStart?.(this);
   }
 
+  /** Done: a generator started, or a relay cut. */
   start(): void {
     this.running = true;
+    if (this.kind === "relay") {
+      // ON AIR goes dark; the handle is down.
+      this.lampMat.color.setHex(0x1a0606);
+      this.lamp.material.opacity = 0;
+      this.fan.rotation.x = Math.PI * 0.85;
+      return;
+    }
     this.lampMat.color.setHex(GREEN);
     this.lamp.material.color.setHex(GREEN);
   }
 
   update(dt: number, time: number): void {
+    if (this.kind === "relay") {
+      // Live: ON AIR burns, unsteadily, as if something were talking through it.
+      if (!this.running) this.lamp.material.opacity = 0.75 + 0.25 * Math.sin(time * 9) * Math.sin(time * 2.3);
+      return;
+    }
     if (!this.running) {
       this.lamp.material.opacity = 0.5 + 0.4 * Math.sin(time * 4);
       return;

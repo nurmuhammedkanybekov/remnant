@@ -94,7 +94,7 @@ export function validateLevel(level: ParsedLevel): string[] {
   // Script actions that happen somewhere: on the map, and figures on open floor you can reach.
   const def = level.def;
   const scripts: ScriptAction[] = [
-    ...Object.values(def.events ?? {}).flat(),
+    ...Object.values(def.events ?? {}).flat(2),
     ...Object.values(def.triggers ?? {}).flat(),
     ...(def.intercoms ?? []).flat(),
   ];
