@@ -35,7 +35,7 @@ import { LevelSession, type CoopLink, type SessionServices } from "./levelSessio
 import { carryOver, cloneLoadout, startingLoadout, type Loadout } from "./loadout";
 import { MenuBackdrop } from "./menuBackdrop";
 import { addStats, freshStats, type RunStats } from "./stats";
-import { cloneVoice, freshVoice, parseVoice, type VoiceMemory } from "./voiceMemory";
+import { cloneVoice, freshVoice, parseVoice, remembered, type VoiceMemory } from "./voiceMemory";
 
 type GameState = "title" | "menu" | "card" | "playing" | "paused" | "dead" | "levelComplete" | "victory";
 
@@ -883,6 +883,8 @@ export class Game {
   private onDeath(): void {
     const run = this.run!;
     this.state = "dead";
+    // It was there. It counts (see `recountLines`).
+    run.voice.deaths++;
     this.music.setMode("silent");
     this.leaveGameplay();
     const stats = { ...this.session!.stats };
@@ -941,11 +943,9 @@ export class Game {
         : this.isGuest
           ? []
           : [{ label: `Continue to ${next.title}`, primary: true, detail: next.name, action: () => this.continueToPart(next.first) }];
-      // What you told the voice is the last thing the ending says.
+      // Where you stood with the voice is the last thing the ending says.
       // And if you followed Kessler's tune all the way, it stays with you.
-      const codas = [voiceCoda(run.voice.told, run.voice.withheld), run.voice.trail.length >= 4 ? TRAIL_CODA : null].filter(
-        (l): l is string => !!l
-      );
+      const codas = [voiceCoda(remembered(run.voice)), run.voice.trail.length >= 4 ? TRAIL_CODA : null].filter((l): l is string => !!l);
       const shown = codas.length ? { ...ENDINGS[id], lines: [...ENDINGS[id].lines, ...codas] } : ENDINGS[id];
       this.screens.ending(shown, run.stats, run.difficulty.name, [
         ...onward,

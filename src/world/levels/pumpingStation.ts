@@ -1,4 +1,4 @@
-import { checkpoint, habitLine, hint, nur, objective, op, radio } from "../../game/script";
+import { bid, checkpoint, habitLine, hint, nur, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 4 — flooded halls: wading is loud, and the first Listener hears every step. */
@@ -25,7 +25,7 @@ export const PUMPING_STATION: LevelDef = {
     "#.####~~~~~~#~#.~~~~~~.#####",
     "#.#M.#......#~#...R....#...#",
     "#.#..#####.##~####.#####.K.#",
-    "#.#.......*..~.........D...#",
+    "#.#..cc...*..~.........D...#",
     "#.######.####~#####.####...#",
     "#...B....L..~~~..A.....#.E.#",
     "#######+####################",
@@ -34,6 +34,8 @@ export const PUMPING_STATION: LevelDef = {
     "############################",
   ],
   hum: "4",
+  // Ruslan's medkit (see trigger c): always there, whatever the difficulty.
+  keep: [[3, 12]],
   notes: {
     "1": "ARKADIN, LOG 112 (1988). It hears the water. Every drop in this station, it hears. It learns from voices, so we give it none: we have stopped the pumps, and we have stopped talking.",
     "2": "Took the pump control card off what was left of Hendricks. The collapse was him: the detonator was still in his hand. Card's in the east intake for whoever comes next. Wade slowly. — M.",
@@ -60,6 +62,20 @@ export const PUMPING_STATION: LevelDef = {
         nur("No eyes. Its head is split open like a... like an ear.")
       ),
       hint("Listeners are blind — your flashlight won't give you away, but every sound will"),
+    ],
+    // It asks you to leave a medkit for someone else. There's no right answer: see the power plant, and the end.
+    c: [
+      bid(
+        "kit",
+        [
+          op("Nur. In the store by the stairs there's a medkit. Leave it."),
+          op("Ruslan's up in the power plant with his leg broken. He talks to me every night. He needs it more than you do."),
+        ],
+        { kind: "leave", at: { col: 3, row: 12 } },
+        null,
+        [],
+        [radio(op("...Alright. I'll tell him."))]
+      ),
     ],
   },
 };

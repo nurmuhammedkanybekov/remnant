@@ -1,4 +1,4 @@
-import { checkpoint, habitLine, hint, nur, objective, op, radio } from "../../game/script";
+import { alarm, bid, checkpoint, habitLine, hint, nur, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 8 — the consortium's security floor. A shotgun, a big open hall, and the Swarm. */
@@ -12,17 +12,17 @@ export const ARMORY: LevelDef = {
   theme: { fog: 0x060606, wallTint: 0xc8c4bc, floorTint: 0xb8b4ac, lampColor: 0xfff0d8 },
   map: [
     "###################################",
-    "#.T....#.....L.....#...........####",
-    "#.A..1.D...........D....L...K..####",
-    "#......#..C.....C..#...........####",
+    "#.T...g#.....L.....#...........####",
+    "#.A..1gD...........D....L...K..####",
+    "#..gggg#..C.....C..#...........####",
     "####D###...........####D###########",
-    "#.......b...%...E..............####",
-    "#..C....C.........C....C...%...####",
-    "#...........L..........L.......####",
-    "#..E....C....H....C..........A.####",
-    "#..C........T..................####",
-    "#......*.....C...C.....H....C..####",
-    "#.M..........L..........%......####",
+    "#.......b.c.%...E..............####",
+    "#..C....C.c.......C....C...%...####",
+    "#.........c.L..........L.......####",
+    "#..E....C.c..H....C..........A.####",
+    "#..C......c.T..................####",
+    "#......*..c..C...C.....H....C..####",
+    "#.M.......c..L..........%......####",
     "####D############=#######D#########",
     "#......#.................#.....####",
     "#.A..B.#..R....X.....R...#.A.M.+.2#",
@@ -56,5 +56,20 @@ export const ARMORY: LevelDef = {
       hint("A Swarm is fast but fragile — the shotgun, or a boot, deals with it"),
       checkpoint(),
     ],
+    // The first lie. It has your trust by now, or it hasn't; this is how it finds out. Mara's note is in that room.
+    c: [
+      bid(
+        "store",
+        [
+          op("Nur, listen to me. The swarm's waking. The store, top left, through the door. Get in and keep still."),
+          op("Go. Now. I'll tell you when it's passed."),
+        ],
+        { kind: "go", zone: "g" },
+        40,
+        [alarm(48), radio(op("I'm sorry, Nur."), op("I wanted to know if you'd still go where I sent you."))],
+        [radio(op("You didn't go."), op("...Good. You're learning. So am I."))]
+      ),
+    ],
+    g: [],
   },
 };

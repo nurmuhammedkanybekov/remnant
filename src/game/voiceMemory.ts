@@ -26,17 +26,36 @@ export interface VoiceMemory {
   seconds: number;
   /** Levels where you followed Kessler's tune to his note (the voice heard you listening). */
   trail: string[];
+  /** What it told you to do (see the `bid` script action), and you did, by id. */
+  obeyed: string[];
+  /** What it told you to do, and you didn't. */
+  defied: string[];
+  /** Times you died on the way. It was there every time. */
+  deaths: number;
 }
 
 /** What it's noticed most about how you play, if anything stands out yet. */
 export type Habit = "hider" | "torch" | "dark" | "gun" | "knife";
 
 export function freshVoice(): VoiceMemory {
-  return { told: [], withheld: [], hides: 0, litSeconds: 0, darkSeconds: 0, shots: 0, takedowns: 0, seconds: 0, trail: [] };
+  return {
+    told: [],
+    withheld: [],
+    hides: 0,
+    litSeconds: 0,
+    darkSeconds: 0,
+    shots: 0,
+    takedowns: 0,
+    seconds: 0,
+    trail: [],
+    obeyed: [],
+    defied: [],
+    deaths: 0,
+  };
 }
 
 export function cloneVoice(v: VoiceMemory): VoiceMemory {
-  return { ...v, told: [...v.told], withheld: [...v.withheld], trail: [...v.trail] };
+  return { ...v, told: [...v.told], withheld: [...v.withheld], trail: [...v.trail], obeyed: [...v.obeyed], defied: [...v.defied] };
 }
 
 /** It needs this much of you (seconds of play) before it claims to know your habits. */
@@ -69,6 +88,29 @@ export function remember(v: VoiceMemory, id: string, answered: boolean): void {
   (answered ? v.told : v.withheld).push(id);
 }
 
+/** Records whether you did what it told you (once; it doesn't ask twice). */
+export function heed(v: VoiceMemory, id: string, obeyed: boolean): void {
+  if (v.obeyed.includes(id) || v.defied.includes(id)) return;
+  (obeyed ? v.obeyed : v.defied).push(id);
+}
+
+/**
+ * Where you stand with it, from everything you gave it and everything you
+ * did when it told you to. "trusted": you mostly answered and obeyed;
+ * "resisted": you mostly didn't; "torn": neither; null: it never asked or
+ * told you anything (a run started part-way).
+ */
+export type Stance = "trusted" | "resisted" | "torn";
+
+export function stanceOf(v: VoiceMemory): Stance | null {
+  const yes = v.told.length + v.obeyed.length;
+  const no = v.withheld.length + v.defied.length;
+  if (yes + no === 0) return null;
+  if (yes >= no + 2 || (no === 0 && yes > 0)) return "trusted";
+  if (no >= yes + 2 || (yes === 0 && no > 0)) return "resisted";
+  return "torn";
+}
+
 const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x >= 0 ? x : 0);
 const ids = (x: unknown) =>
   Array.isArray(x) ? [...new Set(x.filter((s): s is string => typeof s === "string" && /^[a-z0-9-]{1,24}$/.test(s)))] : [];
@@ -87,5 +129,13 @@ export function parseVoice(raw: unknown): VoiceMemory {
   v.takedowns = num(r.takedowns);
   v.seconds = Math.max(num(r.seconds), v.litSeconds + v.darkSeconds);
   v.trail = ids(r.trail);
+  v.obeyed = ids(r.obeyed);
+  v.defied = ids(r.defied).filter((id) => !v.obeyed.includes(id));
+  v.deaths = Math.floor(num(r.deaths));
   return v;
+}
+
+/** The memory as the story's text reads it (`recountLines`, `voiceCoda`). */
+export function remembered(v: VoiceMemory) {
+  return { told: v.told, withheld: v.withheld, obeyed: v.obeyed, defied: v.defied, trail: v.trail, deaths: v.deaths, stance: stanceOf(v) };
 }

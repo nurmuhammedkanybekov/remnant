@@ -1,4 +1,4 @@
-import { checkpoint, nur, objective, radio, silence, sound, unknown } from "../../game/script";
+import { checkpoint, nur, objective, radio, recount, silence, sound, unknown } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /**
@@ -74,6 +74,8 @@ export const LIFT_SHAFT: LevelDef = {
         unknown("Look at them, Nur. We never saw them. Not once, in all those years in the rock."),
         unknown("The road goes all the way down to the valley. Walk us down.")
       ),
+      // Under the stars, it tells you what it remembers of you. Not a score: the moments.
+      recount(),
       objective("Take the road down the mountain — or go back in and trigger the charges."),
       checkpoint(),
     ],

@@ -1,4 +1,4 @@
-import { nur, checkpoint, hint, objective, op, radio } from "../../game/script";
+import { ifHeeded, nur, checkpoint, hint, objective, op, radio, unknown } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 7 — restart three generators. Each one is loud, and keeps being loud. Spitters guard them. */
@@ -46,6 +46,23 @@ export const POWER_PLANT: LevelDef = {
         nur("And the noise?"),
         op("The noise will bring them. Start a generator, then get out of the way.")
       ),
+      // Ruslan, whose medkit you left at the pumps, or didn't.
+      ifHeeded("kit", {
+        obeyed: [
+          radio(
+            unknown("...hello? This is Ruslan, turbine crew. Someone left a kit for me at pump two. It said a man would."),
+            unknown("Thank you. Whoever you are. I can stand now. I'm going to wait here by the radio."),
+            nur("...By the radio. Of course you are.")
+          ),
+        ],
+        defied: [
+          radio(
+            unknown("...hello? This is Ruslan, turbine crew. It said there'd be a kit at pump two. I crawled all the way down there."),
+            unknown("It's gone. Somebody took it. ...It's alright. It says it'll keep me company."),
+            nur("...I took it. That was his.")
+          ),
+        ],
+      }),
     ],
     power: [
       radio(op("Power. Good. The lift is waking up."), op("Now come up to me, Nur. Come up."), nur("...Why does that sound different?")),

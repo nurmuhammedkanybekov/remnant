@@ -1,4 +1,4 @@
-import { checkpoint, hint, ifTrail, nur, objective, op, radio, silence, sound, unknown } from "../../../game/script";
+import { checkpoint, hint, ifTrail, recount, nur, objective, op, radio, silence, sound, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 17 — the Source: the Choir's cavern. The last boss, then leave or bring it all down. */
@@ -53,6 +53,8 @@ export const THE_SOURCE: LevelDef = {
     bossPhase3: [radio(unknown("...stop, stop, we only wanted to be heard..."))],
     bossDefeated: [
       radio(nur("It's quiet. For the first time since the mountain, it's quiet."), op("...Nur...")),
+      // What's left of it says what it kept of you, all of it, before it goes.
+      recount(),
       objective("Walk out — or trigger the charges and bury the Source for good."),
       checkpoint(),
     ],

@@ -1,4 +1,4 @@
-import { hint, ifTold, nur, objective, op, radio } from "../../game/script";
+import { bid, hint, ifTold, nur, objective, op, radio } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 6 — a maze of ducts, Crawlers overhead, a rivet gun, and the first time the radio lies. */
@@ -22,8 +22,8 @@ export const VENTILATION: LevelDef = {
     "#.#.#.#######.##.#.###.#.####",
     "#...#.#..Q..#.#..#...#.#.####",
     "#####.#.###.#.#.####.#.#.+.3#",
-    "#.....#.#Y#.#.#....#.#...#A.#",
-    "#.#####.#.#.#.####.#.###.####",
+    "#.....#.#Y#d#.#....#.#...#A.#",
+    "#.#####.#.#d#.####.#.###.####",
     "#.#.....#.M5#.b..J.#.#.A.####",
     "#.#.#########.######.#.######",
     "#...V....*.......E.#...X.####",
@@ -42,6 +42,17 @@ export const VENTILATION: LevelDef = {
     start: [
       radio(op("Five is ventilation. It's a maze. Keep your light off and listen before every corner.")),
       ifTold("alone", [radio(op("And Nur? Nobody else is coming. You told me so yourself."))]),
+    ],
+    // The first thing it doesn't want you to hear: the man who hums (the duct to his note is zone d).
+    humHeard: [
+      bid(
+        "hum",
+        [op("Nur. That humming. Don't go towards it."), op("Please. Not down that duct. There's nothing there you need.")],
+        { kind: "avoid", zone: "d" },
+        null,
+        [],
+        [radio(op("...I asked you. I did ask."))]
+      ),
     ],
   },
   intercoms: [
@@ -64,6 +75,7 @@ export const VENTILATION: LevelDef = {
       ),
       hint("Crawlers cling to the ceiling and drop when you pass beneath — sneak by, or shoot them down first"),
     ],
+    d: [],
     b: [
       radio(
         op("Nur? Are you still there? I haven't said anything for ten minutes."),

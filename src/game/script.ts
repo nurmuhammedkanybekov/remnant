@@ -68,7 +68,28 @@ export type ScriptAction =
   /** It tells you what it's noticed about how you play, if anything stands out yet (see `habitOf`). */
   | { type: "habitLine" }
   /** Kessler's trail: `then` if you've followed his tune to at least `count` of his notes this run. */
-  | { type: "ifTrail"; count: number; then: ScriptAction[]; otherwise: ScriptAction[] };
+  | { type: "ifTrail"; count: number; then: ScriptAction[]; otherwise: ScriptAction[] }
+  /**
+   * The voice tells you to do something, and you answer by what you do, not
+   * by a button: turn your light off, keep still, stay out of somewhere, go
+   * somewhere, leave something where it is. The clock starts when it has
+   * finished speaking; `seconds: null` waits until you leave the level.
+   * Either way it remembers (`VoiceMemory.obeyed` / `defied`, by `id`).
+   */
+  | { type: "bid"; id: string; say: RadioLine[]; test: BidTest; seconds: number | null; obeyed: ScriptAction[]; defied: ScriptAction[] }
+  /** What you did when it told you: `obeyed`, `defied`, or `never` (it never told you). */
+  | { type: "ifHeeded"; id: string; obeyed: ScriptAction[]; defied: ScriptAction[]; never: ScriptAction[] }
+  /** It tells you what it remembers of you, in order: what you told it, what you did, what you followed. */
+  | { type: "recount" };
+
+/**
+ * How you answer a bid. `dark`: light off (or in a locker) for a few
+ * seconds running. `still`: don't move from where you stand. `avoid`: don't
+ * set foot in the cells of trigger-zone letter `zone`. `go`: get there.
+ * `leave`: don't pick up what lies at `at`.
+ */
+export type BidTest =
+  { kind: "dark" } | { kind: "still" } | { kind: "avoid"; zone: string } | { kind: "go"; zone: string } | { kind: "leave"; at: CellRef };
 
 // Small constructors so level files read like a script.
 export const op = (text: string): RadioLine => ({ speaker: "operator", text });
@@ -105,6 +126,22 @@ export const ifTrail = (count: number, then: ScriptAction[], otherwise: ScriptAc
   then,
   otherwise,
 });
+export const bid = (
+  id: string,
+  say: RadioLine[],
+  test: BidTest,
+  seconds: number | null,
+  obeyed: ScriptAction[] = [],
+  defied: ScriptAction[] = []
+): ScriptAction => ({ type: "bid", id, say, test, seconds, obeyed, defied });
+export const ifHeeded = (id: string, then: { obeyed?: ScriptAction[]; defied?: ScriptAction[]; never?: ScriptAction[] }): ScriptAction => ({
+  type: "ifHeeded",
+  id,
+  obeyed: then.obeyed ?? [],
+  defied: then.defied ?? [],
+  never: then.never ?? [],
+});
+export const recount = (): ScriptAction => ({ type: "recount" });
 export const checkpoint = (): ScriptAction => ({ type: "checkpoint" });
 export const alarm = (radius: number): ScriptAction => ({ type: "alarm", radius });
 export const blackout = (seconds: number): ScriptAction => ({ type: "blackout", seconds });

@@ -1,4 +1,4 @@
-import { nur, checkpoint, hint, objective, radio, unknown, sound } from "../../game/script";
+import { ifHeeded, nur, checkpoint, hint, objective, radio, unknown, sound } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 9 — the Remnant has grown into the whole sublevel. The Operator stops pretending, and the mass itself blocks the lift. */
@@ -50,7 +50,14 @@ export const HIVE: LevelDef = {
     "3": "Mara's pack, empty but for a photograph of a village in the valley. On the back: 'If I don't come out, go there. Tell them never to answer a radio.'",
   },
   events: {
-    start: [radio(nur("The walls are... soft. Warm. It's grown through everything."), unknown("Keep going, Nur. You're nearly home."))],
+    start: [
+      radio(nur("The walls are... soft. Warm. It's grown through everything."), unknown("Keep going, Nur. You're nearly home.")),
+      // The duct in the vents, where the man hummed. It hasn't forgotten.
+      ifHeeded("hum", {
+        obeyed: [radio(unknown("You stayed out of the duct when I asked. You're a good listener, Nur. The best we've had."))],
+        defied: [radio(unknown("You went to the humming, in the vents. What did he tell you, the man with the nail?"))],
+      }),
+    ],
     bossPhase2: [radio(unknown("You can't kill forty-one people twice, Nur."))],
     bossPhase3: [radio(unknown("Stop. Stop. We only wanted to see the sky."))],
     bossDefeated: [

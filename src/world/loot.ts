@@ -67,11 +67,17 @@ function otherSupplies(level: ParsedLevel, items: ItemSpawn[], supply: number): 
   const supplies = items.filter((i) => SUPPLIES.has(i.type));
 
   if (supply < 1) {
-    const kept: ItemSpawn[] = [];
+    // What the story asks you about (`LevelDef.keep`) is always there.
+    const story = (i: ItemSpawn) => {
+      const c = worldToCell(i.pos.x, i.pos.y);
+      return (level.def.keep ?? []).some(([col, row]) => c.col === col && c.row === row);
+    };
+    const kept: ItemSpawn[] = supplies.filter(story);
     for (const type of new Set(supplies.map((i) => i.type))) {
-      const ofType = supplies.filter((i) => i.type === type);
+      const ofType = supplies.filter((i) => i.type === type && !story(i));
       shuffle(ofType, rand);
-      kept.push(...ofType.slice(0, Math.max(1, Math.round(ofType.length * supply))));
+      const keptOfType = kept.filter((i) => i.type === type).length;
+      kept.push(...ofType.slice(0, Math.max(keptOfType ? 0 : 1, Math.round(ofType.length * supply) - keptOfType)));
     }
     // Keep the map's reading order, so indices are stable and readable.
     return [...fixed, ...supplies.filter((i) => kept.includes(i))].map((i) => ({ ...i }));

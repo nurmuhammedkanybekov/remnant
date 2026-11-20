@@ -1,4 +1,4 @@
-import { ask, nur, op, ping, radio } from "../../game/script";
+import { alarm, ask, bid, nur, op, ping, radio, sound } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 2 — stealth against a pack of husks. */
@@ -21,7 +21,7 @@ export const MAINTENANCE_WING: LevelDef = {
     "#.####.###.#####..#E.####",
     "#....#...#....L...#..+.4#",
     "###.##.#.#######.##.##B.#",
-    "#E..L...*......#..L..####",
+    "#E..L...*...c..#..L..####",
     "#.#############3##.#.####",
     "#.#O....L....M.....#.####",
     "#.#.##########.#####.####",
@@ -50,5 +50,17 @@ export const MAINTENANCE_WING: LevelDef = {
   triggers: {
     a: [radio(nur("Three of them, at least. I can hear them clicking."), op("Then they can hear you too. Walk. Don't run."))],
     b: [radio(op("You're close. Eight is cold storage. It's where Hendricks went."))],
+    // The first time it tells you to do something. It's true: something walks past on the other side of the wall.
+    // Do as it says and it goes by; keep your light on and it saw it.
+    c: [
+      bid(
+        "lights-off",
+        [op("Nur. Stop. Put your light out. Now."), op("Something's coming along the other side of that wall.")],
+        { kind: "dark" },
+        7,
+        [sound("steps", 13, 9), radio(op("...Wait."), op("...It's gone. You see? You can trust me, Nur."))],
+        [sound("steps", 13, 9), alarm(30), radio(op("Too late. It saw your light through the vent. Move, Nur."))]
+      ),
+    ],
   },
 };
