@@ -27,6 +27,8 @@ export const ACTIONS = [
   "holdBreath",
   "throw",
   "talk",
+  "leanLeft",
+  "leanRight",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -57,6 +59,8 @@ export const ACTION_LABELS: Record<Action, string> = {
   holdBreath: "Hold breath",
   throw: "Throw bottle / can",
   talk: "Push to talk (co-op)",
+  leanLeft: "Lean left (peek)",
+  leanRight: "Lean right (peek)",
 };
 
 export const DEFAULT_BINDINGS: Bindings = {
@@ -81,6 +85,8 @@ export const DEFAULT_BINDINGS: Bindings = {
   holdBreath: ["KeyB", null],
   throw: ["KeyG", null],
   talk: ["KeyT", null],
+  leanLeft: ["KeyZ", null],
+  leanRight: ["KeyX", null],
 };
 
 /** Codes that can never be bound: Escape is reserved by the browser for releasing the mouse. */

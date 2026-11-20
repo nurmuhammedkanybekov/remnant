@@ -31,6 +31,8 @@ export interface LevelTheme {
   cliffs?: boolean;
   /** What's on the horizon under the open sky: a low ridge (the valley floor) or the high peaks (up on the mountain). */
   skyline?: "ridge" | "peaks";
+  /** Cold enough indoors to see your breath (it always is under the open sky). */
+  cold?: boolean;
 }
 
 export const DEFAULT_THEME: LevelTheme = {

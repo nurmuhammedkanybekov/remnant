@@ -46,7 +46,9 @@ class ParticlePool {
 
   constructor(
     private readonly count: number,
-    blending: THREE.Blending
+    blending: THREE.Blending,
+    /** Smoke-like: grows as it fades instead of shrinking, and never fully opaque. */
+    private readonly billow = false
   ) {
     const geo = new THREE.BufferGeometry();
     this.pos = new Float32Array(count * 3).fill(-999);
@@ -98,8 +100,8 @@ class ParticlePool {
       this.pos[i * 3 + 1] = Math.max(0.02, this.pos[i * 3 + 1] + part.vel.y * dt);
       this.pos[i * 3 + 2] += part.vel.z * dt;
       const t = Math.max(0, part.life / part.maxLife);
-      this.alpha[i] = t;
-      this.size[i] = part.size * (0.5 + 0.5 * t);
+      this.alpha[i] = this.billow ? t * (1 - t) * 0.8 : t;
+      this.size[i] = part.size * (this.billow ? 1 + 1.6 * (1 - t) : 0.5 + 0.5 * t);
     }
     const g = this.points.geometry;
     g.attributes.position.needsUpdate = true;
@@ -177,6 +179,7 @@ class DecalPool {
 export class Effects {
   private readonly sparks = new ParticlePool(220, THREE.AdditiveBlending);
   private readonly blood = new ParticlePool(420, THREE.NormalBlending);
+  private readonly breath = new ParticlePool(48, THREE.NormalBlending, true);
   private readonly holes: DecalPool;
   private readonly splats: DecalPool;
   private readonly chips: Chip[] = [];
@@ -190,7 +193,7 @@ export class Effects {
     private readonly scene: THREE.Scene,
     dustMotes = 260
   ) {
-    scene.add(this.sparks.points, this.blood.points);
+    scene.add(this.sparks.points, this.blood.points, this.breath.points);
 
     this.holes = new DecalPool(scene, HOLES, textures().bulletHole, -4);
     this.splats = new DecalPool(scene, SPLATS, textures().bloodSplat, -3);
@@ -321,6 +324,24 @@ export class Effects {
     }
   }
 
+  /**
+   * Your breath in the cold: a soft puff from just below your eyes, carried
+   * forward and up. `light` (0..1) is how lit the air in front of you is: in
+   * the dark you can't see your own breath.
+   */
+  breathPuff(mouth: THREE.Vector3, forward: THREE.Vector3, light: number, hard = 0): void {
+    const g = 0.08 + 0.2 * light;
+    const c = new THREE.Color(g, g * 1.02, g * 1.06);
+    for (let i = 0; i < 4 + Math.round(hard * 3); i++) {
+      const v = forward
+        .clone()
+        .multiplyScalar(0.5 + hard * 0.5 + Math.random() * 0.35)
+        .add(new THREE.Vector3((Math.random() - 0.5) * 0.18, 0.08 + Math.random() * 0.1, (Math.random() - 0.5) * 0.18));
+      const p = mouth.clone().addScaledVector(forward, 0.05 * i);
+      this.breath.emit(p, v, 1.1 + Math.random() * 0.7, 0.05 + Math.random() * 0.04, c, -0.05);
+    }
+  }
+
   /** Blood thrown onto a surface behind whatever was hit. */
   bloodSplat(point: THREE.Vector3, normal: THREE.Vector3, size = 0.6): void {
     this.splats.place(point, normal, size * (0.8 + Math.random() * 0.5));
@@ -440,6 +461,7 @@ export class Effects {
   }
 
   update(dt: number, camera: THREE.Camera, flashlightLevel: number, time: number): void {
+    this.breath.update(dt);
     this.sparks.update(dt);
     this.blood.update(dt);
     this.updateChips(dt);
@@ -460,6 +482,14 @@ export class Effects {
   }
 
   dispose(): void {
-    this.scene.remove(this.sparks.points, this.blood.points, this.dust, this.chipMesh, ...this.holes.all, ...this.splats.all);
+    this.scene.remove(
+      this.sparks.points,
+      this.blood.points,
+      this.breath.points,
+      this.dust,
+      this.chipMesh,
+      ...this.holes.all,
+      ...this.splats.all
+    );
   }
 }

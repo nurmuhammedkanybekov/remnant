@@ -1265,6 +1265,71 @@ export function flashlightCookie(): THREE.CanvasTexture {
   return tex;
 }
 
+/**
+ * Footprint masks (white on black, read from the red channel): a left boot
+ * sole on the left half, a bare left foot, long-toed and wrong, on the
+ * right. Heel at the bottom, toes at the top. Mirrored for right feet.
+ */
+export function footprintTexture(): THREE.CanvasTexture {
+  return canvasTexture(
+    128,
+    128,
+    33,
+    (ctx, _w, _h, rand) => {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, 128, 128);
+      ctx.filter = "blur(1.2px)";
+      // The boot: a sole and a heel, with a tread of bars across them.
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.ellipse(33, 40, 16, 28, -0.08, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(31, 100, 13, 15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#000";
+      for (let y = 20; y < 114; y += 10) {
+        if (y > 70 && y < 86) continue; // the arch
+        ctx.fillRect(14, y, 40, 1.6);
+      }
+      // Worn unevenly.
+      for (let i = 0; i < 40; i++) {
+        ctx.fillStyle = `rgba(0,0,0,${0.2 + rand() * 0.4})`;
+        ctx.beginPath();
+        ctx.arc(14 + rand() * 38, 12 + rand() * 105, 1 + rand() * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // The bare foot: a narrow heel, a long sole, and five toes too long for it.
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.ellipse(96, 98, 10, 16, 0.05, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(99, 62, 13, 24, -0.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.ellipse(110, 78, 6, 15, 0, 0, Math.PI * 2); // the arch
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      const toes: [number, number, number, number][] = [
+        [88, 28, 5, 12],
+        [97, 22, 4, 11],
+        [105, 22, 3.6, 10],
+        [112, 26, 3.2, 9],
+        [118, 32, 3, 8],
+      ];
+      for (const [x, y, rx, ry] of toes) {
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, 0.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.filter = "none";
+    },
+    false
+  );
+}
+
 function buildAll() {
   return {
     wall: wallSurface(),
@@ -1284,6 +1349,7 @@ function buildAll() {
     flash: flashTexture(),
     bulletHole: bulletHoleTexture(),
     bloodSplat: bloodSplatTexture(),
+    footprint: footprintTexture(),
     medkit: medkitTexture(),
     paper: paperTexture(),
     veins: veinTexture(),

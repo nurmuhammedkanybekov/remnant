@@ -9,7 +9,7 @@ export const COLD_STORAGE: LevelDef = {
   tagline: "Hendricks took the keycard into the freezers. He didn't come back.",
   objective: "Find the security keycard, then reach the exit.",
   spawnYaw: -Math.PI / 2,
-  theme: { fog: 0x05070a, wallTint: 0xc4d4e4, floorTint: 0xc8d4e0, lampColor: 0xcfe6ff, skyLight: 0x5a6a80 },
+  theme: { fog: 0x05070a, wallTint: 0xc4d4e4, floorTint: 0xc8d4e0, lampColor: 0xcfe6ff, skyLight: 0x5a6a80, cold: true },
   map: [
     "##########################",
     "#S...L....#.....C...L....#",

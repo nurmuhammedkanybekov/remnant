@@ -22,6 +22,7 @@ const PostShader = {
     uFilm: { value: 1 }, // 0 turns off grain and the resting chromatic aberration (quality)
     uBars: { value: 0 }, // 0..1: cinema bars top and bottom (the menu)
     uGamma: { value: 1 }, // the player's brightness: a gamma lift (raises the shadows, keeps black black)
+    uFear: { value: 0 }, // 0..1: your nerve going (see player/nerve.ts): the edges close in
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -39,6 +40,7 @@ const PostShader = {
     uniform float uFilm;
     uniform float uBars;
     uniform float uGamma;
+    uniform float uFear;
     varying vec2 vUv;
 
     float hash(vec2 p) {
@@ -78,8 +80,10 @@ const PostShader = {
       col *= mix(vec3(1.0), vec3(1.04, 1.0, 0.92), smoothstep(0.3, 0.9, l2));
 
       // Vignette
-      float vig = smoothstep(0.85, 0.25, d);
-      col *= mix(0.3, 1.0, vig);
+      // Vignette. Frightened, the edges of your sight close in, and colour goes out of things.
+      float vig = smoothstep(0.85 - uFear * 0.22, 0.25 - uFear * 0.1, d);
+      col *= mix(0.3 - uFear * 0.18, 1.0, vig);
+      col = mix(col, vec3(dot(col, vec3(0.299, 0.587, 0.114))), uFear * 0.25);
 
       // Grain (animated)
       float g = hash(uv * vec2(1920.0, 1080.0) + fract(uTime * 13.7) * 100.0) - 0.5;
@@ -195,7 +199,7 @@ export class Engine {
     // linear light, so only what's really bright glows: lamps, the exit sign,
     // a muzzle flash, the hot spot of your own beam on a near wall.
     if (q.bloom && !this.bloom) {
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.45, 0.55, 0.92);
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.42, 0.3, 2.4);
       this.composer.insertPass(this.bloom, this.composer.passes.indexOf(this.viewPass));
     } else if (!q.bloom && this.bloom) {
       this.composer.removePass(this.bloom);
@@ -226,7 +230,8 @@ export class Engine {
     this.camera.updateProjectionMatrix();
   }
 
-  setPostFx(damage: number, lowHealth: number, time: number): void {
+  setPostFx(damage: number, lowHealth: number, time: number, fear = 0): void {
+    this.post.uniforms.uFear.value = fear;
     this.post.uniforms.uDamage.value = damage;
     this.post.uniforms.uLowHealth.value = lowHealth;
     this.post.uniforms.uTime.value = time;

@@ -38,6 +38,8 @@ export interface PlayerCommand {
   throw: boolean;
   /** The push-to-talk key is held (co-op voice). */
   talk: boolean;
+  /** Lean intent, -1 (left) .. 1 (right): peeking round a corner. */
+  lean: number;
 }
 
 export function emptyCommand(): PlayerCommand {
@@ -61,6 +63,7 @@ export function emptyCommand(): PlayerCommand {
     holdBreath: false,
     throw: false,
     talk: false,
+    lean: 0,
   };
 }
 
@@ -117,5 +120,6 @@ export function buildCommand(input: InputSource, bindings: Bindings, look: LookS
     holdBreath: held("holdBreath"),
     throw: pressed("throw"),
     talk: held("talk"),
+    lean: axis("leanLeft", "leanRight"),
   };
 }
