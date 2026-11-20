@@ -516,6 +516,20 @@ level at most, each tied to a story beat; see `STORY.md`):
   come within 7 units, or after 30 s (`world/apparition.ts`). It can't hurt
   you and can't be shot.
 
+Four more belong to the voice (see `DIRECTION.md` → How the voice works now):
+
+- `ask(id, question, answer, reward, silent)`: it asks; you have 7 s after
+  the question to answer (push to talk, or Use) or say nothing. Recorded in
+  `VoiceMemory` by id, never asked twice in a run.
+- `ifTold(id, then, otherwise)`: branches on whether you answered `id`.
+- `ping()`: three radio chirps from the keycard you haven't got, else the
+  nearest machine still to do, else the exit.
+- `habitLine()`: it tells you your strongest habit (`habitOf`), if any.
+
+Levels can also say what their `G` machines are: `machine: "relay"` makes
+them breaker cabinets that hum on air (drawing creatures) until cut, and
+`events.machineDone` runs as each one before the last is done.
+
 The level checker rejects a placed sound off the map and a figure on a cell
 you can't reach. In co-op, triggers already fire for every player, so each
 player gets the moment on their own machine, centred on them.

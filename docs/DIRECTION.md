@@ -82,7 +82,35 @@ aside.
 | Item                                                                | State                    |
 | ------------------------------------------------------------------- | ------------------------ |
 | The voice can be silenced: Kosh-Tash's relay (idea 3)               | Implemented, play-tested |
-| The voice asks: answer or stay silent (idea 1)                      | In progress              |
-| The voice listens: habits remembered and used (idea 2)              | In progress              |
+| The voice asks: answer or stay silent (idea 1)                      | Implemented, play-tested |
+| The voice listens: habits remembered and used (idea 2)              | Implemented, play-tested |
 | Kessler's tune leads somewhere (idea 4)                             | Proposed                 |
 | Part Two: notes and moments brought up to Part One's (finding 4, 5) | Proposed                 |
+
+## 6. How the voice works now
+
+**It asks three times** (`ask` in the level scripts): in the maintenance wing
+("Are you alone?"), in cold storage ("What are you afraid of?") and in the
+Ak-Suu clinic ("Where are you going?"). After the question you have seven
+seconds, with the question and a countdown on screen; push to talk (or Use)
+answers, anything else is silence. An answer helps, with something true: a
+radio chirp from the stairwell, the keycard, the way out. Silence gets you
+nothing, and a line about it.
+
+**What you told it comes back** (`ifTold`). Told it you were alone: the
+voice in the vents reminds you nobody is coming, and in the valley it says
+you still are. Told it you fear the dark: the containment labs' blackout
+takes your torch for twice as long, and it says why. Told it where you were
+going: at the dam they are waiting, and the creatures come for you from
+the start. Every ending's last line depends on how much you gave it.
+
+**It learns how you play** (`VoiceMemory`, saved with the run, kept across
+both parts). Once it has listened for four minutes it knows your strongest
+habit, if one stands out: hiding in lockers, keeping your light on, keeping
+to the dark, shooting, or killing quietly from behind. At four points in
+the campaign it tells you so, and from then on the creatures behave
+accordingly: a hunter close by when you climb into a locker knows which
+one; your light is seen from a quarter further, or they see into the dark
+a third further; your shots carry a quarter further; they look over their
+shoulders, so taking one from behind needs a narrower angle. A player who
+has learned the game's rules finds the game has learned theirs.
