@@ -1,4 +1,4 @@
-import { alarm, checkpoint, hint, ifTold, nur, objective, op, radio, unknown } from "../../../game/script";
+import { alarm, apparition, checkpoint, hint, ifTold, nur, objective, op, radio, silence, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 13 — the hydro dam: flooded channels and three generators for the spillway gate. */
@@ -28,7 +28,7 @@ export const HYDRO_DAM: LevelDef = {
     "#S...#.......~~~~~~~~~~.......#....#",
     "#.a..D...U...~~~~~~~~~~...P...D..G.#",
     "#....#.......~~~~~~~~~~.......#....#",
-    "###.####.#########.#########.####.##",
+    "###.####.#########L#########.####.##",
     "#.....L.....#....b......#.....L....#",
     "#..G........D...........D....N.....#",
     "#.....E.....#.....1.....#..........#",
@@ -39,7 +39,7 @@ export const HYDRO_DAM: LevelDef = {
     "######.###.#######*#######.###.#####",
     "#.....c...#...A.......M...#....V...#",
     "#..PJ.....D.......H.......D........#",
-    "#A....B...#.......G.......#..2..A..#",
+    "#A....B.3.#.......G.......#..2..A..#",
     "#####D#####..............A#####D####",
     "#.........#.....L....d....#......X.#",
     "####################################",
@@ -47,6 +47,7 @@ export const HYDRO_DAM: LevelDef = {
   notes: {
     "1": "Spillway gate won't open without all three generators. Whoever starts the first one: the whole valley hears it. Start the second one fast. — B. Toktogulov, shift engineer",
     "2": "They stand in the reservoir up to the neck. Hundreds. Not breathing. Waiting for the water to carry them somewhere. — B.T.",
+    "3": "GATE LOG. Pumps two and three started by hand, 04:20. By first light the reservoir was full of people. Not one of them came out to stop us. They only turned, all together, to watch the lamps come on. — B.T.",
   },
   events: {
     start: [
@@ -66,7 +67,14 @@ export const HYDRO_DAM: LevelDef = {
   },
   triggers: {
     a: [hint("Water is loud. Wading brings Listeners. Find the dry walkways")],
-    b: [radio(unknown("...cold, it's so cold in the water, come and warm us, Nur..."))],
+    b: [
+      radio(unknown("...cold, it's so cold in the water, come and warm us, Nur...")),
+      // Out in the reservoir, up to the neck, three of them, watching you. Light them and they're not there.
+      silence(5),
+      apparition("husk", 18, 3),
+      apparition("husk", 17, 2),
+      apparition("husk", 19, 2),
+    ],
     c: [radio(nur("Spitters on the gantry. Stay out of their line.")), checkpoint()],
     d: [radio(op("One more generator. Then the gate."))],
   },

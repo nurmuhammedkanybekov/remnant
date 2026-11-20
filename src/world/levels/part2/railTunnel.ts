@@ -1,4 +1,4 @@
-import { alarm, checkpoint, hint, nur, objective, op, radio, unknown } from "../../../game/script";
+import { alarm, checkpoint, hint, nur, objective, op, radio, sound, torchFails, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 15 — the drainage line into the mountain: a long tunnel with bays, Crawlers overhead, packs in the dark. */
@@ -51,7 +51,14 @@ export const RAIL_TUNNEL: LevelDef = {
   },
   triggers: {
     a: [hint("Crawlers wait on the ceiling. Watch the dark above you, and move when they drop")],
-    b: [radio(nur("Water in the middle of the line. Bays on either side. I'll stay dry.")), checkpoint()],
+    b: [
+      radio(nur("Water in the middle of the line. Bays on either side. I'll stay dry.")),
+      checkpoint(),
+      // Someone keeping pace with you, a few steps behind, along the rails. Then your light goes.
+      sound("steps"),
+      torchFails(2),
+      radio(nur("...Who's there? ...Sadykova?")),
+    ],
     c: [
       radio(unknown("...the Deep is below ten, Nur. Below the infirmary where you woke up. We were always underneath you...")),
       alarm(18),
