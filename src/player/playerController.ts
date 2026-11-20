@@ -240,7 +240,8 @@ export class PlayerController {
     const sy = (Math.sin(time * 41.7) + Math.sin(time * 19.9)) * 0.5 * shake;
 
     // Frightened hands: a slow, uneven wander, not a buzz.
-    const tremor = this.nerve.tremor * 0.0045;
+    // (The reduced-shake setting all but stills it.)
+    const tremor = this.nerve.tremor * 0.0045 * this.motionScale;
     const tx = (Math.sin(time * 5.3) + Math.sin(time * 8.9 + 1.3) * 0.6) * tremor;
     const ty = (Math.sin(time * 6.1 + 0.7) + Math.sin(time * 11.3) * 0.5) * tremor;
 
