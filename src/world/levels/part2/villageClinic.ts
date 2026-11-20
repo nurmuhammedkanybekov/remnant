@@ -11,6 +11,8 @@ export const VILLAGE_CLINIC: LevelDef = {
   objective: "Find out where everyone went.",
   spawnYaw: -Math.PI / 2,
   theme: {
+    // Inside, but in the valley: the wind is outside the windows, not a machine.
+    soundscape: "valley",
     fog: 0x0a0d12,
     fogDensity: 0.055,
     wallTint: 0xe8e4dc,

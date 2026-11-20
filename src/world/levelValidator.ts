@@ -1,5 +1,6 @@
 import { isSolid, worldToCell, type Cell } from "./grid";
 import type { ParsedLevel } from "./levelParser";
+import type { ScriptAction } from "../game/script";
 
 /**
  * Design checks beyond "does it parse": can the level actually be finished?
@@ -89,6 +90,23 @@ export function validateLevel(level: ParsedLevel): string[] {
     const ew = isSolid(level, col - 1, row) && isSolid(level, col + 1, row);
     const ns = isSolid(level, col, row - 1) && isSolid(level, col, row + 1);
     if (ew === ns) problems.push(`${id}: door at ${col},${row} is not in a doorway (needs walls on exactly two opposite sides)`);
+  }
+  // Script actions that happen somewhere: on the map, and figures on open floor you can reach.
+  const def = level.def;
+  const scripts: ScriptAction[] = [
+    ...Object.values(def.events ?? {}).flat(),
+    ...Object.values(def.triggers ?? {}).flat(),
+    ...(def.intercoms ?? []).flat(),
+  ];
+  for (const a of scripts) {
+    if (a.type !== "sound" && a.type !== "apparition") continue;
+    const c = a.at;
+    if (!c) continue;
+    if (c.col < 0 || c.row < 0 || c.col >= level.cols || c.row >= level.rows) {
+      problems.push(`${id}: ${a.type} at ${c.col},${c.row} is off the map`);
+    } else if (a.type === "apparition" && !canReach(c)) {
+      problems.push(`${id}: apparition at ${c.col},${c.row} is not on floor you can reach`);
+    }
   }
   if (level.def.finale && s.consoles.length === 0) problems.push(`${id}: the finale needs a detonator console (Z)`);
   for (const e of s.enemies) {

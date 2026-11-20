@@ -14,8 +14,6 @@ import { Projectiles } from "../enemies/projectiles";
 import { Effects } from "../fx/particles";
 import { Footprints, type PrintKind } from "../fx/footprints";
 import { BloodPools } from "../fx/pools";
-import { resolveTheme } from "../world/theme";
-import { skyCells } from "../world/outdoors";
 import { Pickup } from "../items/pickup";
 import { SMASH_NOISE, throwFrom, Throwables } from "../items/throwables";
 import { r2, type PlayerState, type SessionMsg } from "../net/protocol";
@@ -37,6 +35,9 @@ import { textures } from "../fx/textures";
 import { castShadows, spotShadows } from "../core/shadows";
 import { CheckpointMarker, DetonatorConsole, Door, Generator, Intercom, type Interactable } from "../world/interactables";
 import { LampSystem } from "../world/lamps";
+import { Apparition } from "../world/apparition";
+import { skyCells } from "../world/outdoors";
+import { resolveTheme, soundscapeOf } from "../world/theme";
 import { animateWater, animateWeather, buildLevel, type LevelData } from "../world/levelBuilder";
 import type { LevelDef } from "../world/levelDef";
 import { parseLevel } from "../world/levelParser";
@@ -262,6 +263,10 @@ export class LevelSession {
   private breathTimer = 1;
   /** How used to the dark your eyes are (see `updateEyes`). */
   private eyes = 0;
+  /** Cells open to the sky: snow underfoot, wind in your ears. */
+  private readonly skyCells: Set<number>;
+  /** Figures placed by the script that aren't really there. */
+  private readonly apparitions: Apparition[] = [];
   private readonly radio: RadioChannel;
   private readonly muzzleLight: THREE.PointLight;
   /** The flashlight's light coming back off the surface it's on (always present: a light added mid-level would stutter). */
@@ -333,6 +338,7 @@ export class LevelSession {
 
     const quality = services.quality();
     this.level = buildLevel(scene, parseLevel(def), quality.bumpMaps, quality.skyScale);
+    this.skyCells = skyCells(this.level);
     const sp = this.level.spawns;
     const cellIndex = (c: { col: number; row: number }) => c.row * this.level.cols + c.col;
     this.lamps = new LampSystem(scene, sp.lamps, this.level.lampFixtures, quality.lampLights);
@@ -381,7 +387,7 @@ export class LevelSession {
     this.player.onFootstep = (gait, wet) => {
       if (wet) sound.playSplash(gait);
       else if (this.player.terrain === SNOW) sound.playSnowStep(gait);
-      else sound.playFootstep(gait);
+      else sound.playFootstep(gait, this.underSky());
       this.leavePrint();
     };
     this.player.flashlight.onToggle = (on) => sound.playFlashlight(on);
@@ -472,7 +478,7 @@ export class LevelSession {
     this.markers = sp.checkpoints.map((c) => new CheckpointMarker(scene, c));
     for (const t of sp.triggers) this.triggerCells.set(cellIndex(t.cell), t.key);
     for (const w of sp.water) this.waterCells.add(cellIndex(w.cell));
-    this.skyAir = skyCells(this.level);
+    this.skyAir = this.skyCells;
     for (const k of this.skyAir) if (!this.waterCells.has(k)) this.snowCells.add(k);
 
     for (const id of WEAPON_ORDER) {
@@ -510,6 +516,8 @@ export class LevelSession {
     this.refreshObjective();
 
     // The building's hum: machinery where there's machinery, a deep rumble everywhere else.
+    services.sound.unhush();
+    services.sound.setSoundscape(soundscapeOf(resolveTheme(def.theme)));
     services.sound.setRoomTone(0.16, MACHINE_HUM.has(def.id) ? 1 : 0);
 
     // Shadows: the flashlight throws them, and everything solid casts and catches them.
@@ -655,7 +663,9 @@ export class LevelSession {
     sound.updateHeartbeat(dt, hp, shaken);
     const winded = THREE.MathUtils.clamp((60 - this.player.stamina) / 60, 0, 1);
     sound.updateBreathing(dt, shaken, winded, this.player.breath.held);
+    sound.setExposure(this.underSky() ? 1 : 0);
     sound.updateAmbient(dt);
+    this.updateApparitions(dt);
     this.roomTimer -= dt;
     if (this.roomTimer <= 0) {
       this.roomTimer = 0.4;
@@ -925,7 +935,7 @@ export class LevelSession {
         const lamps = this.lamps.lampsAlong(me, end, CELL_SIZE * 0.9).reverse();
         if (lamps.length < 2) return false;
         lamps.forEach((idx, k) => {
-          const pos = this.lamps.blackout(idx, 0.35 + k * 0.55, 6 + lamps.length * 0.55 - k * 0.55);
+          const pos = this.lamps.blackoutLamp(idx, 0.35 + k * 0.55, 6 + lamps.length * 0.55 - k * 0.55);
           if (pos) this.later(0.35 + k * 0.55, () => sound.playLampOut(this.spatial(pos)));
         });
         return true;
@@ -1232,6 +1242,24 @@ export class LevelSession {
         case "alarm":
           this.worldNoise(this.player.position2D, a.radius);
           sound.playLocked();
+          break;
+        case "blackout":
+          this.lamps.blackout(this.time, a.seconds, this.player.position2D);
+          sound.playStinger("power");
+          break;
+        case "torchFails":
+          this.player.flashlight.interfere(a.seconds);
+          break;
+        case "silence":
+          sound.hush(a.seconds);
+          break;
+        case "sound": {
+          const at = a.at ? this.cellCentre(a.at.col, a.at.row) : this.behindMe(1.6);
+          sound.playStinger(a.sound, this.spatial(at));
+          break;
+        }
+        case "apparition":
+          this.apparitions.push(new Apparition(this.services.engine.scene, a.kind, this.cellCentre(a.at.col, a.at.row), a.facing));
           break;
       }
     }
@@ -2403,6 +2431,38 @@ export class LevelSession {
       sum += hit ? hit.distance : ROOM_PROBE;
     }
     return THREE.MathUtils.clamp((sum / 8 - 2.2) / 9, 0, 1);
+  }
+
+  /** Whether you're standing out under the open sky. */
+  private underSky(): boolean {
+    const c = worldToCell(this.player.position.x, this.player.position.z);
+    return this.skyCells.has(c.row * this.level.cols + c.col);
+  }
+
+  private cellCentre(col: number, row: number): THREE.Vector2 {
+    return new THREE.Vector2((col + 0.5) * CELL_SIZE, (row + 0.5) * CELL_SIZE);
+  }
+
+  /** A point `d` units behind where you're looking. */
+  private behindMe(d: number): THREE.Vector2 {
+    const look = this.services.engine.camera.getWorldDirection(new THREE.Vector3());
+    const back = new THREE.Vector2(look.x, look.z).normalize().multiplyScalar(-d);
+    return this.player.position2D.add(back);
+  }
+
+  /** The script's figures: each is gone when you look at it properly. Something answers when one goes. */
+  private updateApparitions(dt: number): void {
+    if (this.apparitions.length === 0) return;
+    const look = this.services.engine.camera.getWorldDirection(new THREE.Vector3());
+    const view = new THREE.Vector2(look.x, look.z).normalize();
+    const lit = this.player.flashlight.on && this.player.flashlight.level > 0.3;
+    for (const a of this.apparitions) {
+      if (a.update(dt, this.time, this.level, this.player.position2D, view, lit)) {
+        // Gone. Your heart takes a moment longer to believe it.
+        this.dread = Math.max(this.dread, 0.55);
+      }
+    }
+    for (let i = this.apparitions.length - 1; i >= 0; i--) if (this.apparitions[i].finished) this.apparitions.splice(i, 1);
   }
 
   private spatial(p: THREE.Vector2): Spatial {
