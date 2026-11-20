@@ -68,6 +68,9 @@ const WET_STEPS = 12;
 const BLOOD_STEPS = 9;
 /** Metres between a creature's prints in the snow. */
 const CREATURE_STRIDE = 0.85;
+/** Rates (per second) your eyes adjust at: to the dark, slowly; to light, at once. */
+const DARK_ADAPT = 0.22;
+const LIGHT_ADAPT = 3;
 const BOUNCE_RANGE = 7;
 const BOUNCE_REACH = 20;
 const BOUNCE_STRENGTH = 9;
@@ -248,6 +251,8 @@ export class LevelSession {
   /** Cold enough to see your breath everywhere (the cold store); outdoors always is. */
   private readonly coldLevel: boolean;
   private breathTimer = 1;
+  /** How used to the dark your eyes are (see `updateEyes`). */
+  private eyes = 0;
   private readonly radio: RadioChannel;
   private readonly muzzleLight: THREE.PointLight;
   /** The flashlight's light coming back off the surface it's on (always present: a light added mid-level would stutter). */
@@ -633,7 +638,7 @@ export class LevelSession {
     this.updateBreathFog(dt);
     this.footprints.update(this.time);
     this.updatePools();
-    engine.setPostFx(this.damageFx, THREE.MathUtils.clamp((0.4 - hp) / 0.4, 0, 1), this.time, this.player.nerve.level * 0.8);
+    engine.setPostFx(this.damageFx, THREE.MathUtils.clamp((0.4 - hp) / 0.4, 0, 1), this.time, this.player.nerve.level * 0.8, this.eyes);
     // After a fright your heart and lungs take a while to settle, even with nothing near.
     const shaken = Math.max(this.dread, this.player.nerve.level * 0.65);
     sound.updateHeartbeat(dt, hp, shaken);
@@ -772,11 +777,23 @@ export class LevelSession {
     this.effects.breathPuff(mouth, fwd, Math.min(1, light), hard);
   }
 
+  /**
+   * Your eyes getting used to the dark (0..1): slowly, over the best part of
+   * ten seconds without a light, and back in a moment when one comes on.
+   */
+  private updateEyes(dt: number, torch: boolean, lamp: number): void {
+    const light = Math.max(torch ? 1 : 0, Math.min(1, lamp * 1.6));
+    const target = 1 - light;
+    const rate = target > this.eyes ? DARK_ADAPT : LIGHT_ADAPT;
+    this.eyes += (target - this.eyes) * Math.min(1, dt * rate);
+  }
+
   /** Your nerve (see `Nerve`): dread, the dark and the lamps feed it. */
   private updateNerve(dt: number): void {
     const p = this.player;
     const lamp = this.lamps.lightAt(p.position.x, p.position.z);
     const torch = p.flashlight.on && p.flashlight.level > 0.3;
+    this.updateEyes(dt, torch, lamp);
     p.nerve.update(dt, {
       dread: this.downed || p.health.isDead ? 0 : this.dread,
       dark: !torch && lamp < 0.15,

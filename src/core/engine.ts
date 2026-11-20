@@ -22,6 +22,7 @@ const PostShader = {
     uFilm: { value: 1 }, // 0 turns off grain and the resting chromatic aberration (quality)
     uBars: { value: 0 }, // 0..1: cinema bars top and bottom (the menu)
     uGamma: { value: 1 }, // the player's brightness: a gamma lift (raises the shadows, keeps black black)
+    uAdapt: { value: 0 }, // 0..1: eyes adjusted to the dark (see LevelSession.updateEyes)
     uFear: { value: 0 }, // 0..1: your nerve going (see player/nerve.ts): the edges close in
   },
   vertexShader: /* glsl */ `
@@ -41,6 +42,7 @@ const PostShader = {
     uniform float uBars;
     uniform float uGamma;
     uniform float uFear;
+    uniform float uAdapt;
     varying vec2 vUv;
 
     float hash(vec2 p) {
@@ -80,6 +82,16 @@ const PostShader = {
       col *= mix(vec3(1.0), vec3(1.04, 1.0, 0.92), smoothstep(0.3, 0.9, l2));
 
       // Vignette
+      // Eyes adjusted to the dark: the shadows open up (a lift that leaves
+      // anything properly lit alone) and read the way night vision does,
+      // without colour and a little blue.
+      float lumA = dot(col, vec3(0.299, 0.587, 0.114));
+      float night = uAdapt * (1.0 - smoothstep(0.08, 0.45, lumA));
+      vec3 lifted = pow(max(col, 0.0), vec3(0.5));
+      float lumL = dot(lifted, vec3(0.299, 0.587, 0.114));
+      lifted = mix(lifted, vec3(lumL) * vec3(0.8, 0.94, 1.2), 0.7);
+      col = mix(col, lifted * 0.8, night);
+
       // Vignette. Frightened, the edges of your sight close in, and colour goes out of things.
       float vig = smoothstep(0.85 - uFear * 0.22, 0.25 - uFear * 0.1, d);
       col *= mix(0.3 - uFear * 0.18, 1.0, vig);
@@ -230,7 +242,8 @@ export class Engine {
     this.camera.updateProjectionMatrix();
   }
 
-  setPostFx(damage: number, lowHealth: number, time: number, fear = 0): void {
+  setPostFx(damage: number, lowHealth: number, time: number, fear = 0, adapt = 0): void {
+    this.post.uniforms.uAdapt.value = adapt;
     this.post.uniforms.uFear.value = fear;
     this.post.uniforms.uDamage.value = damage;
     this.post.uniforms.uLowHealth.value = lowHealth;
