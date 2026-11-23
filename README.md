@@ -93,6 +93,15 @@ and what is waiting at the top. Where a note was left, the place shows what
 it says: the bed you slept through it all in, the radio with its plug pulled
 out, R-7's cell broken from the inside.
 
+**A voice that listens.** The thing on the radio learned to speak by
+listening, and it hasn't stopped. It asks you things (are you alone? what
+are you afraid of?), and answering is breaking the first rule you were
+given. It tells you to do things (put your light out; leave that medkit for
+someone else; hide in that room), and sometimes it's right. It learns how
+you play, and its creatures learn with it: hide in lockers and one of them
+is waiting in one. At the end it tells you what it kept of you: not a
+score, the moments.
+
 **Places that were used.** Every room has a purpose (wards, labs, freezers,
 pump halls, an armory with its racks nearly empty) and is furnished to
 match, with a sign by its door. Pipes painted to the Soviet colour code run

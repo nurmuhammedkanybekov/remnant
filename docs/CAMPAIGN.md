@@ -66,13 +66,14 @@ cover).
 - **Optional**: Omurbek's note, the tune written down.
 - **Connects to**: Ruslan at the power plant and at both ends; the trail to the photograph.
 - **Changes**: someone you haven't met now depends on what you did.
+- **Built: still the water.** Two intake valves, optional. Each one clangs when you shut it, and everything near comes to look; shut both and the water stops moving, and wading is barely louder than dry floor. The Listeners lose you. You redo what Arkadin did ("He was very quiet, after that").
 
 ### 5 Containment Labs (Sublevel 6)
 
 - **Story**: R-7, Arkadin's daughter's drawing, Project GLASS.
 - **Play**: the Watcher. Light is a weapon and a risk.
 - **Identity**: the original 1980s laboratory, broken glass.
-- **Main interaction**: a keycard, in the dark.
+- **Main interaction**: the only working keycard is on a lanyard round a Watcher's neck, in the west lab. Hold it in your light and it can't move; walk up to it in the light and take it down. Let the torch slip and it's fast. The card says Arkadin, L.
 - **Moment**: the power dies in a wave that reaches you last; your torch fails; breathing behind you.
 - **Optional**: the blood cabinet, one vial dark.
 - **Connects to**: your answer in cold storage.
@@ -110,6 +111,7 @@ cover).
 - **Optional**: Mara's note is on the table in the room it sends you to.
 - **Connects to**: every instruction after this one; the recount.
 - **Changes**: you know it lies. Everything it says afterwards is in doubt.
+- **Built: the way back.** Lifting the card from the security desk sets off the armory's siren and drops the lights to red: the hall you crept through on the way in is awake for the way out. Measured: standing still by the desk for fifteen seconds is survivable on Story and fatal on Normal; running is the answer.
 
 ### 9 The Hive (Sublevel 2)
 
@@ -149,7 +151,7 @@ cover).
 - **Story**: every door open, every house warm.
 - **Play**: the Howler: if it sees you, everything hears.
 - **Identity**: snow, timber houses, lamps on wires.
-- **Main interaction**: the garage key. And it tells you not to move.
+- **Main interaction**: the garage key, in Miss Asanova's house. The voice doesn't know which house is hers ("She never listened to me"). Every house has its radio on, all on one station, except hers. Listen at the doors. The house changes every run; a radio stops when you walk in. And it tells you not to move.
 - **Moment**: the villagers in the snow with their backs to you, gone in your light.
 - **Optional**: Aibek's note: granny hums it over the washing.
 - **Connects to**: the Source (what was behind you).
@@ -218,10 +220,22 @@ Shapes, after this pass (counted from the level data): walk 5, keycard 5,
 keycard + relay 1 (the observatory), generators 1 (power plant), gates 1 (the dam),
 generators + keycard 1 (Laboratory Zero), boss 1 (the Hive), finale 2 (the
 portal; the Source, with its boss).
-The dam is now gates, not generators (generators 1, gates 1). Beyond the
-objectives, levels now differ in what they ask of you: cold storage a
-choice under pressure, the dam a question of trust, the rail tunnel
-navigation by ear, Laboratory Zero restraint, and five levels a decision
-the voice gives you. The objectives themselves are still mostly "find the
-card"; the keycard levels (pumping station, containment, armory, village)
-are the next place to look.
+The objective names are the same, but what each one asks of you differs:
+
+| Level            | Objective        | What it actually asks                               |
+| ---------------- | ---------------- | --------------------------------------------------- |
+| Cold Storage     | keycard          | a choice under pressure (ask it, or the panel)      |
+| Pumping Station  | keycard          | quiet: shut the valves first, or wade loud          |
+| Containment Labs | keycard          | light: hold a Watcher in your beam to take the card |
+| Armory           | keycard          | the way back, with the floor awake                  |
+| The Village      | keycard          | listening: the one house with no radio              |
+| Power Plant      | generators       | noise: start one, then get away from it             |
+| Hydro Dam        | gates            | trust: which gate does it send you to               |
+| Observatory      | keycard + relays | silencing it                                        |
+| Rail Tunnel      | walk             | navigating by ear in the dark                       |
+| Laboratory Zero  | keycard + power  | restraint: every kill makes the Choir stronger      |
+
+Five levels also carry a decision the voice gives you (the bids). What's
+left untouched structurally is the infirmary (a tutorial, on purpose), the
+maintenance wing and the clinic (short, quiet levels between bigger ones),
+and the two boss fights.

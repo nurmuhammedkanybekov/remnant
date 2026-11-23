@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LevelDef } from "./levelDef";
 import { parseLevel } from "./levelParser";
 import { validateLevel } from "./levelValidator";
-import { apparition, sound } from "../game/script";
+import { apparition, beacon, bid, guide, shutDoors, sound } from "../game/script";
 
 const check = (map: string[], extra: Partial<LevelDef> = {}) =>
   validateLevel(
@@ -58,5 +58,33 @@ describe("validateLevel", () => {
     expect(check(map, { events: { start: [sound("knock", 0, 1), apparition("husk", 4, 1)] } })).toEqual([]);
     expect(check(map, { events: { start: [sound("knock", 9, 1)] } }).join()).toMatch(/sound at 9,1 is off the map/);
     expect(check(map, { triggers: {}, events: { start: [apparition("husk", 0, 1)] } }).join()).toMatch(/apparition at 0,1 is not on floor/);
+  });
+
+  it("checks what the voice's scripts point at", () => {
+    const map = ["############", "#S...D..a.X#", "#....#K...E#", "#.#####.####", "#.#..#.....#", "############"];
+    const ok = { triggers: { a: [] } };
+    expect(check(map, ok)).toEqual([]);
+    const at = (a: ReturnType<typeof bid>) => check(map, { triggers: { a: [] }, events: { start: [a] } }).join();
+    expect(at(bid("x", [], { kind: "go", zone: "q" }, 5))).toMatch(/zone "q", which isn't on the map/);
+    expect(at(bid("x", [], { kind: "leave", at: { col: 6, row: 2 } }, null))).toMatch(/must be in `keep`/);
+    expect(at(bid("x", [], { kind: "leave", at: { col: 4, row: 2 } }, null))).toMatch(/nothing is/);
+    expect(at(shutDoors([3, 1]))).toMatch(/no door there/);
+    expect(at(shutDoors([5, 1]))).toBe("");
+    expect(at(beacon("hummer", 3, 4, 10, 3))).toMatch(/beacon at 3,4 is not on floor you can reach/);
+    expect(at(guide([7, 4], [3, 4], 10))).toMatch(/guide at 3,4/);
+  });
+
+  it("checks a carried keycard and the houses a key might be in", () => {
+    const map = ["############", "#S......K.X#", "#.......E..#", "#.#####.####", "#.#..#.....#", "############"];
+    expect(check(map, { carrier: [8, 2] })).toEqual([]);
+    expect(check(map, { carrier: [5, 2] }).join()).toMatch(/carrier at 5,2 isn't a creature/);
+    expect(
+      check(map, {
+        keyHouses: [
+          [8, 1],
+          [3, 4],
+        ],
+      }).join()
+    ).toMatch(/key house at 3,4 is not on floor you can reach/);
   });
 });

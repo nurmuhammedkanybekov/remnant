@@ -1,4 +1,4 @@
-import { alarm, bid, checkpoint, habitLine, hint, nur, objective, op, radio } from "../../game/script";
+import { alarm, bid, blackout, checkpoint, habitLine, hint, nur, objective, op, radio, sound } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 8 — the consortium's security floor. A shotgun, a big open hall, and the Swarm. */
@@ -45,9 +45,17 @@ export const ARMORY: LevelDef = {
       ),
       habitLine(),
     ],
+    // The card was on the security desk for a reason: lift it and the armory's alarm goes. The hall you crept through
+    // on the way in is awake for the way back, and the lights go to red.
     keycard: [
-      radio(nur("Armory card. The stairwell is right below the main hall.")),
-      objective("Open the security door in the main hall."),
+      sound("siren"),
+      alarm(50),
+      blackout(25),
+      radio(
+        nur("Armory card. And an alarm. Of course there's an alarm."),
+        op("Everything on this floor heard that, Nur. The security door's in the main hall. Run.")
+      ),
+      objective("Get back across the hall to the security door."),
     ],
   },
   triggers: {

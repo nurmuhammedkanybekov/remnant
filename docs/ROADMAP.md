@@ -207,6 +207,23 @@ sounded like the same concrete.
 - [x] Laboratory Zero and the Source lit so you can read them: lab lamps,
       violet work lamps in the cavern, a higher fill
 
+## Phase 13 — The voice listens (done)
+
+From `docs/DIRECTION.md`: make the voice on the radio the game's identity.
+
+- [x] It asks (three questions), and remembers what you told it
+- [x] It tells you to do things (five instructions answered by action),
+      helping, testing and once lying, and remembers what you did
+- [x] It learns your habits, and each habit shows itself in the world
+- [x] Kessler's trail: follow the tune to what the people who heard it left
+- [x] At the end of each part it tells you what it kept of you; the
+      ending's last line says where you stood with it
+- [x] Levels with a reason beyond the objective: the freezer, the valves,
+      the Watcher's lanyard, the armory's way back, the silent house, the
+      spillway sirens, the tunnel by ear, the cost of fighting in
+      Laboratory Zero
+- [x] Part Two's notes and moments brought up to Part One's
+
 ## Phase 9 — Play it together, play it scared (done)
 
 - [x] Ammunition in small caches spread over each level, found by exploring;

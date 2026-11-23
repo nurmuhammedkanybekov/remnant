@@ -92,7 +92,7 @@ export type ScriptAction =
    * A sound that keeps playing from a cell, every `every` seconds, until you
    * get there or `seconds` run out: something to find your way by in the dark.
    */
-  | { type: "beacon"; sound: "hummer" | "ping"; at: CellRef; seconds: number; every: number }
+  | { type: "beacon"; sound: "hummer" | "ping" | "radio"; at: CellRef; seconds: number; every: number }
   /**
    * It offers to guide you, by its chirp, for `seconds`: towards `truth` if
    * you've trusted it, towards `lie` if you haven't (torn counts as not).
@@ -172,7 +172,7 @@ export const openDoors = (...at: [number, number][]): ScriptAction => ({
   at: at.map(([col, row]) => ({ col, row })),
   open: true,
 });
-export const beacon = (kind: "hummer" | "ping", col: number, row: number, seconds: number, every: number): ScriptAction => ({
+export const beacon = (kind: "hummer" | "ping" | "radio", col: number, row: number, seconds: number, every: number): ScriptAction => ({
   type: "beacon",
   sound: kind,
   at: { col, row },

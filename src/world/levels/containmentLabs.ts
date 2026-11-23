@@ -9,6 +9,8 @@ export const CONTAINMENT_LABS: LevelDef = {
   tagline: "Sample R-7 is to be kept in darkness.",
   objective: "Find a keycard for the security door.",
   spawnYaw: Math.PI,
+  // The keycard is round the neck of the Watcher in the west lab. Hold it in your light, and take it.
+  carrier: [3, 9],
   theme: { fog: 0x06070a, wallTint: 0xdde2ea, floorTint: 0xd0d6de, lampColor: 0xe8f4ff, skyLight: 0x606a78 },
   map: [
     "##############################",
@@ -19,7 +21,7 @@ export const CONTAINMENT_LABS: LevelDef = {
     "#####D#########D########D#####",
     "#...a.........L.c........*...#",
     "#####D#########D#####=########",
-    "#.........#....b.H..#........#",
+    "#...dd....#....b.H..#........#",
     "#..W...L..#..C...C..#...L....#",
     "#....M....#....K....#......X.#",
     "#.4.......#..C...C..#..R.....#",
@@ -43,8 +45,12 @@ export const CONTAINMENT_LABS: LevelDef = {
         nur("You sound like you know what they were studying."),
         op("I've read the files. The stairwell is behind a security door. Find a keycard.")
       ),
+      radio(op("There's only one card left down there that still works, Nur. It's on a lanyard."), op("Round the neck of one of them.")),
     ],
-    keycard: [radio(nur("Lab clearance. Arkadin, L. This thing is older than I am.")), objective("Open the security door.")],
+    keycard: [
+      radio(nur("Lab clearance. Arkadin, L. It was round its neck."), nur("...Arkadin. Was that you?")),
+      objective("Open the security door."),
+    ],
   },
   triggers: {
     a: [radio(op("Every door you open makes noise. Open them, then move."))],
@@ -58,6 +64,11 @@ export const CONTAINMENT_LABS: LevelDef = {
       silence(7),
       sound("breath"),
       radio(nur("No. No, no — come on...")),
+    ],
+    // The west lab: the one with the card.
+    d: [
+      radio(nur("There. On the lanyard. It's got the card.")),
+      hint("Keep your light on a Watcher and it can't move. Walk up to it in the light, and take it down from any side"),
     ],
     c: [
       radio(

@@ -23,7 +23,7 @@ import type { Role } from "../net/link";
 import { emptyCommand, type PlayerCommand } from "../player/command";
 import { MAX_BATTERY } from "../player/flashlight";
 import { BREATH_NOISE, EXHALE_NOISE, GASP_NOISE } from "../player/breath";
-import { DRY, NOISE_RADIUS, PlayerController, SNOW, WATER } from "../player/playerController";
+import { DRY, NOISE_RADIUS, PlayerController, SNOW, STILL_WATER, WATER } from "../player/playerController";
 import type { Hud } from "../ui/hud";
 import { Weapon } from "../weapons/weapon";
 import type { Viewmodel } from "../weapons/viewmodel";
@@ -118,6 +118,8 @@ const PANEL_NOISE = 4;
 const GENERATOR_START_NOISE = 26;
 /** A spillway gate's siren: the whole reservoir hears it. */
 const GATE_SIREN_NOISE = 44;
+/** An intake valve wrenched shut: a long clang down the pipes. */
+const VALVE_NOISE = 20;
 /** What it says when it offers to show you the way (`advise`), the first time, the second, and after. */
 const ADVICE_LINES = ["Listen. I'll show you the quiet one.", "Again, Nur. This way. It's quiet this way.", "The last one. Follow me."];
 /** The Choir's health per creature killed under ten (`LevelDef.feeds`), and the most it can gain. */
@@ -364,10 +366,12 @@ export class LevelSession {
    */
   private takenLocker: HideSpot | null = null;
   private takenHeard = false;
+  /** The keycard round a creature's neck, and the creature (see `LevelDef.carrier`). */
+  private carried: { who: Enemy; card: Pickup } | null = null;
   /** How many times it has advised you on this level, and the last thing it said (see `advice`). */
   private advised = 0;
   /** Sounds to find your way by (`beacon`, `guide`), until you reach them or they stop. */
-  private readonly beacons: { sound: "hummer" | "ping"; at: THREE.Vector2; until: number; every: number; next: number }[] = [];
+  private readonly beacons: { sound: "hummer" | "ping" | "radio"; at: THREE.Vector2; until: number; every: number; next: number }[] = [];
   private lastAdvice: { at: THREE.Vector2; honest: boolean } | null = null;
   /** Each of the other habits shows itself once a level (see `updateHabit`); this is whether it has. */
   private habitShown = false;
@@ -414,6 +418,8 @@ export class LevelSession {
     this.pools = new BloodPools(scene);
     this.drips = new BloodPools(scene, 90, 0.8);
     this.coldLevel = !!resolveTheme(def.theme).cold;
+    // How long it had listened when the level began: the run's own seed (`keyHouses`), the same on every retry.
+    const runSeconds = Math.floor(this.voice.seconds);
     // Back at a checkpoint, it still knows what you told it and did before it, on this level too.
     if (restore?.voice) {
       const deaths = this.voice.deaths;
@@ -522,6 +528,23 @@ export class LevelSession {
       ...lootFor(this.level, difficulty.lootSupply * COOP_LOOT[players]).map((i) => new Pickup(scene, i.type, i.pos)),
       ...sp.notes.map((n) => new Pickup(scene, "note", n.pos, n.text, n.key)),
     ];
+    // The key is in one house of several, a different one each run; a radio plays in every other (`LevelDef.keyHouses`).
+    if (def.keyHouses?.length) {
+      const card = this.pickups.find((p) => p.type === "keycard");
+      const pick = (runSeconds * 7919 + def.id.length) % def.keyHouses.length;
+      def.keyHouses.forEach(([col, row], i) => {
+        const at = this.cellCentre(col, row);
+        if (i === pick) card?.group.position.set(at.x + 0.6, 0, at.y - 0.4);
+        else this.beacons.push({ sound: "radio", at, until: Infinity, every: 7 + i, next: 1 + i * 1.7 });
+      });
+    }
+    // A creature carries the keycard (`LevelDef.carrier`).
+    if (def.carrier) {
+      const at = this.cellCentre(def.carrier[0], def.carrier[1]);
+      const who = this.enemies.enemies.find((e) => e.position2D.distanceTo(at) < CELL_SIZE * 0.75) ?? null;
+      const card = this.pickups.find((p) => p.type === "keycard") ?? null;
+      if (who && card) this.carried = { who, card };
+    }
     this.humNote = def.hum ? (this.pickups.find((p) => p.noteKey === `${def.id}:${def.hum}`) ?? null) : null;
 
     // ---- interactables
@@ -693,8 +716,19 @@ export class LevelSession {
     };
   }
 
-  private get powerOn(): boolean {
+  /** Every machine on the level done: generators started, relays cut, gates opened or valves shut. */
+  private get machinesDone(): boolean {
     return this.generators.every((g) => g.running);
+  }
+
+  /** Whether the exit has what it needs from the machines (valves don't hold it). */
+  private get powerOn(): boolean {
+    return this.def.machine === "valve" || this.machinesDone;
+  }
+
+  /** The pumping station's valves all shut: the water has stopped moving, and wading is nearly silent. */
+  private get waterStill(): boolean {
+    return this.def.machine === "valve" && this.generators.length > 0 && this.machinesDone;
   }
 
   /** The keycard opens security doors if there are any, otherwise the exit. */
@@ -713,7 +747,7 @@ export class LevelSession {
 
     const cell = worldToCell(this.player.position.x, this.player.position.z);
     const cellI = cell.row * this.level.cols + cell.col;
-    this.player.terrain = this.waterCells.has(cellI) ? WATER : this.snowCells.has(cellI) ? SNOW : DRY;
+    this.player.terrain = this.waterCells.has(cellI) ? (this.waterStill ? STILL_WATER : WATER) : this.snowCells.has(cellI) ? SNOW : DRY;
     // Down: you can look around, and that's all.
     // Down: you can look around, and that's all. In a locker: look, breathe, keep still.
     const still = { ...emptyCommand(), turn: cmd.turn, tilt: cmd.tilt };
@@ -1641,10 +1675,11 @@ export class LevelSession {
       b.next -= dt;
       if (b.next > 0) continue;
       b.next = b.every;
-      // Far off, it still comes from the right direction, at the edge of hearing.
-      const from = b.at.distanceTo(me) > BEACON_REACH ? me.clone().add(b.at.clone().sub(me).setLength(BEACON_REACH)) : b.at;
+      // Far off, a guide still comes from the right direction, at the edge of hearing. A radio just carries as far as it carries.
+      const far = b.sound !== "radio" && b.at.distanceTo(me) > BEACON_REACH;
+      const from = far ? me.clone().add(b.at.clone().sub(me).setLength(BEACON_REACH)) : b.at;
       if (b.sound === "ping") this.services.sound.playPing(this.spatial(from));
-      else this.services.sound.playStinger("hummer", this.spatial(from));
+      else this.services.sound.playStinger(b.sound, this.spatial(from));
     }
   }
 
@@ -1946,24 +1981,32 @@ export class LevelSession {
     const { sound, hud } = this.services;
     const relay = gen.kind === "relay";
     const gate = gen.kind === "gate";
+    const valve = gen.kind === "valve";
     if (relay) sound.playRelayCut(this.spatial(gen.pos));
     else if (gate) sound.playSiren(this.spatial(gen.pos));
+    else if (valve) sound.playSlam(this.spatial(gen.pos));
     else sound.playGeneratorStart(this.spatial(gen.pos));
-    this.worldNoise(gen.pos, gate ? GATE_SIREN_NOISE : GENERATOR_START_NOISE);
+    this.worldNoise(gen.pos, gate ? GATE_SIREN_NOISE : valve ? VALVE_NOISE : GENERATOR_START_NOISE);
     const done = this.generators.filter((g) => g.running).length;
     const n = this.generators.length;
     // Where it sent you, if you went: it says whether it told you the truth (before it advises again).
     const advice = this.lastAdvice;
     this.lastAdvice = null;
-    if (this.powerOn) {
+    if (this.machinesDone) {
       hud.toast(
-        relay ? "THE RELAY IS DEAD" : gate ? "THE SPILLWAY IS OPEN" : "POWER RESTORED",
+        relay ? "THE RELAY IS DEAD" : gate ? "THE SPILLWAY IS OPEN" : valve ? "THE WATER IS STILL" : "POWER RESTORED",
         relay || gate ? "var(--ui-amber)" : "var(--ui-green)"
       );
       this.run(this.def.events?.power ?? []);
     } else {
       hud.toast(
-        relay ? `RELAY ${done}/${n} CUT` : gate ? `GATE ${done}/${n} OPEN` : `GENERATOR ${done}/${n} ONLINE`,
+        relay
+          ? `RELAY ${done}/${n} CUT`
+          : gate
+            ? `GATE ${done}/${n} OPEN`
+            : valve
+              ? `VALVE ${done}/${n} SHUT`
+              : `GENERATOR ${done}/${n} ONLINE`,
         relay || gate ? "var(--ui-amber)" : "var(--ui-green)"
       );
       this.run(this.def.events?.machineDone?.[done - 1] ?? []);
@@ -1983,7 +2026,7 @@ export class LevelSession {
   /** Running generators thrum every few seconds — and every thrum is a noise creatures can follow. */
   private updateGenerators(dt: number): void {
     // A generator makes noise once it runs; a relay breaker until it's cut. Either way creatures follow it.
-    const loud = (g: Generator) => (g.kind === "relay" ? !g.running : g.kind === "gate" ? false : g.running);
+    const loud = (g: Generator) => (g.kind === "relay" ? !g.running : g.kind === "gate" || g.kind === "valve" ? false : g.running);
     if (!this.generators.some(loud)) return;
     this.humTimer -= dt;
     if (this.humTimer > 0) return;
@@ -1999,7 +2042,8 @@ export class LevelSession {
   private refreshObjective(): void {
     const n = this.generators.length;
     const on = this.generators.filter((g) => g.running).length;
-    const text = n > 0 && on < n ? `${this.objective} (${on}/${n})` : this.objective;
+    // Valves are optional: no count on the objective.
+    const text = n > 0 && on < n && this.def.machine !== "valve" ? `${this.objective} (${on}/${n})` : this.objective;
     this.services.hud.setObjective(`${this.def.name} — ${this.def.subtitle}`, text);
   }
 
@@ -2335,6 +2379,17 @@ export class LevelSession {
     for (const p of this.pickups) {
       if (p.collected) continue;
       p.update(dt);
+      // Still round its neck: it goes where it goes, at chest height, out of reach.
+      if (this.carried?.card === p) {
+        const w = this.carried.who;
+        p.group.position.set(w.root.position.x, 0, w.root.position.z);
+        if (!w.isDead) {
+          p.group.position.y = 0.75 * w.stats.scale;
+          continue;
+        }
+        p.group.position.y = 0;
+        this.carried = null;
+      }
       if (p.distanceTo(px, pz) > PICKUP_RADIUS) continue;
 
       const item = ITEMS[p.type];

@@ -34,6 +34,8 @@ export interface Terrain {
 
 export const DRY: Terrain = { speed: 1, noise: 1, wet: false };
 export const WATER: Terrain = { speed: 0.72, noise: 1.8, wet: true };
+/** Water that has stopped moving (the pumping station's valves shut): as slow, and hardly louder than dry floor. */
+export const STILL_WATER: Terrain = { speed: 0.72, noise: 1.1, wet: true };
 /** Snow: a little slower going, and the crust crunches. */
 export const SNOW: Terrain = { speed: 0.9, noise: 1.2, wet: false };
 

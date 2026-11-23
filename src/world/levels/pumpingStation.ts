@@ -17,13 +17,13 @@ export const PUMPING_STATION: LevelDef = {
     "#.#A.B#..D~~~U~~~~D.#...#..#",
     "#.#.4.#..#~~~~~~~~#.#.2.#..#",
     "#.##.##..####~#####.##.##..#",
-    "#....a....L.b~.......L.....#",
+    "#....add..L.b~.......L.....#",
     "####.####.###~#####.######=#",
     "#1...#...L..#~#....L...#.R.#",
     "#.####~~~~~~#~#.~~~~~~.#.X.#",
     "#.....~~U~~~D~D~~H~~~..#...#",
     "#.####~~~~~~#~#.~~~~~~.#####",
-    "#.#M.#......#~#...R....#...#",
+    "#.#M.#..G...#~#...R..G.#...#",
     "#.#..#####.##~####.#####.K.#",
     "#.#..cc...*..~.........D...#",
     "#.######.####~#####.####...#",
@@ -36,6 +36,8 @@ export const PUMPING_STATION: LevelDef = {
   hum: "4",
   // Ruslan's medkit (see trigger c): always there, whatever the difficulty.
   keep: [[3, 12]],
+  // Two intake valves. Not needed to leave, but shut both and the water stops moving: wading goes quiet.
+  machine: "valve",
   notes: {
     "1": "ARKADIN, LOG 112 (1988). It hears the water. Every drop in this station, it hears. It learns from voices, so we give it none: we have stopped the pumps, and we have stopped talking.",
     "2": "Took the pump control card off what was left of Hendricks. The collapse was him: the detonator was still in his hand. Card's in the east intake for whoever comes next. Wade slowly. — M.",
@@ -52,6 +54,10 @@ export const PUMPING_STATION: LevelDef = {
       ),
       habitLine(),
     ],
+    machineDone: [[radio(nur("One. The water's still moving on the other side."))]],
+    power: [
+      radio(nur("...Listen. Nothing's moving. The water's dead still."), op("You did what Arkadin did. He was very quiet, after that.")),
+    ],
     keycard: [radio(nur("Mara left it here. She's alive. She's ahead of me.")), objective("Open the security door to the east stairwell.")],
   },
   triggers: {
@@ -64,6 +70,14 @@ export const PUMPING_STATION: LevelDef = {
       hint("Listeners are blind — your flashlight won't give you away, but every sound will"),
     ],
     // It asks you to leave a medkit for someone else. There's no right answer: see the power plant, and the end.
+    // The valves: Arkadin's answer, redone. Loud to shut; after that the Listeners lose you in the water.
+    d: [
+      radio(
+        nur("Intake valves. The water's still running in from the mountain. That's what makes it so loud."),
+        nur("Arkadin stopped the pumps. If I shut both valves, the water goes still. Shutting them won't be quiet.")
+      ),
+      hint("Close both intake valves and wading becomes nearly silent. Each one clangs when it shuts"),
+    ],
     c: [
       bid(
         "kit",

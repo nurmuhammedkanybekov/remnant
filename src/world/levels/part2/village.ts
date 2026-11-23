@@ -66,12 +66,29 @@ export const VILLAGE: LevelDef = {
     // Kessler's trail: someone hums his four notes from here until you find it.
     "3": "Granny has hummed it over the washing ever since the well water came up grey. She says it isn't a song, it's the way home, and soon everyone who knows it will go home together. I don't want to go home. — Aibek, 9",
   },
+  // The garage key is in Miss Asanova's house: the only house without a radio playing. Which one changes every run.
+  keyHouses: [
+    [21, 10],
+    [10, 3],
+    [24, 3],
+    [30, 3],
+  ],
   events: {
     start: [
       radio(op("The bus in the garage still runs. The dam road goes up the valley. That's where everyone is."), nur("Everyone. Right.")),
       habitLine(),
+      radio(
+        nur("Radios. In every house. All on, all on the same station."),
+        op("The garage key's with Miss Asanova, the teacher. I don't know which house is hers."),
+        op("She never listened to me. Not once.")
+      ),
+      hint("Listen at the doors. The key is in the one house where no radio is playing"),
     ],
-    keycard: [radio(nur("The garage key. Now let's hope the bus starts quietly.")), objective("Get to the bus garage."), checkpoint()],
+    keycard: [
+      radio(nur("The garage key. Her radio's in the bin, smashed."), nur("Now let's hope the bus starts quietly.")),
+      objective("Get to the bus garage."),
+      checkpoint(),
+    ],
   },
   triggers: {
     a: [

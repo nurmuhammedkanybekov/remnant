@@ -74,9 +74,11 @@ export interface LevelDef {
    * What the level's `G` tiles are: generators to start (the default), the
    * breaker cabinets of a transmitter relay, live and humming until you cut
    * them, or spillway gates, each with a siren the whole level hears when
-   * it opens. Either way the exit opens when every one is done.
+   * it opens. Either way the exit opens when every one is done. Or valves
+   * (the pumping station): these don't hold the exit, but shutting every one
+   * stills the water, and wading stops giving you away.
    */
-  machine?: "generator" | "relay" | "gate";
+  machine?: "generator" | "relay" | "gate" | "valve";
   /**
    * Kessler's trail: the note (its digit on the map) that someone humming
    * his four notes leads you to. The tune plays from there, through the
@@ -88,6 +90,19 @@ export interface LevelDef {
    * the Choir is that much stronger at the Source (`VoiceMemory.fed`).
    */
   feeds?: boolean;
+  /**
+   * The creature spawning at this cell carries the level's keycard (round its
+   * neck, glinting): it can't be picked up until the creature is dead, and
+   * then it lies where it fell. The map's K still marks the card (any open
+   * floor will do; it's moved onto the creature at the start).
+   */
+  carrier?: [number, number];
+  /**
+   * Where the keycard might be: one of these cells, a different one each run
+   * (the map's K is the first). Every other one has a radio playing in it,
+   * until you walk in; the card is in the only quiet one.
+   */
+  keyHouses?: [number, number][];
   /** Cells whose supplies the story is about (a bid to leave them): never thinned out by the difficulty. */
   keep?: [number, number][];
   /** The last level of a part: the exit and the detonator console each end it. */

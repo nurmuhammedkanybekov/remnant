@@ -56,7 +56,7 @@ const CENTER: Spatial = { pan: 0, distance: 0, muffled: false };
 export type Soundscape = "facility" | "valley" | "lab" | "cavern";
 
 /** Sounds a level script can place in the world (see `game/script.ts`). */
-export type Stinger = "knock" | "hum" | "hummer" | "choir" | "steps" | "breath" | "scream" | "radio" | "power";
+export type Stinger = "knock" | "hum" | "hummer" | "choir" | "steps" | "breath" | "scream" | "radio" | "power" | "siren";
 
 /** Kessler's four notes, in Hz: the tune the drill crew hummed, and the Remnant still does. */
 export const KESSLER_NOTES = [293.66, 349.23, 329.63, 220.0];
@@ -1483,6 +1483,9 @@ export class SoundManager {
     if (!this.ctx) return;
     const t = this.ctx.currentTime + 0.05;
     switch (kind) {
+      case "siren":
+        this.playSiren(sp);
+        return;
       case "knock": {
         const o = this.out(sp, 60, 0.9);
         if (!o) return;

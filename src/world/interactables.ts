@@ -300,10 +300,46 @@ export class Generator implements Interactable {
     scene: THREE.Scene,
     readonly spawn: CellSpawn,
     /** A generator to start, or a relay breaker cabinet to cut (`LevelDef.machine`). */
-    readonly kind: "generator" | "relay" | "gate" = "generator"
+    readonly kind: "generator" | "relay" | "gate" | "valve" = "generator"
   ) {
     this.pos = spawn.pos;
     this.body.position.set(spawn.pos.x, 0, spawn.pos.y);
+    if (kind === "valve") {
+      // An intake valve: a fat pipe out of the floor and back into it, a red wheel on its crown.
+      const pipeMat = metal(0x3a4a4a, 0.6);
+      for (const x of [-0.5, 0.5]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.1, 14), pipeMat);
+        leg.position.set(x, 0.55, 0);
+        this.body.add(leg);
+      }
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.0, 14), pipeMat);
+      top.rotation.z = Math.PI / 2;
+      top.position.y = 1.1;
+      this.body.add(top);
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.35, 8), metal(0x2a2d31, 0.5));
+      stem.position.y = 1.45;
+      this.body.add(stem);
+      this.fan = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 8, 22), metal(0x8a1a12, 0.45));
+      this.fan.rotation.x = Math.PI / 2;
+      this.fan.position.y = 1.62;
+      for (let i = 0; i < 2; i++) {
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.04, 0.04), metal(0x8a1a12, 0.45));
+        spoke.rotation.z = (i * Math.PI) / 2;
+        this.fan.add(spoke);
+      }
+      this.body.add(this.fan);
+      // No lamp to speak of: a dull tag that turns green when it's shut.
+      this.lampMat = new THREE.MeshBasicMaterial({ color: 0x401010 });
+      const tag = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.2, 0.02), this.lampMat);
+      tag.position.set(0.24, 1.25, 0.24);
+      this.body.add(tag);
+      this.lamp = glow(GREEN, 0.5);
+      this.lamp.material.opacity = 0;
+      this.lamp.position.copy(tag.position);
+      this.body.add(this.lamp);
+      scene.add(this.body);
+      return;
+    }
     if (kind === "gate") {
       // A spillway gate's winch: a concrete plinth, a red valve wheel on its face, a siren lamp on a pole.
       const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 1.2), metal(0x3e423d, 0.9));
@@ -391,7 +427,13 @@ export class Generator implements Interactable {
 
   get prompt(): string | null {
     if (this.running) return null;
-    return this.kind === "relay" ? "CUT THE RELAY" : this.kind === "gate" ? "OPEN THE GATE" : "START GENERATOR";
+    return this.kind === "relay"
+      ? "CUT THE RELAY"
+      : this.kind === "gate"
+        ? "OPEN THE GATE"
+        : this.kind === "valve"
+          ? "CLOSE THE VALVE"
+          : "START GENERATOR";
   }
 
   interact(): void {
@@ -408,6 +450,11 @@ export class Generator implements Interactable {
       this.lampMat.color.setHex(AMBER);
       return;
     }
+    if (this.kind === "valve") {
+      this.lampMat.color.setHex(GREEN);
+      this.lamp.material.opacity = 0.6;
+      return;
+    }
     if (this.kind === "relay") {
       // ON AIR goes dark; the handle is down.
       this.lampMat.color.setHex(0x1a0606);
@@ -420,6 +467,14 @@ export class Generator implements Interactable {
   }
 
   update(dt: number, time: number): void {
+    if (this.kind === "valve") {
+      // Shut: the wheel turns down for a couple of seconds.
+      if (!this.running) return;
+      if (this.openedAt < 0) this.openedAt = time;
+      const since = time - this.openedAt;
+      if (since < 2) this.fan.rotation.z += dt * 5 * (1 - since / 2);
+      return;
+    }
     if (this.kind === "gate") {
       // Opened: the wheel spins down for a few seconds, and the siren lamp turns while it wails.
       if (!this.running) return;

@@ -134,6 +134,21 @@ export function validateLevel(level: ParsedLevel): string[] {
         problems.push(`${id}: bid "${a.id}"'s item at ${t.at.col},${t.at.row} must be in \`keep\` (or a difficulty could thin it out)`);
     }
   }
+  // A keycard carried by a creature: there has to be a creature there, and a card.
+  if (def.carrier) {
+    const [cc, cr] = def.carrier;
+    if (
+      !s.enemies.some((e) => {
+        const c = worldToCell(e.pos.x, e.pos.y);
+        return c.col === cc && c.row === cr;
+      })
+    )
+      problems.push(`${id}: the keycard's carrier at ${cc},${cr} isn't a creature`);
+    if (!s.items.some((i) => i.type === "keycard")) problems.push(`${id}: a carrier, and no keycard (K) for it to carry`);
+  }
+  // Every house the key might be in has to be somewhere you can get to.
+  for (const [col, row] of def.keyHouses ?? [])
+    if (!canReach({ col, row })) problems.push(`${id}: key house at ${col},${row} is not on floor you can reach`);
   // Doors the script shuts or opens have to be doors.
   for (const a of scripts) {
     if (a.type !== "doors") continue;

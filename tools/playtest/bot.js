@@ -102,7 +102,8 @@ window.botPlayLevel = function (maxSeconds, opts = {}) {
       (p.type === "battery" && s.player.flashlight.battery < 99);
     const supply = s.pickups.find((p) => !p.collected && wanted(p) && near(p, 9));
     if (supply) return { kind: "item", x: supply.group.position.x, z: supply.group.position.z, what: supply.type };
-    const gen = s.generators.find((g2) => !g2.running);
+    // Valves (the pumping station) are optional: they quiet the water, the exit doesn't need them.
+    const gen = s.generators.find((g2) => !g2.running && g2.kind !== "valve");
     if (gen) return { kind: "use", x: gen.pos.x, z: gen.pos.y, cell: gen.spawn.cell, what: "generator", obj: gen };
     // Low on everything: detour for ammo.
     const ammo = [...s.weapons.values()].reduce((a, w) => a + w.reserveAmmo + w.ammoInMag, 0);
