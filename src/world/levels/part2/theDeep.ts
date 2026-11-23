@@ -23,6 +23,8 @@ export const THE_DEEP: LevelDef = {
   tagline: "Arkadin's first laboratory. Under the floor you woke up on.",
   objective: "Restore power to the cavity lift.",
   spawnYaw: -Math.PI / 2,
+  // Fighting is possible here, and it costs: every one you kill sings in the Choir at the Source.
+  feeds: true,
   theme: {
     fog: 0x060b0c,
     fogDensity: 0.058,
@@ -67,6 +69,10 @@ export const THE_DEEP: LevelDef = {
         nur("Tiles and drains. They hosed this place down every night. It didn't help.")
       ),
       habitLine(),
+      radio(
+        unknown("Everything that dies down here comes home to us, Nur. Every one makes the choir a little louder."),
+        nur("Then I go quietly. As much as I can.")
+      ),
     ],
     keycard: [radio(nur("The drill-site card. The lower gate is open now.")), checkpoint()],
     power: [

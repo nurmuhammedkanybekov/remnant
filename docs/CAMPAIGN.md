@@ -54,7 +54,7 @@ cover).
 - **Optional**: Hendricks' GLASS crates and his detonator wire.
 - **Connects to**: the containment blackout (if you said the dark, it lasts twice as long).
 - **Changes**: it knows your fear, or knows you wouldn't say.
-- **Proposed**: no authored moment yet. A freezer door that closes behind you when you take the keycard, and the voice offering to open it for you: an instruction you can refuse, and a debt if you don't.
+- **Moment (built)**: you take the keycard and both freezer doors slam behind you. "I can open them. You only have to ask me." Ask, and they open, and it remembers that you asked. Don't, and there's a loose panel in the freezer's back wall; it says Hendricks found one too.
 
 ### 4 Pumping Station (Sublevel 7)
 
@@ -158,14 +158,13 @@ cover).
 ### 13 Hydro Dam (Kara-Suu)
 
 - **Story**: hundreds in the reservoir, waiting.
-- **Play**: three generators for the spillway.
+- **Play**: three spillway gates. Each one's siren calls everything in the reservoir to it, so the order matters.
 - **Identity**: the open reservoir under the sky.
-- **Main interaction**: generators again.
+- **Main interaction**: choosing the order, and whether to believe the voice when it shows you "the quiet one".
 - **Moment**: three figures standing in the water under the shore lamp.
 - **Optional**: the gate log.
 - **Connects to**: the clinic's question.
-- **Changes**: little. **This is the weakest level structurally**: a second generator level.
-- **Proposed**: replace the generators with the spillway's sirens. Each gate you open sounds a siren that every creature hears; you choose the order, and the voice tells you which is safest (it's honest, here, if you've obeyed it more than you defied it, and lies otherwise).
+- **Changes**: you find out what your history with it is worth. **Built**: it chirps from the gate it recommends: the one with fewest creatures near if you've trusted it, the most if you've resisted, turn about if you're torn. Open that gate and it tells you which it was: "You see? Quiet. I told you the truth" or "You never listened to me. Why would I tell you the truth now?" The shift engineer's note warns you: the radio always knows which is quiet; it doesn't always say.
 
 ### 14 Observatory (Kosh-Tash)
 
@@ -188,7 +187,7 @@ cover).
 - **Optional**: the survey photograph: Kessler in 1987, not a day younger.
 - **Connects to**: the Source (Nur names where the tune came from).
 - **Changes**: you know who taught Kessler.
-- **Proposed**: navigation by sound. A long blackout stretch where the only guide is the hum coming down the tunnel from the cavity, and the voice offering to guide you instead.
+- **Built: by ear.** At the last stretch everything goes dark, the torch too, for half a minute. Kessler's tune comes up the line from the true way; the voice offers to guide you with its chirp. They come from the same place if you've trusted it. If not, its chirp leads up into the bay where the swarm and the crawler are. A Listener waits on the true way, so even the truth needs a quiet foot.
 
 ### 16 Laboratory Zero (Beneath Ten)
 
@@ -200,7 +199,7 @@ cover).
 - **Optional**: Arkadin's second log: the first time it answered.
 - **Connects to**: the Source.
 - **Changes**: you're under the bed you woke up on.
-- **Proposed**: fighting is possible but makes it worse: every creature killed here joins the Choir's voices at the Source (one more voice in the last fight).
+- **Built: fighting costs.** It tells you as you arrive: everything that dies down here comes home to it. Every creature you kill here makes the Choir 2% stronger at the Source, up to a third; it tells you how many you sent ("...12 more of us, Nur"), and the recount names the number.
 
 ### 17 The Source (The Cavity)
 
@@ -216,11 +215,13 @@ cover).
 ## Structure, honestly
 
 Shapes, after this pass (counted from the level data): walk 5, keycard 5,
-keycard + relay 1 (the observatory), generators 2 (power plant, dam),
+keycard + relay 1 (the observatory), generators 1 (power plant), gates 1 (the dam),
 generators + keycard 1 (Laboratory Zero), boss 1 (the Hive), finale 2 (the
 portal; the Source, with its boss).
-The bids give five levels a decision that isn't the objective, but the
-objectives themselves are still mostly "find the card". The three
-**Proposed** redesigns above (the dam's sirens, the tunnel by sound,
-Laboratory Zero's cost of fighting) are the next structural work, in that
-order: the dam is the most repetitive, the tunnel the most promising.
+The dam is now gates, not generators (generators 1, gates 1). Beyond the
+objectives, levels now differ in what they ask of you: cold storage a
+choice under pressure, the dam a question of trust, the rail tunnel
+navigation by ear, Laboratory Zero restraint, and five levels a decision
+the voice gives you. The objectives themselves are still mostly "find the
+card"; the keycard levels (pumping station, containment, armory, village)
+are the next place to look.

@@ -1,14 +1,20 @@
-import { alarm, apparition, checkpoint, hint, ifTold, nur, objective, op, radio, silence, unknown } from "../../../game/script";
+import { advise, alarm, apparition, checkpoint, hint, ifTold, nur, objective, op, radio, silence, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
-/** Level 13 — the hydro dam: flooded channels and three generators for the spillway gate. */
+/**
+ * Level 13 — the hydro dam: flooded channels, and three spillway gates. Each
+ * one's siren calls the reservoir to it, so the order matters, and the voice
+ * offers to tell you which is quietest. Whether it tells the truth depends on
+ * how you've treated it (see `advise`).
+ */
 export const HYDRO_DAM: LevelDef = {
   id: "kara-suu-dam",
   name: "Kara-Suu",
   subtitle: "Hydro Dam",
   number: 13,
   tagline: "Where the meltwater goes, they go.",
-  objective: "Start the three generators to open the spillway gate.",
+  objective: "Open the three spillway gates.",
+  machine: "gate",
   spawnYaw: -Math.PI / 2,
   theme: {
     fog: 0x06100e,
@@ -45,7 +51,7 @@ export const HYDRO_DAM: LevelDef = {
     "####################################",
   ],
   notes: {
-    "1": "Spillway gate won't open without all three generators. Whoever starts the first one: the whole valley hears it. Start the second one fast. — B. Toktogulov, shift engineer",
+    "1": "Three gates to open the spillway. Every gate sounds the siren when it opens, and the whole reservoir hears it. Open the quiet one first. The radio always knows which is quiet. It doesn't always say. — B. Toktogulov, shift engineer",
     "2": "They stand in the reservoir up to the neck. Hundreds. Not breathing. Waiting for the water to carry them somewhere. — B.T.",
     "3": "GATE LOG. Pumps two and three started by hand, 04:20. By first light the reservoir was full of people. Not one of them came out to stop us. They only turned, all together, to watch the lamps come on. — B.T.",
   },
@@ -58,12 +64,11 @@ export const HYDRO_DAM: LevelDef = {
       ),
       // You told it where you were going. They're waiting.
       ifTold("where", [radio(unknown("...we waited at the water, Nur, like you said. All of us...")), alarm(24)]),
+      advise(),
     ],
-    power: [
-      radio(nur("The gate's opening. Loud enough to wake the whole reservoir.")),
-      objective("Get through the spillway."),
-      checkpoint(),
-    ],
+    // After each gate it offers again. You'll know by now whether to believe it.
+    machineDone: [[advise()], [advise()]],
+    power: [radio(nur("The spillway's open. Everything in the reservoir heard it.")), objective("Get through the spillway."), checkpoint()],
   },
   triggers: {
     a: [hint("Water is loud. Wading brings Listeners. Find the dry walkways")],
@@ -76,6 +81,6 @@ export const HYDRO_DAM: LevelDef = {
       apparition("husk", 19, 2),
     ],
     c: [radio(nur("Spitters on the gantry. Stay out of their line.")), checkpoint()],
-    d: [radio(op("One more generator. Then the gate."))],
+    d: [radio(op("The spillway's right below you. Every gate you open, they'll come to."))],
   },
 };

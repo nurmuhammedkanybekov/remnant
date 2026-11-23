@@ -14,7 +14,7 @@ import { Projectiles } from "../enemies/projectiles";
 import { Effects } from "../fx/particles";
 import { Footprints, type PrintKind } from "../fx/footprints";
 import { BloodPools } from "../fx/pools";
-import { cloneVoice, freshVoice, habitOf, heed, remember, remembered, type Habit, type VoiceMemory } from "./voiceMemory";
+import { cloneVoice, freshVoice, habitOf, heed, remember, remembered, stanceOf, type Habit, type VoiceMemory } from "./voiceMemory";
 import { recountLines } from "../content/story";
 import { Pickup } from "../items/pickup";
 import { SMASH_NOISE, throwFrom, Throwables } from "../items/throwables";
@@ -116,6 +116,15 @@ const DOOR_NOISE = 9;
 /** Prying a loose panel: a scrape and a thud, much quieter than a door's motor. */
 const PANEL_NOISE = 4;
 const GENERATOR_START_NOISE = 26;
+/** A spillway gate's siren: the whole reservoir hears it. */
+const GATE_SIREN_NOISE = 44;
+/** What it says when it offers to show you the way (`advise`), the first time, the second, and after. */
+const ADVICE_LINES = ["Listen. I'll show you the quiet one.", "Again, Nur. This way. It's quiet this way.", "The last one. Follow me."];
+/** The Choir's health per creature killed under ten (`LevelDef.feeds`), and the most it can gain. */
+const CHOIR_PER_VOICE = 0.02;
+const CHOIR_FED_MAX = 0.35;
+/** A beacon further than this is heard from this far, in its direction (the hum barely carries further). */
+const BEACON_REACH = 26;
 const GENERATOR_HUM_NOISE = 11;
 const GENERATOR_HUM_INTERVAL = 4.5;
 /** cos of the widest angle off-centre you can be looking and still use something. */
@@ -289,6 +298,8 @@ export class LevelSession {
   /** A question the voice is waiting on an answer to (see `updateAsking`). */
   private asking: { a: Extract<ScriptAction, { type: "ask" }>; open: boolean; until: number } | null = null;
   private talkWas = false;
+  /** Questions it will ask as soon as the one it's waiting on is answered. */
+  private readonly askQueue: Extract<ScriptAction, { type: "ask" }>[] = [];
   /** Something it told you to do, and is watching to see if you do (see `updateBid`). */
   private bidding: { a: Extract<ScriptAction, { type: "bid" }>; open: boolean; until: number; from: THREE.Vector2; dark: number } | null =
     null;
@@ -353,6 +364,17 @@ export class LevelSession {
    */
   private takenLocker: HideSpot | null = null;
   private takenHeard = false;
+  /** How many times it has advised you on this level, and the last thing it said (see `advice`). */
+  private advised = 0;
+  /** Sounds to find your way by (`beacon`, `guide`), until you reach them or they stop. */
+  private readonly beacons: { sound: "hummer" | "ping"; at: THREE.Vector2; until: number; every: number; next: number }[] = [];
+  private lastAdvice: { at: THREE.Vector2; honest: boolean } | null = null;
+  /** Each of the other habits shows itself once a level (see `updateHabit`); this is whether it has. */
+  private habitShown = false;
+  private darkFor = 0;
+  /** Seconds until something answers your shots again (habit "gun"). */
+  private echoRest = 0;
+  private echoHeard = false;
   /** Health when you got in: hurt in there means something pulled you out. */
   private hideHp = 0;
   private bleed = 0;
@@ -482,6 +504,19 @@ export class LevelSession {
     };
     this.enemies.wireAll();
     this.boss = this.enemies.boss;
+    // Every voice you sent it from under ten sings in the Choir: it's that much harder to kill (solo; co-op
+    // players' memories differ). A third more at most, so killing everything is a cost, not a wall.
+    if (this.boss?.stats.id === "choir" && this.voice.fed > 0 && !coop) {
+      const k = 1 + Math.min(CHOIR_FED_MAX, this.voice.fed * CHOIR_PER_VOICE);
+      (this.boss as { maxHealth: number }).maxHealth *= k;
+      this.boss.health = this.boss.maxHealth;
+      if (!restore)
+        this.later(14, () =>
+          this.radio.say([
+            { speaker: "unknown", text: `...${this.voice.fed} more of us, Nur. You sent them home from under ten. Listen to them sing.` },
+          ])
+        );
+    }
 
     this.pickups = [
       ...lootFor(this.level, difficulty.lootSupply * COOP_LOOT[players]).map((i) => new Pickup(scene, i.type, i.pos)),
@@ -507,7 +542,7 @@ export class LevelSession {
       };
       door.onLocked = () => {
         sound.playLocked();
-        this.throttledPrompt("NEEDS THE KEYCARD");
+        this.throttledPrompt(door.jammed ? "IT WON'T OPEN — SOMETHING'S HOLDING IT" : "NEEDS THE KEYCARD");
       };
       return door;
     });
@@ -717,6 +752,8 @@ export class LevelSession {
     this.updateAsking(cmd.talk, cmd.interact);
     this.updateBid(dt);
     this.updateTakenLocker();
+    this.updateHabit(dt);
+    this.updateBeacons(dt);
     this.updateHum(dt);
     viewmodel.update(
       dt,
@@ -1350,7 +1387,12 @@ export class LevelSession {
           break;
         case "ask":
           // It never asks the same thing twice in a run.
-          if (this.voice.told.includes(a.id) || this.voice.withheld.includes(a.id) || this.asking) break;
+          if (this.voice.told.includes(a.id) || this.voice.withheld.includes(a.id)) break;
+          // Already waiting on an answer: this one waits its turn.
+          if (this.asking) {
+            if (!this.askQueue.some((q) => q.id === a.id)) this.askQueue.push(a);
+            break;
+          }
           this.radio.say(a.question);
           this.asking = { a, open: false, until: Infinity };
           break;
@@ -1375,6 +1417,49 @@ export class LevelSession {
         case "ifHeeded":
           this.run(this.voice.obeyed.includes(a.id) ? a.obeyed : this.voice.defied.includes(a.id) ? a.defied : a.never);
           break;
+        case "advise": {
+          const at = this.advice();
+          if (!at) break;
+          this.radio.say([{ speaker: "operator", text: ADVICE_LINES[Math.min(this.advised, ADVICE_LINES.length) - 1] }]);
+          this.later(3.5, () => {
+            for (let k = 0; k < 3; k++) this.later(k * 1.4, () => sound.playPing(this.spatial(at)));
+          });
+          break;
+        }
+        case "doors": {
+          const here = worldToCell(this.player.position.x, this.player.position.z);
+          for (const c of a.at) {
+            const d = this.doors.find((x) => x.spawn.cell.col === c.col && x.spawn.cell.row === c.row);
+            if (!d) continue;
+            if (a.open) {
+              if (d.jammed || !d.isOpen) {
+                d.release();
+                sound.playDoor(this.spatial(d.pos), false);
+              }
+              continue;
+            }
+            // Never onto someone standing in the doorway.
+            if (here.col === c.col && here.row === c.row) continue;
+            if (d.isOpen) sound.playSlam(this.spatial(d.pos));
+            d.shut();
+          }
+          break;
+        }
+        case "beacon":
+          this.beacons.push({
+            sound: a.sound,
+            at: this.cellCentre(a.at.col, a.at.row),
+            until: this.time + a.seconds,
+            every: a.every,
+            next: 0,
+          });
+          break;
+        case "guide": {
+          const honest = stanceOf(this.voice) === "trusted";
+          const to = honest ? a.truth : a.lie;
+          this.beacons.push({ sound: "ping", at: this.cellCentre(to.col, to.row), until: this.time + a.seconds, every: 3, next: 1.5 });
+          break;
+        }
         case "recount": {
           const part = this.def.endings?.exit === "dawn" || this.def.endings?.exit === "silence" ? 2 : 1;
           const lines = recountLines(remembered(this.voice), part);
@@ -1400,7 +1485,11 @@ export class LevelSession {
     // Push to talk answers; so does Use (a gamepad has no talk button).
     const pressed = (talk && !this.talkWas) || (use && !!q?.open);
     this.talkWas = talk;
-    if (!q) return;
+    if (!q) {
+      // The next question waiting its turn, once the radio is free.
+      if (this.askQueue.length && !this.radio.busy && !this.downed) this.run([this.askQueue.shift()!]);
+      return;
+    }
     const { hud } = this.services;
     if (this.downed || this.player.health.isDead) {
       remember(this.voice, q.a.id, false);
@@ -1499,6 +1588,66 @@ export class LevelSession {
     this.services.sound.playStinger("breath", this.spatial(spot.pos));
   }
 
+  /**
+   * What it has learned about you shows, once a level, where you can see it
+   * (the hider's taken locker is `updateTakenLocker`; the gun and the knife
+   * are in `fire` and `melee`). Not in the first forty seconds, so a level
+   * gets to start before it starts on you.
+   * - torch: the lamp you're walking towards goes out as you reach it, and
+   *   comes back on behind you.
+   * - dark: after a while in the dark, something stands ahead of you in it,
+   *   where your light never goes. It isn't really there.
+   */
+  private updateHabit(dt: number): void {
+    this.echoRest = Math.max(0, this.echoRest - dt);
+    if (this.habitShown || this.time < 40 || this.downed || this.hiding) return;
+    const me = this.player.position2D;
+    const fwd = new THREE.Vector2(-Math.sin(this.player.facing), -Math.cos(this.player.facing));
+    const torch = this.player.flashlight.on && this.player.flashlight.level > 0.3;
+    if (this.learned === "torch" && torch && this.player.moveFactor > 0.2) {
+      const ahead = this.lamps.lampsAlong(me, me.clone().addScaledVector(fwd, 7), 2.2);
+      for (const i of ahead) {
+        const at = this.lamps.blackoutLamp(i, 0.5, 9);
+        if (!at || at.distanceTo(me) < 2.5) continue;
+        this.habitShown = true;
+        this.services.sound.playLampOut(this.spatial(at));
+        this.later(3, () => this.radio.say([{ speaker: "nur", text: "...It went out just as I got to it." }]));
+        return;
+      }
+    }
+    if (this.learned === "dark") {
+      this.darkFor = torch ? 0 : this.darkFor + dt;
+      if (this.darkFor < 8) return;
+      for (let d = 7; d >= 4; d -= 0.5) {
+        const at = me.clone().addScaledVector(fwd, d);
+        const c = worldToCell(at.x, at.y);
+        if (isSolid(this.level, c.col, c.row) || !hasLineOfSight(this.level, me, at) || this.lamps.lightAt(at.x, at.y) > 0.15) continue;
+        this.habitShown = true;
+        this.apparitions.push(new Apparition(this.services.engine.scene, "watcher", at, "toward"));
+        this.services.sound.playStinger("breath", this.spatial(at));
+        return;
+      }
+    }
+  }
+
+  private updateBeacons(dt: number): void {
+    const me = this.player.position2D;
+    for (let i = this.beacons.length - 1; i >= 0; i--) {
+      const b = this.beacons[i];
+      if (this.time > b.until || b.at.distanceTo(me) < CELL_SIZE * 1.5) {
+        this.beacons.splice(i, 1);
+        continue;
+      }
+      b.next -= dt;
+      if (b.next > 0) continue;
+      b.next = b.every;
+      // Far off, it still comes from the right direction, at the edge of hearing.
+      const from = b.at.distanceTo(me) > BEACON_REACH ? me.clone().add(b.at.clone().sub(me).setLength(BEACON_REACH)) : b.at;
+      if (b.sound === "ping") this.services.sound.playPing(this.spatial(from));
+      else this.services.sound.playStinger("hummer", this.spatial(from));
+    }
+  }
+
   /** The pickup lying in a cell, if any. */
   private pickupAt(col: number, row: number): Pickup | null {
     const at = this.cellCentre(col, row);
@@ -1549,6 +1698,24 @@ export class LevelSession {
       default:
         return NO_WISDOM;
     }
+  }
+
+  /**
+   * Which machine still to do it sends you to (`advise`): the one with the
+   * fewest creatures near it if it's being honest, the most if it isn't.
+   * Honest if you've trusted it; not if you've resisted it; if you're torn,
+   * every other time.
+   */
+  private advice(): THREE.Vector2 | null {
+    const left = this.generators.filter((g) => !g.running);
+    if (!left.length) return null;
+    const stance = stanceOf(this.voice);
+    const honest = stance === "resisted" ? false : stance === "torn" ? this.advised % 2 === 0 : true;
+    this.advised++;
+    const crowd = (g: Generator) => this.enemies.enemies.filter((e) => !e.isDead && e.position2D.distanceTo(g.pos) < 20).length;
+    const pick = left.reduce((a, b) => ((honest ? crowd(b) < crowd(a) : crowd(b) > crowd(a)) ? b : a));
+    this.lastAdvice = { at: pick.pos.clone(), honest };
+    return pick.pos.clone();
   }
 
   /** Where the voice would send you now: the keycard you haven't got, a machine still to do, or the way out. */
@@ -1778,19 +1945,37 @@ export class LevelSession {
   private handleGeneratorStarted(gen: Generator): void {
     const { sound, hud } = this.services;
     const relay = gen.kind === "relay";
+    const gate = gen.kind === "gate";
     if (relay) sound.playRelayCut(this.spatial(gen.pos));
+    else if (gate) sound.playSiren(this.spatial(gen.pos));
     else sound.playGeneratorStart(this.spatial(gen.pos));
-    this.worldNoise(gen.pos, GENERATOR_START_NOISE);
+    this.worldNoise(gen.pos, gate ? GATE_SIREN_NOISE : GENERATOR_START_NOISE);
     const done = this.generators.filter((g) => g.running).length;
+    const n = this.generators.length;
+    // Where it sent you, if you went: it says whether it told you the truth (before it advises again).
+    const advice = this.lastAdvice;
+    this.lastAdvice = null;
     if (this.powerOn) {
-      hud.toast(relay ? "THE RELAY IS DEAD" : "POWER RESTORED", relay ? "var(--ui-amber)" : "var(--ui-green)");
+      hud.toast(
+        relay ? "THE RELAY IS DEAD" : gate ? "THE SPILLWAY IS OPEN" : "POWER RESTORED",
+        relay || gate ? "var(--ui-amber)" : "var(--ui-green)"
+      );
       this.run(this.def.events?.power ?? []);
     } else {
       hud.toast(
-        relay ? `RELAY ${done}/${this.generators.length} CUT` : `GENERATOR ${done}/${this.generators.length} ONLINE`,
-        relay ? "var(--ui-amber)" : "var(--ui-green)"
+        relay ? `RELAY ${done}/${n} CUT` : gate ? `GATE ${done}/${n} OPEN` : `GENERATOR ${done}/${n} ONLINE`,
+        relay || gate ? "var(--ui-amber)" : "var(--ui-green)"
       );
       this.run(this.def.events?.machineDone?.[done - 1] ?? []);
+    }
+    if (advice && advice.at.distanceTo(gen.pos) < 0.5) {
+      this.later(5.5, () =>
+        this.radio.say([
+          advice.honest
+            ? { speaker: "operator", text: "You see? Quiet. I told you the truth, Nur. I always do, for you." }
+            : { speaker: "operator", text: "You never listened to me. Why would I tell you the truth now?" },
+        ])
+      );
     }
     this.refreshObjective();
   }
@@ -1798,7 +1983,7 @@ export class LevelSession {
   /** Running generators thrum every few seconds — and every thrum is a noise creatures can follow. */
   private updateGenerators(dt: number): void {
     // A generator makes noise once it runs; a relay breaker until it's cut. Either way creatures follow it.
-    const loud = (g: Generator) => (g.kind === "relay" ? !g.running : g.running);
+    const loud = (g: Generator) => (g.kind === "relay" ? !g.running : g.kind === "gate" ? false : g.running);
     if (!this.generators.some(loud)) return;
     this.humTimer -= dt;
     if (this.humTimer > 0) return;
@@ -1953,6 +2138,21 @@ export class LevelSession {
     if (this.currentWeapon !== "rivet") this.muzzleTime = MUZZLE_FLASH_TIME;
     // One that's learned you shoot hears it from further (see `HABIT_LINES.gun`).
     this.playerNoise(this.player.position2D, cfg.noiseRadius * (this.learned === "gun" ? 1.25 : 1));
+    // And something answers: your own shot, from somewhere else, to draw you off. Creatures don't hear it; you do.
+    if (this.learned === "gun" && this.echoRest <= 0 && this.time > 40) {
+      this.echoRest = 50;
+      const me = this.player.position2D.clone();
+      const weapon = this.currentWeapon;
+      this.later(1.4, () => {
+        let at = randomFloorNear(this.level, me.x, me.y, 6);
+        for (let k = 0; k < 8 && at.distanceTo(me) < CELL_SIZE * 3; k++) at = randomFloorNear(this.level, me.x, me.y, 6);
+        this.services.sound.playGunshotAt(weapon, this.spatial(at));
+        if (!this.echoHeard) {
+          this.echoHeard = true;
+          this.later(1.5, () => this.radio.say([{ speaker: "nur", text: "...That wasn't me. That was my gun. Over there." }]));
+        }
+      });
+    }
 
     let anyHit = false;
     let anyHead = false;
@@ -2035,6 +2235,7 @@ export class LevelSession {
   private onEnemyKilled(enemy: Enemy, by = this.mySlot): void {
     if (by !== this.mySlot) this.coop?.sendTo(by, { t: "killed", i: this.enemies.enemies.indexOf(enemy) });
     else this.stats.kills++;
+    if (this.def.feeds && enemy !== this.boss) this.voice.fed++;
     if (enemy !== this.boss) return;
     for (const e of this.brood) e.takeDamage(e.health + 1, enemy.position2D);
     this.coop?.send({ t: "bossDead" });
@@ -2079,6 +2280,17 @@ export class LevelSession {
       return;
     }
     const chest = new THREE.Vector3(target.root.position.x, 1.1 * target.stats.scale, target.root.position.z);
+    // One that's learned you come from behind turns round as you reach it: the first time on each level.
+    if (this.learned === "knife" && !this.habitShown && target.canBeTakenDown(me)) {
+      this.habitShown = true;
+      sound.playMelee(false);
+      target.alertTo(me);
+      sound.playEnemy("alert", target.stats.voicePitch, this.spatial(target.position2D));
+      this.player.addTrauma(0.3);
+      this.player.nerve.shock(0.3);
+      this.later(1, () => this.radio.say([{ speaker: "nur", text: "It turned round. It knew I was there." }]));
+      return;
+    }
     if (target.canBeTakenDown(me)) {
       this.stats.takedowns++;
       this.voice.takedowns++;
@@ -2250,7 +2462,12 @@ export class LevelSession {
   private exitLockReason(): string | null {
     if (this.boss && !this.boss.isDead) return `SEALED — ${this.boss.stats.name.toUpperCase()} HOLDS THE DOOR`;
     if (this.keycardLocksExit && !this.hasKeycard) return "LOCKED — FIND THE KEYCARD";
-    if (!this.powerOn) return this.def.machine === "relay" ? "THE RELAY IS STILL ON AIR — CUT IT" : "NO POWER — START THE GENERATORS";
+    if (!this.powerOn)
+      return this.def.machine === "relay"
+        ? "THE RELAY IS STILL ON AIR — CUT IT"
+        : this.def.machine === "gate"
+          ? "THE SPILLWAY IS SHUT — OPEN THE GATES"
+          : "NO POWER — START THE GENERATORS";
     return null;
   }
 

@@ -1071,6 +1071,25 @@ export class SoundManager {
     this.tone(o, "sawtooth", 100, 30, t + 0.1, 1.8, 0.08, 0.05); // the transformer winding down
   }
 
+  /**
+   * A spillway gate's siren: a hand-cranked wail rising and falling three
+   * times over the water, so loud the whole reservoir hears it.
+   */
+  playSiren(sp: Spatial): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.out(sp, 120, 1.4);
+    if (!o) return;
+    this.burst(o, "lowpass", 220, 1, t, 0.3, 0.5, 0.002); // the gate's lock giving
+    for (let i = 0; i < 3; i++) {
+      const at = t + 0.3 + i * 1.6;
+      this.tone(o, "sawtooth", 320, 760, at, 0.8, 0.07, 0.25);
+      this.tone(o, "sawtooth", 760, 300, at + 0.8, 0.8, 0.07, 0.02);
+      this.tone(o, "square", 160, 380, at, 0.8, 0.03, 0.25);
+      this.tone(o, "square", 380, 150, at + 0.8, 0.8, 0.03, 0.02);
+    }
+  }
+
   /** A live relay cabinet: mains buzz, and the carrier whining over it with a crackle of static. */
   playRelayHum(sp: Spatial): void {
     if (!this.ctx) return;

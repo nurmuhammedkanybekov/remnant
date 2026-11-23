@@ -113,6 +113,8 @@ export interface Remembered {
   defied: readonly string[];
   trail: readonly string[];
   deaths: number;
+  /** Creatures killed under ten, whose voices went to the Choir. */
+  fed: number;
   stance: "trusted" | "resisted" | "torn" | null;
 }
 
@@ -166,6 +168,9 @@ export function recountLines(m: Remembered, part: 1 | 2): RecountLine[] {
         say("When I told you to put your light out, you did. In the dark, with one of them walking past. Before you even knew what I was.")
       );
     else if (didnt("lights-off")) add(3, say("When I told you to put your light out, you didn't. You wanted to see. We understand that."));
+    if (told("open"))
+      add(3, say("In the freezer, when the doors shut, you asked me to open them. You asked. I'll always remember that you asked."));
+    else if (held("open")) add(3, say("In the freezer you'd rather tear the wall open than ask me for anything. Hendricks was like that."));
     if (told("fear")) add(2, say("You told me you were afraid of the dark. So I showed you some."));
     else if (held("fear")) add(1, say("You never told me what you were afraid of. I had to guess. I think I guessed well."));
     if (did("kit"))
@@ -203,6 +208,8 @@ export function recountLines(m: Remembered, part: 1 | 2): RecountLine[] {
   else if (didnt("still"))
     out.push(say("In the village I told you not to move, and you ran. There was something behind you. I asked it to let you go."));
   if (m.trail.length >= 4) out.push(say("You followed the man who hummed, all the way to the photograph. Now you know who taught him."));
+  if (m.fed >= 5)
+    out.push(say(`You killed ${m.fed} of them under ten. Every one came home to me. They sang with us, at the end. You heard them.`));
   if (m.deaths > 0)
     out.push(say(`You died ${m.deaths === 1 ? "once" : `${m.deaths} times`} on the way to me. I was there every time. I waited.`));
   if (!out.length && !m.stance) return [];

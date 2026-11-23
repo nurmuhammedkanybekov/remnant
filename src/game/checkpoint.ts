@@ -12,8 +12,9 @@ import { parseVoice, type VoiceMemory } from "./voiceMemory";
  * checkpoint stores indices into them). A checkpoint from another layout is
  * dropped, and the level restarts from its beginning instead.
  * 2: ammunition split into caches spread over each level.
+ * 3: cold storage's freezer doors and panel; the pumping station's medkit kept on lean difficulties.
  */
-export const CHECKPOINT_LAYOUT = 2;
+export const CHECKPOINT_LAYOUT = 3;
 
 export interface CheckpointState {
   /** `CHECKPOINT_LAYOUT` when it was taken. */

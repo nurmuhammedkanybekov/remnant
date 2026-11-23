@@ -1,4 +1,18 @@
-import { alarm, checkpoint, hint, nur, objective, op, radio, sound, torchFails, unknown } from "../../../game/script";
+import {
+  alarm,
+  beacon,
+  blackout,
+  checkpoint,
+  guide,
+  hint,
+  nur,
+  objective,
+  op,
+  radio,
+  sound,
+  torchFails,
+  unknown,
+} from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 15 — the drainage line into the mountain: a long tunnel with bays, Crawlers overhead, packs in the dark. */
@@ -59,10 +73,21 @@ export const RAIL_TUNNEL: LevelDef = {
       torchFails(2),
       radio(nur("...Who's there? ...Sadykova?")),
     ],
+    // The last stretch in the dark, by ear. Kessler's tune comes up the line from where you're going; the voice
+    // offers to guide you, and its chirp leads the true way only if you've trusted it (see \`guide\`).
     c: [
       radio(unknown("...the Deep is below ten, Nur. Below the infirmary where you woke up. We were always underneath you...")),
       alarm(18),
       checkpoint(),
+      blackout(32),
+      torchFails(30),
+      radio(nur("Everything's gone. Even the torch.")),
+      beacon("hummer", 46, 8, 32, 4),
+      radio(
+        op("Nur. I can see you. Follow my voice, I'll take you through."),
+        nur("Two sounds. His tune, from down the line. And the radio.")
+      ),
+      guide([46, 8], [38, 2], 30),
     ],
   },
 };

@@ -71,17 +71,23 @@ export interface LevelDef {
   };
   theme?: Partial<LevelTheme>;
   /**
-   * What the level's `G` tiles are: generators to start (the default), or the
+   * What the level's `G` tiles are: generators to start (the default), the
    * breaker cabinets of a transmitter relay, live and humming until you cut
-   * them. Either way the exit opens when every one is done.
+   * them, or spillway gates, each with a siren the whole level hears when
+   * it opens. Either way the exit opens when every one is done.
    */
-  machine?: "generator" | "relay";
+  machine?: "generator" | "relay" | "gate";
   /**
    * Kessler's trail: the note (its digit on the map) that someone humming
    * his four notes leads you to. The tune plays from there, through the
    * walls, until you find it. See `docs/STORY.md` → Kessler's trail.
    */
   hum?: string;
+  /**
+   * Laboratory Zero: every creature killed here goes home to the Choir, and
+   * the Choir is that much stronger at the Source (`VoiceMemory.fed`).
+   */
+  feeds?: boolean;
   /** Cells whose supplies the story is about (a bid to leave them): never thinned out by the difficulty. */
   keep?: [number, number][];
   /** The last level of a part: the exit and the detonator console each end it. */

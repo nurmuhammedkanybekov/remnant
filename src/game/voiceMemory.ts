@@ -32,6 +32,8 @@ export interface VoiceMemory {
   defied: string[];
   /** Times you died on the way. It was there every time. */
   deaths: number;
+  /** Creatures you killed where their voices go home to it (`LevelDef.feeds`): each one sings in the Choir. */
+  fed: number;
 }
 
 /** What it's noticed most about how you play, if anything stands out yet. */
@@ -51,6 +53,7 @@ export function freshVoice(): VoiceMemory {
     obeyed: [],
     defied: [],
     deaths: 0,
+    fed: 0,
   };
 }
 
@@ -132,10 +135,20 @@ export function parseVoice(raw: unknown): VoiceMemory {
   v.obeyed = ids(r.obeyed);
   v.defied = ids(r.defied).filter((id) => !v.obeyed.includes(id));
   v.deaths = Math.floor(num(r.deaths));
+  v.fed = Math.floor(num(r.fed));
   return v;
 }
 
 /** The memory as the story's text reads it (`recountLines`, `voiceCoda`). */
 export function remembered(v: VoiceMemory) {
-  return { told: v.told, withheld: v.withheld, obeyed: v.obeyed, defied: v.defied, trail: v.trail, deaths: v.deaths, stance: stanceOf(v) };
+  return {
+    told: v.told,
+    withheld: v.withheld,
+    obeyed: v.obeyed,
+    defied: v.defied,
+    trail: v.trail,
+    deaths: v.deaths,
+    fed: v.fed,
+    stance: stanceOf(v),
+  };
 }

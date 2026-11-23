@@ -106,6 +106,8 @@ export class Door implements Interactable {
   readonly reach = CELL_SIZE * 0.5 + 1.4;
   readonly security: boolean;
   isOpen = false;
+  /** Shut and held shut by something on the other side (`shut`), until `release`. */
+  jammed = false;
   /** Security doors ask this before opening. */
   isUnlocked: () => boolean = () => true;
   onOpen: ((door: Door) => void) | null = null;
@@ -180,18 +182,33 @@ export class Door implements Interactable {
   get prompt(): string | null {
     if (this.isOpen) return null;
     if (this.panel) return "PRY THE LOOSE PANEL";
+    if (this.jammed) return "IT WON'T OPEN";
     if (this.security && !this.isUnlocked()) return "LOCKED — NEEDS KEYCARD";
     return this.security ? "USE KEYCARD" : "OPEN DOOR";
   }
 
   interact(): void {
     if (this.isOpen) return;
-    if (this.security && !this.isUnlocked()) {
+    if (this.jammed || (this.security && !this.isUnlocked())) {
       this.onLocked?.(this);
       return;
     }
     this.open();
     this.onOpen?.(this);
+  }
+
+  /** Slams shut (if open) and holds shut until `release`. Not a panel. */
+  shut(): void {
+    if (this.panel) return;
+    this.jammed = true;
+    this.isOpen = false;
+    this.level.solid[this.spawn.cell.row][this.spawn.cell.col] = true;
+  }
+
+  /** Lets go, and opens. */
+  release(): void {
+    this.jammed = false;
+    this.open();
   }
 
   /** Opens without callbacks. `instant` skips the animation (checkpoint restore). */
@@ -215,6 +232,8 @@ export class Door implements Interactable {
       return;
     }
     if (this.isOpen && this.openT < 1) this.openT = Math.min(1, this.openT + dt / 1.1);
+    // Shut: it comes down much faster than it goes up.
+    if (!this.isOpen && this.openT > 0) this.openT = Math.max(0, this.openT - dt / 0.3);
     // Judder while the motor strains, then slide up into the ceiling.
     const k = easeInOut(this.openT);
     this.slab.position.y = k * (WALL_HEIGHT + 0.2) + (this.openT > 0 && this.openT < 1 ? Math.sin(time * 60) * 0.01 : 0);
@@ -274,15 +293,44 @@ export class Generator implements Interactable {
   private readonly fan: THREE.Mesh;
   private readonly lamp: THREE.Sprite;
   private readonly lampMat: THREE.MeshBasicMaterial;
+  /** When a gate was opened (game time; -1 until its first update after). */
+  private openedAt = -1;
 
   constructor(
     scene: THREE.Scene,
     readonly spawn: CellSpawn,
     /** A generator to start, or a relay breaker cabinet to cut (`LevelDef.machine`). */
-    readonly kind: "generator" | "relay" = "generator"
+    readonly kind: "generator" | "relay" | "gate" = "generator"
   ) {
     this.pos = spawn.pos;
     this.body.position.set(spawn.pos.x, 0, spawn.pos.y);
+    if (kind === "gate") {
+      // A spillway gate's winch: a concrete plinth, a red valve wheel on its face, a siren lamp on a pole.
+      const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 1.2), metal(0x3e423d, 0.9));
+      plinth.position.y = 0.65;
+      this.body.add(plinth);
+      this.fan = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.05, 8, 24), metal(0x8a1a12, 0.45));
+      this.fan.position.set(0, 1.0, 0.68);
+      for (let i = 0; i < 3; i++) {
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.05, 0.05), metal(0x8a1a12, 0.45));
+        spoke.rotation.z = (i * Math.PI) / 3;
+        this.fan.add(spoke);
+      }
+      this.body.add(this.fan);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.4, 8), metal(0x2a2d31, 0.5));
+      pole.position.set(0.6, 2.0, 0);
+      this.body.add(pole);
+      this.lampMat = new THREE.MeshBasicMaterial({ color: 0x3a2004 });
+      const lampMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.24, 12), this.lampMat);
+      lampMesh.position.set(0.6, 2.8, 0);
+      this.body.add(lampMesh);
+      this.lamp = glow(AMBER, 1.6);
+      this.lamp.material.opacity = 0;
+      this.lamp.position.copy(lampMesh.position);
+      this.body.add(this.lamp);
+      scene.add(this.body);
+      return;
+    }
     if (kind === "relay") {
       // A tall grey cabinet of valves and relays, a big breaker handle on its face, ON AIR burning red above it.
       const cab = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.5, 0.9), metal(0x4a4f55, 0.5));
@@ -343,7 +391,7 @@ export class Generator implements Interactable {
 
   get prompt(): string | null {
     if (this.running) return null;
-    return this.kind === "relay" ? "CUT THE RELAY" : "START GENERATOR";
+    return this.kind === "relay" ? "CUT THE RELAY" : this.kind === "gate" ? "OPEN THE GATE" : "START GENERATOR";
   }
 
   interact(): void {
@@ -352,9 +400,14 @@ export class Generator implements Interactable {
     this.onStart?.(this);
   }
 
-  /** Done: a generator started, or a relay cut. */
+  /** Done: a generator started, a relay cut, or a gate opened. */
   start(): void {
     this.running = true;
+    this.openedAt = -1;
+    if (this.kind === "gate") {
+      this.lampMat.color.setHex(AMBER);
+      return;
+    }
     if (this.kind === "relay") {
       // ON AIR goes dark; the handle is down.
       this.lampMat.color.setHex(0x1a0606);
@@ -367,6 +420,15 @@ export class Generator implements Interactable {
   }
 
   update(dt: number, time: number): void {
+    if (this.kind === "gate") {
+      // Opened: the wheel spins down for a few seconds, and the siren lamp turns while it wails.
+      if (!this.running) return;
+      if (this.openedAt < 0) this.openedAt = time;
+      const since = time - this.openedAt;
+      if (since < 3) this.fan.rotation.z += dt * 6 * (1 - since / 3);
+      this.lamp.material.opacity = since < 5.2 ? 0.5 + 0.5 * Math.abs(Math.sin(time * 6)) : 0.25;
+      return;
+    }
     if (this.kind === "relay") {
       // Live: ON AIR burns, unsteadily, as if something were talking through it.
       if (!this.running) this.lamp.material.opacity = 0.75 + 0.25 * Math.sin(time * 9) * Math.sin(time * 2.3);

@@ -80,7 +80,26 @@ export type ScriptAction =
   /** What you did when it told you: `obeyed`, `defied`, or `never` (it never told you). */
   | { type: "ifHeeded"; id: string; obeyed: ScriptAction[]; defied: ScriptAction[]; never: ScriptAction[] }
   /** It tells you what it remembers of you, in order: what you told it, what you did, what you followed. */
-  | { type: "recount" };
+  | { type: "recount" }
+  /**
+   * It tells you which machine to go to next, and shows you by sound (like
+   * `ping`). If you've trusted it, it means the quietest (fewest creatures
+   * near). If you've resisted it, the busiest. If you're torn, it takes
+   * turns. You find out which when you get there.
+   */
+  | { type: "advise" }
+  /**
+   * A sound that keeps playing from a cell, every `every` seconds, until you
+   * get there or `seconds` run out: something to find your way by in the dark.
+   */
+  | { type: "beacon"; sound: "hummer" | "ping"; at: CellRef; seconds: number; every: number }
+  /**
+   * It offers to guide you, by its chirp, for `seconds`: towards `truth` if
+   * you've trusted it, towards `lie` if you haven't (torn counts as not).
+   */
+  | { type: "guide"; truth: CellRef; lie: CellRef; seconds: number }
+  /** The doors at these cells slam shut and stay shut (`open: false`), or let go and open (`open: true`). */
+  | { type: "doors"; at: CellRef[]; open: boolean };
 
 /**
  * How you answer a bid. `dark`: light off (or in a locker) for a few
@@ -142,6 +161,30 @@ export const ifHeeded = (id: string, then: { obeyed?: ScriptAction[]; defied?: S
   never: then.never ?? [],
 });
 export const recount = (): ScriptAction => ({ type: "recount" });
+export const advise = (): ScriptAction => ({ type: "advise" });
+export const shutDoors = (...at: [number, number][]): ScriptAction => ({
+  type: "doors",
+  at: at.map(([col, row]) => ({ col, row })),
+  open: false,
+});
+export const openDoors = (...at: [number, number][]): ScriptAction => ({
+  type: "doors",
+  at: at.map(([col, row]) => ({ col, row })),
+  open: true,
+});
+export const beacon = (kind: "hummer" | "ping", col: number, row: number, seconds: number, every: number): ScriptAction => ({
+  type: "beacon",
+  sound: kind,
+  at: { col, row },
+  seconds,
+  every,
+});
+export const guide = (truth: [number, number], lie: [number, number], seconds: number): ScriptAction => ({
+  type: "guide",
+  truth: { col: truth[0], row: truth[1] },
+  lie: { col: lie[0], row: lie[1] },
+  seconds,
+});
 export const checkpoint = (): ScriptAction => ({ type: "checkpoint" });
 export const alarm = (radius: number): ScriptAction => ({ type: "alarm", radius });
 export const blackout = (seconds: number): ScriptAction => ({ type: "blackout", seconds });

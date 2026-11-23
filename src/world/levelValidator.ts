@@ -134,6 +134,18 @@ export function validateLevel(level: ParsedLevel): string[] {
         problems.push(`${id}: bid "${a.id}"'s item at ${t.at.col},${t.at.row} must be in \`keep\` (or a difficulty could thin it out)`);
     }
   }
+  // Doors the script shuts or opens have to be doors.
+  for (const a of scripts) {
+    if (a.type !== "doors") continue;
+    for (const c of a.at)
+      if (!s.doors.some((d) => d.cell.col === c.col && d.cell.row === c.row && !d.panel))
+        problems.push(`${id}: the script shuts or opens a door at ${c.col},${c.row}, and there's no door there`);
+  }
+  // Something to find your way by has to be somewhere you can get to.
+  for (const a of scripts) {
+    const cells = a.type === "beacon" ? [a.at] : a.type === "guide" ? [a.truth, a.lie] : [];
+    for (const c of cells) if (!canReach(c)) problems.push(`${id}: ${a.type} at ${c.col},${c.row} is not on floor you can reach`);
+  }
   for (const a of scripts) {
     if (a.type !== "sound" && a.type !== "apparition") continue;
     const c = a.at;

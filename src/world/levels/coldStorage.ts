@@ -1,4 +1,4 @@
-import { ask, nur, objective, op, ping, radio } from "../../game/script";
+import { ask, nur, objective, op, openDoors, ping, radio, shutDoors } from "../../game/script";
 import type { LevelDef } from "../levelDef";
 
 /** Level 3 — the keycard, and the first Brute. */
@@ -23,11 +23,11 @@ export const COLD_STORAGE: LevelDef = {
     "#.#.....#...#...#..H...#.#",
     "#.#.#########.###.###.##.#",
     "#.#..*....L.......#1#..L.#",
-    "#.#######.#######.#.#.####",
+    "#.#######.###+###.#.#.####",
     "#.3.M...#.#.....#...#....#",
     "#.#####.#.#.#####.#####.##",
     "#.#..E#...#.K..E#.#...#..#",
-    "#.#.#.#####.###.#.#.#.##.#",
+    "#.#.#.#####D###D#.#.#.##.#",
     "#R..#.....L...#.....#..X.#",
     "#############+############",
     "#############.4###########",
@@ -57,6 +57,19 @@ export const COLD_STORAGE: LevelDef = {
         [op("Keep it to yourself, then. I'll find out.")]
       ),
     ],
-    keycard: [radio(nur("It's still warm. Where is he?"), op("Don't look for him. Just go.")), objective("Reach the exit.")],
+    // Both freezer doors slam behind you. It can open them. All you have to do is ask: it'll remember that you did.
+    // Say nothing, and there's a loose panel in the freezer's back wall.
+    keycard: [
+      shutDoors([11, 16], [15, 16]),
+      radio(nur("It's still warm. Where is he?"), op("Don't look for him.")),
+      ask(
+        "open",
+        [op("The doors have shut behind you, Nur. Both of them."), op("I can open them. You only have to ask me.")],
+        [nur("...Open them."), op("There. You see? You only had to ask.")],
+        [openDoors([11, 16], [15, 16])],
+        [op("Then find your own way out of the cold. There's always a way. Hendricks found one.")]
+      ),
+      objective("Reach the exit."),
+    ],
   },
 };

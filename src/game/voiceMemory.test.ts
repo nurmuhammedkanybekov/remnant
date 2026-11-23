@@ -185,6 +185,27 @@ describe("four ways to play", () => {
   });
 });
 
+describe("the second pass", () => {
+  it("counts the voices you sent home from under ten, and says so when there are enough", () => {
+    expect(parseVoice({ fed: 12.9 }).fed).toBe(12);
+    const m = (fed: number) =>
+      recountLines(remembered({ ...freshVoice(), told: ["where"], fed }), 2)
+        .map((l) => l.text)
+        .join(" ");
+    expect(m(4)).not.toMatch(/under ten/);
+    expect(m(12)).toMatch(/You killed 12 of them under ten/);
+  });
+
+  it("remembers whether you asked it to open the freezer", () => {
+    const one = (p: Partial<VoiceMemory>) =>
+      recountLines(remembered({ ...freshVoice(), ...p }), 1)
+        .map((l) => l.text)
+        .join(" ");
+    expect(one({ told: ["open"] })).toMatch(/You asked/);
+    expect(one({ withheld: ["open"] })).toMatch(/tear the wall open/);
+  });
+});
+
 describe("the ending's last line", () => {
   it("depends on where you stood with it, and is absent if it never asked", () => {
     const m = (p: Partial<VoiceMemory>) => remembered({ ...freshVoice(), ...p });
