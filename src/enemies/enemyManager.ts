@@ -107,7 +107,6 @@ export class EnemyManager {
     return this.enemies.filter((e) => !e.isDead).length;
   }
 
-  /** 0..1 — the highest suspicion/hunting level, drives the HUD "awareness" eye. */
   /**
    * For the HUD: 1 when something is hunting you, up to 0.6 when something
    * is suspicious (checking out a noise it heard, or half-sure it saw you).

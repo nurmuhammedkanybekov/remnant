@@ -132,7 +132,6 @@ export class Hud {
     }
   }
 
-  /** Co-op: the other player's health and state, or null to hide it. */
   /** The other players' health, one line each (none outside co-op). */
   partners(list: { hp: number; down: boolean; bleed: number; talking?: boolean; name?: string; color?: string }[]): void {
     const html = list

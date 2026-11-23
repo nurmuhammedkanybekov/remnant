@@ -53,16 +53,12 @@ import { isCharacterLook, LOOKS, personalise, type CharacterLook } from "../cont
 import { RemotePlayer } from "./remotePlayer";
 import { freshStats, type RunStats } from "./stats";
 
-/** How far the crash of a lamp being shot out carries (world units). */
 /** A locker you can hide in: where it stands, and which way its door faces. */
 interface HideSpot {
   pos: THREE.Vector2;
   out: THREE.Vector2;
 }
 
-/** How far away a creature's footsteps can be heard (world units). */
-/** Levels whose hum is machinery (the rest rumble). */
-/** Bounce light (see `updateBounce`): how far it reaches, how far the beam is followed, how bright at a metre or two. */
 /** No scripted scare in the first this-many seconds of a level, nor within this long of another. */
 const SCARE_FIRST_REST = 25;
 const SCARE_REST = 40;
@@ -99,15 +95,19 @@ const BLOOD_SCENT = 3.5;
 /** Rates (per second) your eyes adjust at: to the dark, slowly; to light, at once. */
 const DARK_ADAPT = 0.22;
 const LIGHT_ADAPT = 3;
+/** Bounce light (see `updateBounce`): how far it reaches, how far the beam is followed, how bright at a metre or two. */
 const BOUNCE_RANGE = 7;
 const BOUNCE_REACH = 20;
 const BOUNCE_STRENGTH = 9;
 const bounceFrom = new THREE.Vector3();
 const bounceTo = new THREE.Vector3();
+/** Levels whose hum is machinery (the rest rumble). */
 const MACHINE_HUM = new Set(["ventilation", "power-plant", "lift-shaft"]);
+/** How far away a creature's footsteps can be heard (world units). */
 const STEP_HEAR_RANGE = 22;
 /** How far the room probe looks in each direction. */
 const ROOM_PROBE = 16;
+/** How far the crash of a lamp being shot out carries (world units). */
 const LAMP_BREAK_NOISE = 12;
 const EXIT_RADIUS = 1.6;
 const PICKUP_RADIUS = 1.1;
@@ -748,7 +748,6 @@ export class LevelSession {
     const cell = worldToCell(this.player.position.x, this.player.position.z);
     const cellI = cell.row * this.level.cols + cell.col;
     this.player.terrain = this.waterCells.has(cellI) ? (this.waterStill ? STILL_WATER : WATER) : this.snowCells.has(cellI) ? SNOW : DRY;
-    // Down: you can look around, and that's all.
     // Down: you can look around, and that's all. In a locker: look, breathe, keep still.
     const still = { ...emptyCommand(), turn: cmd.turn, tilt: cmd.tilt };
     this.player.update(
@@ -2274,8 +2273,7 @@ export class LevelSession {
     return killed;
   }
 
-  /** Host: a creature died. `byPartner` if the guest landed the blow (it counts in their stats). */
-  /** `by`: the slot of the player who killed it (another player's kill is credited to them). */
+  /** Host: a creature died. `by`: the slot of the player who killed it (another player's kill is credited to them). */
   private onEnemyKilled(enemy: Enemy, by = this.mySlot): void {
     if (by !== this.mySlot) this.coop?.sendTo(by, { t: "killed", i: this.enemies.enemies.indexOf(enemy) });
     else this.stats.kills++;

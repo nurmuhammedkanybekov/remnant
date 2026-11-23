@@ -265,7 +265,7 @@ times, the voice asks anyway, and you can answer (push to talk) or not.
 | 11 Clinic          | "Where are you going?"    | The way out calls to you   | At the dam, they're waiting for you, and they come for you from the start.                    |
 
 Every ending's last line says how much you gave it. It also listens to how
-you play (see `DIRECTION.md`), and at the pumping station, the armory, the
+you play, and at the pumping station, the armory, the
 village and Laboratory Zero it tells you what it has noticed.
 
 ## Kessler's trail

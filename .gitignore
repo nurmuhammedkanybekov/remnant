@@ -7,3 +7,7 @@ dist
 # Screenshots from local test scripts
 /*.png
 /backups/
+
+# Development notes kept out of the repository
+/docs/AUDIT.md
+/docs/DIRECTION.md

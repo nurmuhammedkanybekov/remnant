@@ -658,13 +658,13 @@ export function timberSurface(): Surface | null {
   );
 }
 
-/** A night sky over the valley, wrapped round the world: overcast, a little lighter at the horizon. */
 /** The sky is drawn in 1024 × 512 coordinates; this scales the canvas it's drawn into. */
 let SKY_SCALE = 1;
 export function setSkyScale(scale: number): void {
   SKY_SCALE = scale;
 }
 
+/** A night sky over the valley, wrapped round the world: overcast, a little lighter at the horizon. */
 export function valleySkyTexture(zenith: number, horizon: number, peaks = false): THREE.CanvasTexture {
   // Drawn at twice the size (in 1024 × 512 coordinates), so the mountains stay sharp when the sky fills the screen.
   const [canvas, ctx] = blank(1024 * SKY_SCALE, 512 * SKY_SCALE);

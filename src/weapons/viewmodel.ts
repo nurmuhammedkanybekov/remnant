@@ -54,7 +54,7 @@ export class Viewmodel {
   private healDuration = 1;
 
   constructor(
-    private readonly viewScene: THREE.Scene,
+    viewScene: THREE.Scene,
     private readonly camera: THREE.Camera
   ) {
     const mats = {

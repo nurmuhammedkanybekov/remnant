@@ -191,7 +191,7 @@ like where it is.
 
 ## Phase 12 — Horror direction (done)
 
-From an audit of the game as it plays (`docs/AUDIT.md`): the systems were
+From an audit of the game as it plays: the systems were
 strong, but the levels had no tools for authored horror, and every place
 sounded like the same concrete.
 
@@ -209,7 +209,7 @@ sounded like the same concrete.
 
 ## Phase 13 — The voice listens (done)
 
-From `docs/DIRECTION.md`: make the voice on the radio the game's identity.
+Make the voice on the radio the game's identity (see `docs/CAMPAIGN.md`).
 
 - [x] It asks (three questions), and remembers what you told it
 - [x] It tells you to do things (five instructions answered by action),

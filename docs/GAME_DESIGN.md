@@ -516,22 +516,42 @@ level at most, each tied to a story beat; see `STORY.md`):
   come within 7 units, or after 30 s (`world/apparition.ts`). It can't hurt
   you and can't be shot.
 
-Four more belong to the voice (see `DIRECTION.md` → How the voice works now):
+The rest belong to the voice (see `STORY.md` → The voice, as a character).
+What it learns is kept in `VoiceMemory` (`game/voiceMemory.ts`), saved with
+the run and in checkpoints:
 
-- `ask(id, question, answer, reward, silent)`: it asks; you have 7 s after
-  the question to answer (push to talk, or Use) or say nothing. Recorded in
-  `VoiceMemory` by id, never asked twice in a run.
+- `ask(id, question, answer, reward, silent)`: it asks; you have 10 s after
+  the question to answer (push to talk, or Use) or say nothing. Recorded by
+  id, never asked twice in a run; a second question waits for the first.
 - `ifTold(id, then, otherwise)`: branches on whether you answered `id`.
+- `bid(id, say, test, seconds, obeyed, defied)`: it tells you to do
+  something, and you answer by acting: light off (`dark`), keep still
+  (`still`), stay out of a trigger zone (`avoid`), get to one (`go`), or leave
+  an item where it is (`leave`; the item's cell must be in `LevelDef.keep`).
+- `ifHeeded(id, { obeyed, defied, never })`: branches on what you did.
+- `recount()`: at the end of a part, what it kept of you, as moments
+  (`recountLines` in `content/story.ts`).
 - `ping()`: three radio chirps from the keycard you haven't got, else the
   nearest machine still to do, else the exit.
+- `advise()`: it shows you which machine to do next: the quietest if you've
+  trusted it, the busiest if you've resisted it (`stanceOf`).
+- `beacon(sound, col, row, seconds, every)` and `guide(truth, lie, seconds)`:
+  sounds to find your way by in the dark; the voice's guide leads true only
+  if you've trusted it.
+- `shutDoors(...)` and `openDoors(...)`: doors that slam and hold, or let go.
 - `habitLine()`: it tells you your strongest habit (`habitOf`), if any.
 
-Levels can also say what their `G` machines are: `machine: "relay"` makes
-them breaker cabinets that hum on air (drawing creatures) until cut, and
-`events.machineDone` runs as each one before the last is done.
+Levels can also say what their `G` machines are (`machine`): generators,
+relay breaker cabinets that hum on air until cut, spillway gates with a
+siren, or valves that don't hold the exit but still the water when all are
+shut; `events.machineDone` runs as each one before the last is done. Other
+level fields the voice uses: `hum` (Kessler's trail), `carrier` (a creature
+wears the keycard), `keyHouses` (the key is in the one house with no radio
+playing), `feeds` (kills there strengthen the Choir).
 
-The level checker rejects a placed sound off the map and a figure on a cell
-you can't reach. In co-op, triggers already fire for every player, so each
+The level checker rejects a placed sound off the map, a figure, beacon or
+key house on a cell you can't reach, a bid watching a zone that isn't on the
+map, and a script that shuts a door that isn't there. In co-op, triggers already fire for every player, so each
 player gets the moment on their own machine, centred on them.
 
 ### Blood (`fx/pools.ts`)

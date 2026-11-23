@@ -228,7 +228,6 @@ export class SoundManager {
     return buf;
   }
 
-  /** How open the space around you is, 0 (a duct) to 1 (a hall): the reverb follows it smoothly. */
   /**
    * Ringing ears: the world goes dull and far away under a thin, high whine,
    * and comes back over a second or two (longer, the more it's been hit).
@@ -260,6 +259,7 @@ export class SoundManager {
     ring.stop(t + 8);
   }
 
+  /** How open the space around you is, 0 (a duct) to 1 (a hall): the reverb follows it smoothly. */
   setRoom(openness: RoomSize): void {
     if (!this.ctx) return;
     const o = Math.max(0, Math.min(1, openness));

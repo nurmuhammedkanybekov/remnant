@@ -5,11 +5,6 @@ cavity. For each: why it's there in the story, why it's there to play, what
 you remember it by, and what has changed by the time you leave it, in you
 and in the voice.
 
-Everything in this document is **built** unless it is marked
-**Proposed**. Built means in the level data and checked in the browser
-(see `DIRECTION.md` → Status for what that checking does and doesn't
-cover).
-
 ## The arc of the voice
 
 | Part       | Levels | The voice is...                                                          | You learn...                                                     |
@@ -54,7 +49,7 @@ cover).
 - **Optional**: Hendricks' GLASS crates and his detonator wire.
 - **Connects to**: the containment blackout (if you said the dark, it lasts twice as long).
 - **Changes**: it knows your fear, or knows you wouldn't say.
-- **Moment (built)**: you take the keycard and both freezer doors slam behind you. "I can open them. You only have to ask me." Ask, and they open, and it remembers that you asked. Don't, and there's a loose panel in the freezer's back wall; it says Hendricks found one too.
+- **Moment**: you take the keycard and both freezer doors slam behind you. "I can open them. You only have to ask me." Ask, and they open, and it remembers that you asked. Don't, and there's a loose panel in the freezer's back wall; it says Hendricks found one too.
 
 ### 4 Pumping Station (Sublevel 7)
 
@@ -66,7 +61,7 @@ cover).
 - **Optional**: Omurbek's note, the tune written down.
 - **Connects to**: Ruslan at the power plant and at both ends; the trail to the photograph.
 - **Changes**: someone you haven't met now depends on what you did.
-- **Built: still the water.** Two intake valves, optional. Each one clangs when you shut it, and everything near comes to look; shut both and the water stops moving, and wading is barely louder than dry floor. The Listeners lose you. You redo what Arkadin did ("He was very quiet, after that").
+- **Still the water.** Two intake valves, optional. Each one clangs when you shut it, and everything near comes to look; shut both and the water stops moving, and wading is barely louder than dry floor. The Listeners lose you. You redo what Arkadin did ("He was very quiet, after that").
 
 ### 5 Containment Labs (Sublevel 6)
 
@@ -111,7 +106,7 @@ cover).
 - **Optional**: Mara's note is on the table in the room it sends you to.
 - **Connects to**: every instruction after this one; the recount.
 - **Changes**: you know it lies. Everything it says afterwards is in doubt.
-- **Built: the way back.** Lifting the card from the security desk sets off the armory's siren and drops the lights to red: the hall you crept through on the way in is awake for the way out. Measured: standing still by the desk for fifteen seconds is survivable on Story and fatal on Normal; running is the answer.
+- **The way back.** Lifting the card from the security desk sets off the armory's siren and drops the lights to red: the hall you crept through on the way in is awake for the way out.
 
 ### 9 The Hive (Sublevel 2)
 
@@ -166,7 +161,7 @@ cover).
 - **Moment**: three figures standing in the water under the shore lamp.
 - **Optional**: the gate log.
 - **Connects to**: the clinic's question.
-- **Changes**: you find out what your history with it is worth. **Built**: it chirps from the gate it recommends: the one with fewest creatures near if you've trusted it, the most if you've resisted, turn about if you're torn. Open that gate and it tells you which it was: "You see? Quiet. I told you the truth" or "You never listened to me. Why would I tell you the truth now?" The shift engineer's note warns you: the radio always knows which is quiet; it doesn't always say.
+- **Changes**: you find out what your history with it is worth. It chirps from the gate it recommends: the one with fewest creatures near if you've trusted it, the most if you've resisted, turn about if you're torn. Open that gate and it tells you which it was: "You see? Quiet. I told you the truth" or "You never listened to me. Why would I tell you the truth now?" The shift engineer's note warns you: the radio always knows which is quiet; it doesn't always say.
 
 ### 14 Observatory (Kosh-Tash)
 
@@ -189,7 +184,7 @@ cover).
 - **Optional**: the survey photograph: Kessler in 1987, not a day younger.
 - **Connects to**: the Source (Nur names where the tune came from).
 - **Changes**: you know who taught Kessler.
-- **Built: by ear.** At the last stretch everything goes dark, the torch too, for half a minute. Kessler's tune comes up the line from the true way; the voice offers to guide you with its chirp. They come from the same place if you've trusted it. If not, its chirp leads up into the bay where the swarm and the crawler are. A Listener waits on the true way, so even the truth needs a quiet foot.
+- **By ear.** At the last stretch everything goes dark, the torch too, for half a minute. Kessler's tune comes up the line from the true way; the voice offers to guide you with its chirp. They come from the same place if you've trusted it. If not, its chirp leads up into the bay where the swarm and the crawler are. A Listener waits on the true way, so even the truth needs a quiet foot.
 
 ### 16 Laboratory Zero (Beneath Ten)
 
@@ -201,7 +196,7 @@ cover).
 - **Optional**: Arkadin's second log: the first time it answered.
 - **Connects to**: the Source.
 - **Changes**: you're under the bed you woke up on.
-- **Built: fighting costs.** It tells you as you arrive: everything that dies down here comes home to it. Every creature you kill here makes the Choir 2% stronger at the Source, up to a third; it tells you how many you sent ("...12 more of us, Nur"), and the recount names the number.
+- **Fighting costs.** It tells you as you arrive: everything that dies down here comes home to it. Every creature you kill here makes the Choir 2% stronger at the Source, up to a third; it tells you how many you sent ("...12 more of us, Nur"), and the recount names the number.
 
 ### 17 The Source (The Cavity)
 
@@ -214,9 +209,9 @@ cover).
 - **Connects to**: the whole run.
 - **Changes**: it's over, or it isn't.
 
-## Structure, honestly
+## Structure
 
-Shapes, after this pass (counted from the level data): walk 5, keycard 5,
+Shapes (counted from the level data): walk 5, keycard 5,
 keycard + relay 1 (the observatory), generators 1 (power plant), gates 1 (the dam),
 generators + keycard 1 (Laboratory Zero), boss 1 (the Hive), finale 2 (the
 portal; the Source, with its boss).

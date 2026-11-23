@@ -186,7 +186,6 @@ function buildGeometry(
   if (cliffs.size)
     buildCliffs(
       scene,
-      level,
       walls.filter((pos) => cliffs.has(cellOf(pos))),
       bumpMaps
     );
@@ -444,7 +443,7 @@ function cliffGeometry(): THREE.BufferGeometry {
  * Each cell is one block of a height and turn of its own, overlapping its
  * neighbours so the face reads as one mass.
  */
-function buildCliffs(scene: THREE.Scene, level: ParsedLevel, cells: THREE.Vector2[], bumpMaps: boolean): void {
+function buildCliffs(scene: THREE.Scene, cells: THREE.Vector2[], bumpMaps: boolean): void {
   const tex = textures();
   const mat = new THREE.MeshStandardMaterial({
     color: 0xb8b4ac,

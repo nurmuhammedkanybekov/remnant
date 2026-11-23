@@ -1,18 +1,4 @@
-import {
-  alarm,
-  beacon,
-  blackout,
-  checkpoint,
-  guide,
-  hint,
-  nur,
-  objective,
-  op,
-  radio,
-  sound,
-  torchFails,
-  unknown,
-} from "../../../game/script";
+import { alarm, beacon, blackout, checkpoint, guide, hint, nur, op, radio, sound, torchFails, unknown } from "../../../game/script";
 import type { LevelDef } from "../../levelDef";
 
 /** Level 15 — the drainage line into the mountain: a long tunnel with bays, Crawlers overhead, packs in the dark. */

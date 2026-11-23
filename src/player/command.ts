@@ -4,8 +4,8 @@ import { PAD_BINDINGS, stickResponse } from "../core/gamepad";
 /**
  * Everything a player wants to do this frame, independent of the device it
  * came from. The simulation only ever consumes commands — which is what lets
- * the same code be driven by a keyboard, a test script, or (later) a remote
- * player over the network.
+ * the same code be driven by a keyboard, a gamepad, a test script, or a
+ * co-op partner over the network.
  */
 export interface PlayerCommand {
   /** Strafe intent, -1 (left) .. 1 (right). */

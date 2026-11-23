@@ -506,8 +506,8 @@ triggers: {
 Every system and its tuning values are written up in
 [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), the plan and its history in
 [docs/ROADMAP.md](docs/ROADMAP.md), the story and its scripted moments in
-[docs/STORY.md](docs/STORY.md), and the latest quality audit (what was found,
-what changed, what is still open) in [docs/AUDIT.md](docs/AUDIT.md).
+[docs/STORY.md](docs/STORY.md), and the campaign level by level (what each
+level is for, and what it asks of you) in [docs/CAMPAIGN.md](docs/CAMPAIGN.md).
 
 ## Running it yourself
 
